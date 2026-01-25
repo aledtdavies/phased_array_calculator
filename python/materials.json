@@ -1,0 +1,57 @@
+{
+    "components": [
+        {
+            "name": "Mild Steel",
+            "vl": 5920,
+            "vs": 3240
+        },
+        {
+            "name": "Stainless Steel (304)",
+            "vl": 5740,
+            "vs": 3130
+        },
+        {
+            "name": "Aluminium",
+            "vl": 6320,
+            "vs": 3080
+        },
+        {
+            "name": "Titanium",
+            "vl": 6070,
+            "vs": 3110
+        },
+        {
+            "name": "Brass",
+            "vl": 4370,
+            "vs": 2100
+        },
+        {
+            "name": "Copper",
+            "vl": 4660,
+            "vs": 2260
+        },
+        {
+            "name": "Perspex",
+            "vl": 2730,
+            "vs": 1430
+        }
+    ],
+    "wedges": [
+        {
+            "name": "Rexolite",
+            "vl": 2330
+        },
+        {
+            "name": "Water",
+            "vl": 1483
+        },
+        {
+            "name": "Acrylic / Perspex",
+            "vl": 2730
+        },
+        {
+            "name": "Polystyrene",
+            "vl": 2340
+        }
+    ]
+}
