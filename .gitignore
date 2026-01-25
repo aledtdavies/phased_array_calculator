@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# PyInstaller
+build/
+*.spec
+
+# VS Code
+.vscode/
+
+# Output
+phased_array_calculator_executable/
