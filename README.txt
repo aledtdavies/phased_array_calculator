@@ -6,7 +6,7 @@ Date: 2026-01-19
 
 DESCRIPTION
 -----------
-This application calculates delay laws for ultrasonic phased array testing.
+This application calculates delay laws for phased array ultrasonic  testing.
 It allows you to configure probes, wedges, and geometric focal points.
 
 HOW TO RUN
