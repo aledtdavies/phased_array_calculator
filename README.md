@@ -1,6 +1,6 @@
 # Phased Array Focal Law Calculator
 
-A Python and MATLAB-based tool for calculating focal laws (delay logic) for ultrasonic phased array testing. Supports linear probes, wedges, and planar interfaces.
+A Python-based tool for calculating focal laws (delay logic) for phased array ultrasonic testing. Supports linear probes, wedges, and planar interfaces.
 
 ## 1. Quick Start (Python)
 
@@ -17,13 +17,7 @@ A Python and MATLAB-based tool for calculating focal laws (delay logic) for ultr
 3.  **Run**: Click "Calculate". Visualize in the "Ray Tracing" tab.
 4.  **Export**: Save results to CSV or save the configuration (`.json`).
 
-## 2. Quick Start (MATLAB)
-
-1.  Open MATLAB.
-2.  Navigate to `matlab/` folder.
-3.  Run `PhasedArrayGUI` in the command window.
-
-## 3. Documentation
+## 2. Documentation
 
 For a detailed explanation of the physics, mathematics (Fermat's Principle), and step-by-step usage guide, please open the **User Manual**:
 
@@ -32,7 +26,7 @@ For a detailed explanation of the physics, mathematics (Fermat's Principle), and
 *(This HTML manual is provided to ensure all mathematical formulas render correctly in your browser).*
 
 
-## 4. Building the Executable
+## 3. Building the Executable
 
 This project includes a script to build a standalone executable folder using PyInstaller.
 
@@ -47,7 +41,7 @@ This project includes a script to build a standalone executable folder using PyI
 3.  **Locate the Output**:
     The executable and its dependencies will be created in a folder named `phased_array_calculator_executable` located next to the project directory.
 
-## 5. Directory Structure
+## 4. Directory Structure
 ```
 phased_array_calculator/
 ├── python/               # Python source code + GUI
