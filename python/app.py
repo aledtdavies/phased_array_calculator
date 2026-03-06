@@ -6,7 +6,7 @@ import csv
 import json
 import numpy as np
 
-# Files are in the same directory now
+# from material import Material
 from material import Material
 from probe import Probe
 from wedge import Wedge
@@ -250,15 +250,14 @@ class App(tk.Tk):
             if wave_type == "Shear" and solver.material.velocity_shear:
                 v_mat = solver.material.velocity_shear
             else:
-                v_mat = solver.material.velocity_longitudinal # Default / L-wave
+                v_mat = solver.material.velocity_longitudinal
             
             # 1. Find Probe Center (Geometric Center of Array)
             elements = solver.wedge.get_transformed_elements(solver.probe)
             center_x = np.mean(elements[:, 0])
-            center_z = np.mean(elements[:, 1]) # Should be negative (in wedge)
+            center_z = np.mean(elements[:, 1])
             
             # Dist to Interface (Vertical)
-            # Wedge is at Z < 0, Interface at Z=0.
             h_wedge = abs(center_z) 
             
             # Generate Angles
@@ -286,8 +285,6 @@ class App(tk.Tk):
                  
                  if abs(sin_alpha) > 1.0:
                      # Critical Angle Exceeded
-                     # Maybe insert error row or skip
-                     # For table, let's insert Error
                      self.tree.insert("", "end", values=(i+1, f"{ang:.1f}", "Err", "Brit", "-", "-"))
                      continue
                  
@@ -401,8 +398,6 @@ class App(tk.Tk):
                 sv = self.scan_panel.get_values()
                 num_els = len(self.last_results[0]['delays_us'])
                 
-                # Add setup info in manual header lines? Or columns?
-                # Let's keep columnar format but maybe add velocity used
                 header = ['LawID', 'Angle_Deg', 'Fx_mm', 'Fz_mm', 'Velocity_m_s'] + [f'El_{i+1}_us' for i in range(num_els)]
                 writer.writerow(header)
                 

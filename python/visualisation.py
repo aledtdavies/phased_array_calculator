@@ -52,18 +52,7 @@ def plot_setup(solver, focal_point_x, focal_point_z, filename="visual_check.png"
     plt.plot(target[0], target[1], 'rx', markersize=10, markeredgewidth=2, label='Focal Point')
     
     # Formatting
-    plt.gca().invert_yaxis() # Traditional NDT view: Depth is positive Down?
-    # Our Z: Interface=0. Component > 0. Wedge < 0.
-    # If we want "Depth Down", we should plot Z on Y axis and invert it? 
-    # Or just keep Z up?
-    # Usually visuals show Probe at top.
-    # Our Probe Z is negative. Component Z is positive.
-    # So Y-axis = Z. 
-    # Check matplotlib default: Y increases UP.
-    # We want Probe (Neg Z) at TOP? No, usually Probe is Z=0 or Z negative.
-    # Let's just invert Y axis so Positive Z (Depth) is DOWN.
-    # Then Probe (Negative Z) is UP. This matches physical intuition.
-    # plt.gca().invert_yaxis() # REMOVED DUPLICATE
+    plt.gca().invert_yaxis()
     
     plt.xlabel('X Position (m)')
     plt.ylabel('Z Depth (m)')

@@ -7,13 +7,6 @@ class Wedge:
     Handles the coordinate transformation from Probe Frame to Global Frame.
     
     Global Frame Convention:
-    - Origin (0,0) is at the Interface (z=0) directly below the reference point (depends on setup).
-    - Or simpler: The Interface is the plane z=0. The Wedge sits on top (z < 0).
-      Wait, standard NDT convention: z positive is DEPTH amplitude (into part).
-      So Interface is z=0. Wedge is at z < 0. Probe is at z < 0.
-      Component is z > 0.
-      
-    Let's stick to this:
     - Interface plane: Z = 0
     - Component: Z > 0
     - Wedge: Z < 0
@@ -49,9 +42,6 @@ class Wedge:
         local_z = local_coords[:, 1] # All zero
         
         # 2. Rotate
-        # Standard: Wedge Angle tilts the probe 'up' relative to the interface?
-        # Usually, if Wedge Angle is 36 deg, the probe normal is 36 deg from Z axis.
-        # The probe face is tilted 36 deg from Horizontal.
         # Rotated coordinates:
         c = np.cos(self.angle_rad)
         s = np.sin(self.angle_rad)

@@ -10,9 +10,7 @@ def generate_sector_scan(delay_law_solver, depth, start_angle, end_angle, step):
     """
     Generates laws for a sector scan.
     """
-    angles = np.arange(start_angle, end_angle + step, step) # Include end? usually yes
-    # Adjust arange to be inclusive if float logic allows, or use linspace if count is known
-    # Let's simple iterate
+    angles = np.arange(start_angle, end_angle + step, step)
     if step > 0 and angles[-1] < end_angle:
         angles = np.append(angles, end_angle)
     elif step < 0 and angles[-1] > end_angle:
@@ -29,7 +27,7 @@ def generate_sector_scan(delay_law_solver, depth, start_angle, end_angle, step):
     h_wedge = abs(center_z)
     
     v_wedge = delay_law_solver.wedge.velocity
-    v_mat = delay_law_solver.material.velocity_longitudinal # Default L-wave for main.py script
+    v_mat = delay_law_solver.material.velocity_longitudinal
     
     for ang_deg in angles:
         beta_rad = np.radians(ang_deg)
@@ -47,8 +45,6 @@ def generate_sector_scan(delay_law_solver, depth, start_angle, end_angle, step):
         x_int = center_x + h_wedge * np.tan(alpha_rad)
         
         # 4. Focal Point (Constant Depth)
-        # fz = depth
-        # fx calculated from x_int
         fz = depth
         fx = x_int + fz * np.tan(beta_rad)
         
@@ -71,7 +67,6 @@ def main():
     steel = Material(velocity_longitudinal=5900.0, velocity_shear=3240.0)
     
     # Wedge: Rexolite, 36 degree angle, 2330 m/s
-    # Height @ El.1: Distance from El.1 center to interface. Say 15mm.
     wedge = Wedge(angle_degrees=36.0, height_at_element1=15e-3, velocity=2330.0, probe_offset_x=0.0)
 
     # 2. Initialize Solver
@@ -92,7 +87,6 @@ def main():
         writer = csv.writer(f)
         
         # Header
-        # LawID, Angle, Fx, Fz, Element_1_Delay, Element_2_Delay, ...
         header = ['LawID', 'Angle_Deg', 'Fx_mm', 'Fz_mm'] + [f'El_{i+1}_us' for i in range(probe.num_elements)]
         writer.writerow(header)
         

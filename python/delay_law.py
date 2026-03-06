@@ -78,9 +78,6 @@ class DelayLaw:
         best_u = None
         
         for u in real_roots:
-            # Check bounds? Physically x_int is usually between x1 and x2, 
-            # but usually u shares sign with H.
-            # We just verify the time minimization.
             
             # Reconstruct global x for this u
             x_candidate = u + x1
@@ -97,7 +94,6 @@ class DelayLaw:
 
         if best_u is None:
             # Fallback (should not happen for physical setups)
-            # Maybe return intersection of straight line?
             return x1 + H * (h1 / (h1 + h2))
             
         return best_u + x1
@@ -155,7 +151,7 @@ class DelayLaw:
         return {
             'delays': delays,
             'tof': tofs,
-            'interface_points': interface_points, # Useful for plotting if we had a GUI
+            'interface_points': interface_points,
             'focal_point': target,
             'velocity_used': v_mat
         }

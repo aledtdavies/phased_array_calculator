@@ -179,8 +179,6 @@ class PlottingPanel(ttk.Frame):
         
         wedge_patch = Polygon(wedge_pts, closed=True, facecolor='cyan', alpha=0.3, label='Wedge', zorder=1)
         self.ax.add_patch(wedge_patch)
-        
-        # No extra black line for roof as requested
             
         self.ax.axhline(0, color='k', linestyle='-', linewidth=2, zorder=2) # Interface
         
@@ -229,7 +227,6 @@ class PlottingPanel(ttk.Frame):
             indices = [self.current_idx]
             
         # Colormap
-        # Use 'jet' or similar. Normalize index 0..N-1 to 0..1
         cmap = cm.get_cmap('jet')
         norm = mcolors.Normalize(vmin=0, vmax=num_points-1)
         
@@ -250,11 +247,7 @@ class PlottingPanel(ttk.Frame):
             int_pts = law['interface_points']
             target = law['focal_point']
             
-            # Plot rays for Outer Elements (0 and -1) and maybe Middle?
-            # To avoid clutter in "Show All", maybe just plot outer boundary rays?
-            # User asked for "all angles... give them different colours".
-            # Let's plot outer rays for each law.
-            
+            # Plot rays for Outer Elements
             p_el_start = elements[0] * 1000
             p_int_start = int_pts[0] * 1000
             
