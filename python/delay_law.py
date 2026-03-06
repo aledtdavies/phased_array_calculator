@@ -158,14 +158,41 @@ class DelayLaw:
 
     def export_element_positions(self, filename: str):
         """
-        Exports the global (x, z) coordinates of the probe elements to a CSV file.
+        Exports the global (x, z) coordinates of the probe elements to a CSV or MAT file.
         """
-        import csv
+        import os
         elements = self.wedge.get_transformed_elements(self.probe)
-        
         print(f"Exporting element positions to {filename}...")
-        with open(filename, 'w', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow(['ElementID', 'Global_X_mm', 'Global_Z_mm'])
-            for i, (x, z) in enumerate(elements):
-                writer.writerow([i + 1, x * 1000, z * 1000])
+        
+        coords_mm = elements * 1000.0
+        
+        _, ext = os.path.splitext(filename)
+        ext = ext.lower()
+        
+        if ext == '.mat':
+            import scipy.io
+            data = {
+                'ElementID': np.arange(1, len(coords_mm) + 1),
+                'Global_X_mm': coords_mm[:, 0],
+                'Global_Z_mm': coords_mm[:, 1],
+                'Coordinates_mm': coords_mm
+            }
+            scipy.io.savemat(filename, data)
+        elif ext == '.m':
+            with open(filename, 'w') as f:
+                f.write("% Element Positions (mm)\n")
+                f.write(f"ElementID = [ {', '.join(map(str, range(1, len(coords_mm)+1)))} ];\n")
+                f.write(f"Global_X_mm = [ {', '.join(map(str, coords_mm[:, 0]))} ];\n")
+                f.write(f"Global_Z_mm = [ {', '.join(map(str, coords_mm[:, 1]))} ];\n")
+                
+                f.write("Coordinates_mm = [\n")
+                for x, z in coords_mm:
+                    f.write(f"    {x}, {z};\n")
+                f.write("];\n")
+        else:
+            import csv
+            with open(filename, 'w', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow(['ElementID', 'Global_X_mm', 'Global_Z_mm'])
+                for i, (x, z) in enumerate(coords_mm):
+                    writer.writerow([i + 1, x, z])

@@ -109,14 +109,41 @@ classdef DelayLaw
         function exportElementPositions(obj, filename)
             elements = obj.Wedge.getTransformedElements(obj.Probe);
             fprintf('Exporting elements to %s...\n', filename);
-            fid = fopen(filename, 'w');
-            fprintf(fid, 'ElementID,Global_X_mm,Global_Z_mm\n');
-            for i = 1:obj.Probe.NumElements
-                x = elements(i, 1);
-                z = elements(i, 2);
-                fprintf(fid, '%d,%.4f,%.4f\n', i, x * 1000, z * 1000);
+            
+            coords_mm = elements * 1000.0;
+            [~, ~, ext] = fileparts(filename);
+            ext = lower(ext);
+            
+            if strcmp(ext, '.mat')
+                ElementID = (1:obj.Probe.NumElements)';
+                Global_X_mm = coords_mm(:, 1);
+                Global_Z_mm = coords_mm(:, 2);
+                Coordinates_mm = coords_mm;
+                save(filename, 'ElementID', 'Global_X_mm', 'Global_Z_mm', 'Coordinates_mm');
+            elseif strcmp(ext, '.m')
+                fid = fopen(filename, 'w');
+                fprintf(fid, '%% Element Positions (mm)\n');
+                
+                fprintf(fid, 'ElementID = [ %s ];\n', strjoin(arrayfun(@num2str, 1:obj.Probe.NumElements, 'UniformOutput', false), ', '));
+                fprintf(fid, 'Global_X_mm = [ %s ];\n', strjoin(arrayfun(@num2str, coords_mm(:, 1)', 'UniformOutput', false), ', '));
+                fprintf(fid, 'Global_Z_mm = [ %s ];\n', strjoin(arrayfun(@num2str, coords_mm(:, 2)', 'UniformOutput', false), ', '));
+                
+                fprintf(fid, 'Coordinates_mm = [\n');
+                for i = 1:obj.Probe.NumElements
+                    fprintf(fid, '    %.4f, %.4f;\n', coords_mm(i, 1), coords_mm(i, 2));
+                end
+                fprintf(fid, '];\n');
+                fclose(fid);
+            else
+                fid = fopen(filename, 'w');
+                fprintf(fid, 'ElementID,Global_X_mm,Global_Z_mm\n');
+                for i = 1:obj.Probe.NumElements
+                    x = coords_mm(i, 1);
+                    z = coords_mm(i, 2);
+                    fprintf(fid, '%d,%.4f,%.4f\n', i, x, z);
+                end
+                fclose(fid);
             end
-            fclose(fid);
         end
     end
 end
