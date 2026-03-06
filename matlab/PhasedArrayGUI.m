@@ -81,10 +81,32 @@ function PhasedArrayGUI()
     h_target = addParam(y, 'Target X (Global, mm):', 50.0, 'targetVal');
     y = y - 40;
 
+    % Buttons Area
     btn_calc = uicontrol('Style', 'pushbutton', 'String', 'Calculate', ...
                          'Position', [100, y, 150, 40], ...
                          'Callback', @runCalculation, ...
                          'FontWeight', 'bold', 'FontSize', 12);
+
+    y = y - 40;
+    uicontrol('Style', 'text', 'String', 'Export Format:', ...
+              'Position', [20, y, 100, 20], ...
+              'HorizontalAlignment', 'right');
+    h_exportType = uicontrol('Style', 'popupmenu', 'String', {'CSV', 'MAT'}, ...
+                             'Position', [130, y, 100, 20], ...
+                             'Tag', 'exportType');
+    
+    y = y - 40;
+    btn_export = uicontrol('Style', 'pushbutton', 'String', 'Export Laws', ...
+                           'Position', [40, y, 110, 30], ...
+                           'Callback', @exportLaws, ...
+                           'Enable', 'off', ...
+                           'FontWeight', 'bold');
+                           
+    btn_exportEls = uicontrol('Style', 'pushbutton', 'String', 'Export Elements', ...
+                              'Position', [160, y, 110, 30], ...
+                              'Callback', @exportElements, ...
+                              'Enable', 'off', ...
+                              'FontWeight', 'bold');
 
     ax = axes('Position', [0.35, 0.1, 0.60, 0.8]);
     grid(ax, 'on');
@@ -94,6 +116,10 @@ function PhasedArrayGUI()
     ylabel(ax, 'Z Depth (mm)');
     title(ax, 'Ray Tracing');
 
+    % --- State Variables ---
+    lastScanData = [];
+    lastSolver = [];
+    
     % --- Calculation Callback ---
     function runCalculation(~, ~)
         try
@@ -130,6 +156,7 @@ function PhasedArrayGUI()
             end
 
             angles = startA:stepA:endA;
+            currentScanData = struct('Angle', [], 'FocalPoint', [], 'Delays', [], 'VelocityUsed', []);
 
             % Plot Setup
             cla(ax);
@@ -198,6 +225,12 @@ function PhasedArrayGUI()
                 res = solver.calculateLaw(fx, fz, wType);
                 intPts = res.InterfacePoints;
                 c = colors(i, :);
+                
+                % Store data
+                currentScanData(validCount + 1).Angle = angDeg;
+                currentScanData(validCount + 1).FocalPoint = [fx, fz];
+                currentScanData(validCount + 1).Delays = res.Delays;
+                currentScanData(validCount + 1).VelocityUsed = res.VelocityUsed;
 
                 % Plot Rays
                 plot(ax, [elements(1, 1), intPts(1, 1)] * 1000, ...
@@ -214,6 +247,14 @@ function PhasedArrayGUI()
 
             if validCount == 0
                 errordlg('No valid focal laws calculated. Check geometry.', 'Warning');
+                set(btn_export, 'Enable', 'off');
+                set(btn_exportEls, 'Enable', 'on'); % Can still export elements
+                lastScanData = [];
+            else
+                lastScanData = currentScanData;
+                lastSolver = solver;
+                set(btn_export, 'Enable', 'on');
+                set(btn_exportEls, 'Enable', 'on');
             end
 
             axis(ax, 'equal');
@@ -222,5 +263,82 @@ function PhasedArrayGUI()
         catch err
             errordlg(err.message, 'Calculation Error');
         end
+    end
+
+    % --- Export Callbacks ---
+    function exportLaws(~, ~)
+        if isempty(lastScanData)
+            return;
+        end
+        
+        formatIdx = get(h_exportType, 'Value');
+        formats = {'CSV', 'MAT'};
+        fmt = formats{formatIdx};
+        
+        if strcmp(fmt, 'MAT')
+            [file, path] = uiputfile('*.mat', 'Save Focal Laws As');
+            if isequal(file, 0) || isequal(path, 0)
+                return;
+            end
+            
+            fullname = fullfile(path, file);
+            scanData = lastScanData; %#ok<NASGU>
+            save(fullname, 'scanData');
+            msgbox(sprintf('Exported to %s', fullname), 'Success');
+            
+        else % CSV
+            [file, path] = uiputfile('*.csv', 'Save Focal Laws As');
+            if isequal(file, 0) || isequal(path, 0)
+                return;
+            end
+            
+            fullname = fullfile(path, file);
+            fid = fopen(fullname, 'w');
+            
+            % Generate header
+            numEls = length(lastScanData(1).Delays);
+            headerList = {'LawID', 'Angle_Deg', 'Fx_mm', 'Fz_mm', 'Velocity_m_s'};
+            for i = 1:numEls
+                headerList{end+1} = sprintf('El_%d_us', i);
+            end
+            fprintf(fid, '%s\n', strjoin(headerList, ','));
+            
+            % Write data
+            for i = 1:length(lastScanData)
+                law = lastScanData(i);
+                if isempty(law.Angle)
+                    continue;
+                end
+                
+                fprintf(fid, '%d,%.2f,%.4f,%.4f,%.2f', i, law.Angle, ...
+                        law.FocalPoint(1) * 1000, law.FocalPoint(2) * 1000, law.VelocityUsed);
+                        
+                delaysUs = law.Delays * 1e6;
+                for j = 1:length(delaysUs)
+                    fprintf(fid, ',%.4f', delaysUs(j));
+                end
+                fprintf(fid, '\n');
+            end
+            fclose(fid);
+            msgbox(sprintf('Exported to %s', fullname), 'Success');
+        end
+    end
+
+    function exportElements(~, ~)
+        if isempty(lastSolver)
+            return;
+        end
+        
+        [file, path] = uiputfile({'*.csv', 'CSV File (*.csv)'; ...
+                                  '*.mat', 'MATLAB Data (*.mat)'; ...
+                                  '*.m', 'MATLAB Script (*.m)'}, ...
+                                  'Save Element Coordinates As');
+        if isequal(file, 0) || isequal(path, 0)
+            return;
+        end
+        
+        fullname = fullfile(path, file);
+        lastSolver.exportElementPositions(fullname);
+        msgbox(sprintf('Exported elements to %s', fullname), 'Success');
     end
 end

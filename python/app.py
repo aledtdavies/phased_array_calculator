@@ -99,7 +99,7 @@ class App(tk.Tk):
         self.calc_btn.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
         
         self.export_btn = ttk.Button(btn_frame, text="Export CSV", command=self.export_csv, state="disabled")
-        self.export_btn.pack(side=tk.RIGHT, expand=True, fill=tk.X, padx=2)
+        self.export_btn.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
         
         # Status Label (Fixed at bottom of left_container, outside scroll)
         self.status_var = tk.StringVar(value="Ready.")
@@ -162,6 +162,8 @@ class App(tk.Tk):
         file_menu.add_command(label="Save Configuration", command=self.save_config)
         file_menu.add_command(label="Load Configuration", command=self.load_config)
         file_menu.add_separator()
+        file_menu.add_command(label="Export Element Coordinates", command=self.export_element_coords)
+        file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self.quit)
         menubar.add_cascade(label="File", menu=file_menu)
         
@@ -204,6 +206,32 @@ class App(tk.Tk):
                 self.status_var.set(f"Configuration loaded from {os.path.basename(fpath)}")
             except Exception as e:
                 messagebox.showerror("Load Error", str(e))
+
+    def export_element_coords(self):
+        try:
+            solver = self.get_solver()
+        except Exception as e:
+            messagebox.showerror("Export Error", f"Cannot formulate probe geometry: {e}")
+            return
+            
+        fpath = filedialog.asksaveasfilename(
+            defaultextension=".csv",
+            filetypes=[
+                ("CSV File", "*.csv"), 
+                ("MATLAB MAT File", "*.mat"),
+                ("MATLAB Script", "*.m"),
+                ("All Files", "*.*")
+            ],
+            title="Export Element Coordinates"
+        )
+        
+        if fpath:
+            try:
+                solver.export_element_positions(fpath)
+                self.status_var.set(f"Element coordinates exported to {os.path.basename(fpath)}")
+                messagebox.showinfo("Success", f"Exported element coordinates to {os.path.basename(fpath)}")
+            except Exception as e:
+                messagebox.showerror("Export Error", str(e))
 
     def get_solver(self):
         # 1. Probe
