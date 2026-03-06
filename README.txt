@@ -1,8 +1,8 @@
 Phased Array Focal Law Calculator
 =================================
 
-Version: 1.0
-Date: 2026-01-19
+Version: 0.1.0
+Date: 2026-03-06
 
 DESCRIPTION
 -----------

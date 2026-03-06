@@ -1,22 +1,29 @@
+% Probe - Represents a linear phased array probe.
 classdef Probe
     properties
-        NumElements
-        Pitch
-        Frequency
+        NumElements % Number of elements
+        Pitch       % Center-to-center distance between elements in meters
+        Frequency   % Nominal frequency in Hz
     end
     
     methods
-        function obj = Probe(num_elements, pitch, frequency)
-            obj.NumElements = num_elements;
-            obj.Pitch = pitch;
-            if nargin > 2
-                obj.Frequency = frequency;
-            else
-                obj.Frequency = 5e6;
+        function obj = Probe(numElements, pitch, frequency)
+            % Probe Constructor
+            if nargin < 3
+                frequency = 5e6;
             end
+            obj.NumElements = numElements;
+            obj.Pitch = pitch;
+            obj.Frequency = frequency;
         end
         
-        function positions = getElementPositions(obj, centerAtOrigin)
+        function indices = getElementOfInterestIndices(obj)
+            indices = 1:obj.NumElements;
+        end
+        
+        function pos = getElementPositions(obj, centerAtOrigin)
+            % Returns the (x, z) coordinates of the elements in the PROBE's local coordinate system.
+            % The array line is along the x-axis, z is 0.
             if nargin < 2
                 centerAtOrigin = true;
             end
@@ -25,14 +32,13 @@ classdef Probe
             
             if centerAtOrigin
                 totalWidth = (obj.NumElements - 1) * obj.Pitch;
-                xPos = indices * obj.Pitch - (totalWidth / 2.0);
+                xPositions = (indices * obj.Pitch) - (totalWidth / 2.0);
             else
-                xPos = indices * obj.Pitch;
+                xPositions = indices * obj.Pitch;
             end
             
-            zPos = zeros(size(xPos));
-            
-            positions = [xPos', zPos']; % Nx2 matrix returned
+            zPositions = zeros(size(xPositions));
+            pos = [xPositions(:), zPositions(:)];
         end
     end
 end
