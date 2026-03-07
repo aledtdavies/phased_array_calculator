@@ -218,8 +218,8 @@ class PlottingPanel(ttk.Frame):
             # Plot Elements
             if is_dual:
                 n_half = len(el_c) // 2
-                ax.plot(el_c[:n_half], el_z[:n_half], 'rs', markersize=4, label='Array 1', zorder=3)
-                ax.plot(el_c[n_half:], el_z[n_half:], 'bs', markersize=4, label='Array 2', zorder=3)
+                ax.plot(el_c[:n_half], el_z[:n_half], 'bs', markersize=4, label='Tx Array', zorder=3)
+                ax.plot(el_c[n_half:], el_z[n_half:], 'rs', markersize=4, label='Rx Array', zorder=3)
             else:
                 ax.plot(el_c, el_z, 'rs', markersize=4, label='Elements', zorder=3)
             
@@ -252,17 +252,21 @@ class PlottingPanel(ttk.Frame):
                     p_el_mid2 = elements[n_half] * 1000
                     p_int_mid2 = int_pts[n_half] * 1000
                     
-                    # Array 1 Extents
-                    ax.plot([p_el_start[dim_idx], p_int_start[dim_idx]], [p_el_start[2], p_int_start[2]], color=c, alpha=alpha, linewidth=1)
-                    ax.plot([p_int_start[dim_idx], target[dim_idx]], [p_int_start[2], target[2]], color=c, alpha=alpha, linewidth=1)
-                    ax.plot([p_el_mid1[dim_idx], p_int_mid1[dim_idx]], [p_el_mid1[2], p_int_mid1[2]], color=c, alpha=alpha, linewidth=1)
-                    ax.plot([p_int_mid1[dim_idx], target[dim_idx]], [p_int_mid1[2], target[2]], color=c, alpha=alpha, linewidth=1)
+                    # Tx/Rx colours (override jet cmap for dual)
+                    c_tx = c if show_all else 'tab:blue'
+                    c_rx = c if show_all else 'tab:red'
+                    
+                    # Array 1 (Tx) — Blue
+                    ax.plot([p_el_start[dim_idx], p_int_start[dim_idx]], [p_el_start[2], p_int_start[2]], color=c_tx, alpha=alpha, linewidth=1)
+                    ax.plot([p_int_start[dim_idx], target[dim_idx]], [p_int_start[2], target[2]], color=c_tx, alpha=alpha, linewidth=1)
+                    ax.plot([p_el_mid1[dim_idx], p_int_mid1[dim_idx]], [p_el_mid1[2], p_int_mid1[2]], color=c_tx, alpha=alpha, linewidth=1)
+                    ax.plot([p_int_mid1[dim_idx], target[dim_idx]], [p_int_mid1[2], target[2]], color=c_tx, alpha=alpha, linewidth=1)
 
-                    # Array 2 Extents
-                    ax.plot([p_el_mid2[dim_idx], p_int_mid2[dim_idx]], [p_el_mid2[2], p_int_mid2[2]], color=c, alpha=alpha, linewidth=1)
-                    ax.plot([p_int_mid2[dim_idx], target[dim_idx]], [p_int_mid2[2], target[2]], color=c, alpha=alpha, linewidth=1)
-                    ax.plot([p_el_end[dim_idx], p_int_end[dim_idx]], [p_el_end[2], p_int_end[2]], color=c, alpha=alpha, linewidth=1)
-                    ax.plot([p_int_end[dim_idx], target[dim_idx]], [p_int_end[2], target[2]], color=c, alpha=alpha, linewidth=1)
+                    # Array 2 (Rx) — Red
+                    ax.plot([p_el_mid2[dim_idx], p_int_mid2[dim_idx]], [p_el_mid2[2], p_int_mid2[2]], color=c_rx, alpha=alpha, linewidth=1)
+                    ax.plot([p_int_mid2[dim_idx], target[dim_idx]], [p_int_mid2[2], target[2]], color=c_rx, alpha=alpha, linewidth=1)
+                    ax.plot([p_el_end[dim_idx], p_int_end[dim_idx]], [p_el_end[2], p_int_end[2]], color=c_rx, alpha=alpha, linewidth=1)
+                    ax.plot([p_int_end[dim_idx], target[dim_idx]], [p_int_end[2], target[2]], color=c_rx, alpha=alpha, linewidth=1)
                 else:
                     # Single Array Extents
                     ax.plot([p_el_start[dim_idx], p_int_start[dim_idx]], [p_el_start[2], p_int_start[2]], color=c, alpha=alpha, linewidth=1)

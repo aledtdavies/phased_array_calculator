@@ -13,6 +13,8 @@ classdef DelayLaw
         end
         
         function xInt = solveFermatPoint(obj, pStart, pEnd, v1, v2)
+            % 2D Fermat solver (quartic polynomial method).
+            % pStart = [x, z], pEnd = [x, z]
             x1 = pStart(1);
             z1 = pStart(2);
             x2 = pEnd(1);
@@ -33,7 +35,6 @@ classdef DelayLaw
             
             r = roots([a, b, c, d, e]);
             
-            % Filter valid roots
             isReal = abs(imag(r)) < 1e-9;
             realRoots = real(r(isReal));
             
@@ -62,18 +63,118 @@ classdef DelayLaw
             end
         end
         
-        function result = calculateLaw(obj, focalX, focalZ, waveType)
+        function [xi, yi] = solveFermatPoint3D(~, pStart, pEnd, v1, v2)
+            % 3D Fermat solver using Newton-Raphson with analytical Hessian.
+            %
+            % Finds the point P(xi, yi, 0) on the interface that minimises
+            % travel time from pStart(x1, y1, z1) to pEnd(x2, y2, z2).
+            %
+            % Falls back to fminsearch if NR fails to converge.
+            
+            x1 = pStart(1); y1 = pStart(2); z1 = pStart(3);
+            x2 = pEnd(1);   y2 = pEnd(2);   z2 = pEnd(3);
+            
+            % Guard for degenerate geometry
+            if norm([x1 - x2, y1 - y2]) < 1e-9
+                xi = x1;
+                yi = y1;
+                return;
+            end
+            
+            % Initial guess via linear interpolation
+            h1 = abs(z1);
+            h2 = abs(z2);
+            denom = h1 + h2;
+            if denom > 0
+                ratio = h1 / denom;
+            else
+                ratio = 0.5;
+            end
+            
+            u = [x1 + (x2 - x1) * ratio; ...
+                 y1 + (y2 - y1) * ratio];
+            
+            maxIter = 20;
+            tol = 1e-12;
+            
+            for iter = 1:maxIter
+                % Gradient
+                dx1 = u(1) - x1;  dy1 = u(2) - y1;
+                dx2 = x2 - u(1);  dy2 = y2 - u(2);
+                d1 = sqrt(dx1^2 + dy1^2 + z1^2);
+                d2 = sqrt(dx2^2 + dy2^2 + z2^2);
+                
+                gx = dx1 / (v1 * d1) - dx2 / (v2 * d2);
+                gy = dy1 / (v1 * d1) - dy2 / (v2 * d2);
+                g = [gx; gy];
+                
+                if norm(g) < tol
+                    xi = u(1);
+                    yi = u(2);
+                    return;
+                end
+                
+                % Hessian (with epsilon guard)
+                eps_guard = 1e-12;
+                d1_2 = dx1^2 + dy1^2 + z1^2 + eps_guard;
+                d2_2 = dx2^2 + dy2^2 + z2^2 + eps_guard;
+                d1_3 = d1_2 * sqrt(d1_2);
+                d2_3 = d2_2 * sqrt(d2_2);
+                
+                hxx = (d1_2 - dx1^2) / (v1 * d1_3) + (d2_2 - dx2^2) / (v2 * d2_3);
+                hyy = (d1_2 - dy1^2) / (v1 * d1_3) + (d2_2 - dy2^2) / (v2 * d2_3);
+                hxy = -dx1 * dy1 / (v1 * d1_3) - dx2 * dy2 / (v2 * d2_3);
+                
+                H = [hxx, hxy; hxy, hyy];
+                
+                % Newton step
+                if rcond(H) < 1e-15
+                    break; % Singular Hessian — fall through to fminsearch
+                end
+                
+                du = H \ (-g);
+                u = u + du;
+            end
+            
+            % Fallback to fminsearch if NR did not converge
+            timeFun = @(uv) sqrt((uv(1) - x1)^2 + (uv(2) - y1)^2 + z1^2) / v1 + ...
+                           sqrt((x2 - uv(1))^2 + (y2 - uv(2))^2 + z2^2) / v2;
+            
+            opts = optimset('Display', 'off', 'TolX', 1e-12, 'TolFun', 1e-12);
+            uOpt = fminsearch(timeFun, u, opts);
+            xi = uOpt(1);
+            yi = uOpt(2);
+        end
+        
+        function result = calculateLaw(obj, focalX, focalY, focalZ, waveType)
+            % Computes the delay law for a single focal point (3D).
+            %
+            % Args:
+            %   focalX, focalY, focalZ: Target coordinates (meters)
+            %   waveType: 'longitudinal' or 'shear'
+            %
+            % Returns struct with:
+            %   Delays, ToF, InterfacePoints, FocalPoint, VelocityUsed
+            
+            if nargin < 3
+                focalY = 0.0;
+            end
             if nargin < 4
+                focalZ = focalX;  % Legacy 2D call: calculateLaw(fx, fz)
+                focalX = focalY;  % Shift arguments
+                focalY = 0.0;
+            end
+            if nargin < 5
                 waveType = 'longitudinal';
             end
             
             elements = obj.Wedge.getTransformedElements(obj.Probe);
-            numEls = obj.Probe.NumElements;
+            numEls = size(elements, 1);
             
             tofs = zeros(numEls, 1);
-            interfacePoints = zeros(numEls, 2);
+            interfacePoints = zeros(numEls, 3);
             
-            target = [focalX, focalZ];
+            target = [focalX, focalY, focalZ];
             
             vWedge = obj.Wedge.Velocity;
             
@@ -83,10 +184,23 @@ classdef DelayLaw
                 vMat = obj.Material.VelocityLongitudinal;
             end
             
+            % Determine if 3D solver is needed
+            hasY = any(abs(elements(:, 2)) > 1e-9) || abs(focalY) > 1e-9;
+            
             for i = 1:numEls
                 pEl = elements(i, :);
-                xInt = obj.solveFermatPoint(pEl, target, vWedge, vMat);
-                pInt = [xInt, 0.0];
+                
+                if hasY
+                    % 3D solver
+                    [xi, yi] = obj.solveFermatPoint3D(pEl, target, vWedge, vMat);
+                    pInt = [xi, yi, 0.0];
+                else
+                    % 2D solver (faster, quartic)
+                    pEl2D = [pEl(1), pEl(3)];
+                    target2D = [focalX, focalZ];
+                    xi = obj.solveFermatPoint(pEl2D, target2D, vWedge, vMat);
+                    pInt = [xi, 0.0, 0.0];
+                end
                 
                 interfacePoints(i, :) = pInt;
                 
@@ -111,36 +225,37 @@ classdef DelayLaw
             fprintf('Exporting elements to %s...\n', filename);
             
             coords_mm = elements * 1000.0;
+            numEls = size(elements, 1);
             [~, ~, ext] = fileparts(filename);
             ext = lower(ext);
             
             if strcmp(ext, '.mat')
-                ElementID = (1:obj.Probe.NumElements)';
+                ElementID = (1:numEls)';
                 Global_X_mm = coords_mm(:, 1);
-                Global_Z_mm = coords_mm(:, 2);
+                Global_Y_mm = coords_mm(:, 2);
+                Global_Z_mm = coords_mm(:, 3);
                 Coordinates_mm = coords_mm;
-                save(filename, 'ElementID', 'Global_X_mm', 'Global_Z_mm', 'Coordinates_mm');
+                save(filename, 'ElementID', 'Global_X_mm', 'Global_Y_mm', 'Global_Z_mm', 'Coordinates_mm');
             elseif strcmp(ext, '.m')
                 fid = fopen(filename, 'w');
                 fprintf(fid, '%% Element Positions (mm)\n');
                 
-                fprintf(fid, 'ElementID = [ %s ];\n', strjoin(arrayfun(@num2str, 1:obj.Probe.NumElements, 'UniformOutput', false), ', '));
+                fprintf(fid, 'ElementID = [ %s ];\n', strjoin(arrayfun(@num2str, 1:numEls, 'UniformOutput', false), ', '));
                 fprintf(fid, 'Global_X_mm = [ %s ];\n', strjoin(arrayfun(@num2str, coords_mm(:, 1)', 'UniformOutput', false), ', '));
-                fprintf(fid, 'Global_Z_mm = [ %s ];\n', strjoin(arrayfun(@num2str, coords_mm(:, 2)', 'UniformOutput', false), ', '));
+                fprintf(fid, 'Global_Y_mm = [ %s ];\n', strjoin(arrayfun(@num2str, coords_mm(:, 2)', 'UniformOutput', false), ', '));
+                fprintf(fid, 'Global_Z_mm = [ %s ];\n', strjoin(arrayfun(@num2str, coords_mm(:, 3)', 'UniformOutput', false), ', '));
                 
                 fprintf(fid, 'Coordinates_mm = [\n');
-                for i = 1:obj.Probe.NumElements
-                    fprintf(fid, '    %.4f, %.4f;\n', coords_mm(i, 1), coords_mm(i, 2));
+                for i = 1:numEls
+                    fprintf(fid, '    %.4f, %.4f, %.4f;\n', coords_mm(i, 1), coords_mm(i, 2), coords_mm(i, 3));
                 end
                 fprintf(fid, '];\n');
                 fclose(fid);
             else
                 fid = fopen(filename, 'w');
-                fprintf(fid, 'ElementID,Global_X_mm,Global_Z_mm\n');
-                for i = 1:obj.Probe.NumElements
-                    x = coords_mm(i, 1);
-                    z = coords_mm(i, 2);
-                    fprintf(fid, '%d,%.4f,%.4f\n', i, x, z);
+                fprintf(fid, 'ElementID,Global_X_mm,Global_Y_mm,Global_Z_mm\n');
+                for i = 1:numEls
+                    fprintf(fid, '%d,%.4f,%.4f,%.4f\n', i, coords_mm(i, 1), coords_mm(i, 2), coords_mm(i, 3));
                 end
                 fclose(fid);
             end
