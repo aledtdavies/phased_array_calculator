@@ -56,12 +56,74 @@ class ParameterPanel(ttk.LabelFrame):
 
 class ProbePanel(ParameterPanel):
     def __init__(self, parent):
+        super().__init__(parent, "Probe Settings", [])
+        
+        # Probe Type Combobox
+        ttk.Label(self, text="Probe Type:").grid(row=self.row_idx, column=0, sticky="e", padx=5, pady=2)
+        self.probe_type_var = tk.StringVar(value="Linear")
+        self.cb_type = ttk.Combobox(self, textvariable=self.probe_type_var, 
+                                    values=["Linear", "Matrix", "Dual Linear", "Dual Matrix"], 
+                                    state="readonly", width=15)
+        self.cb_type.grid(row=self.row_idx, column=1, sticky="w", padx=5, pady=2)
+        self.cb_type.bind("<<ComboboxSelected>>", self.on_type_changed)
+        self.row_idx += 1
+        
+        # Store references to widgets for showing/hiding
+        self.rows = {}
+        
+        # Params definition
         params = [
-            ("num_elements", 16, "Num Elements:"),
-            ("pitch_mm", 0.6, "Pitch (mm):"),
+            ("num_elements", 16, "Primary Elements (X):"),
+            ("pitch_mm", 0.5, "Primary Pitch (mm):"),
+            ("num_elements_y", 1, "Passive Elements (Y):"),
+            ("pitch_y_mm", 0.0, "Passive Pitch (mm):"),
             ("freq_mhz", 5.0, "Frequency (MHz):")
         ]
-        super().__init__(parent, "Probe Settings", params)
+        
+        for key, default_val, label_text in params:
+            lbl = ttk.Label(self, text=label_text)
+            lbl.grid(row=self.row_idx, column=0, sticky="e", padx=5, pady=2)
+            
+            var = tk.DoubleVar(value=default_val)
+            entry = ttk.Entry(self, textvariable=var, width=10)
+            entry.grid(row=self.row_idx, column=1, sticky="w", padx=5, pady=2)
+            
+            self.entries[key] = var
+            self.rows[key] = (lbl, entry)
+            self.row_idx += 1
+            
+        self.on_type_changed() # Trigger initial visibility
+
+    def on_type_changed(self, event=None):
+        ptype = self.probe_type_var.get()
+        
+        # Define which keys are visible by mode
+        visible_keys = ["num_elements", "pitch_mm", "freq_mhz"]
+        if ptype in ["Matrix", "Dual Matrix"]:
+            visible_keys.extend(["num_elements_y", "pitch_y_mm"])
+            
+        # Apply visibility
+        for key, (lbl, entry) in self.rows.items():
+            if key in visible_keys:
+                lbl.grid()
+                entry.grid()
+            else:
+                lbl.grid_remove()
+                entry.grid_remove()
+                
+        # Emit event for other panels
+        self.event_generate("<<ProbeTypeChanged>>")
+        
+    def get_values(self):
+        vals = super().get_values()
+        vals["probe_type"] = self.probe_type_var.get()
+        return vals
+        
+    def set_values(self, values):
+        super().set_values(values)
+        if "probe_type" in values:
+            self.probe_type_var.set(values["probe_type"])
+            self.on_type_changed()
 
 class WedgePanel(ParameterPanel):
     def __init__(self, parent):
@@ -77,11 +139,44 @@ class WedgePanel(ParameterPanel):
         cb.bind("<<ComboboxSelected>>", self.on_material_select)
         self.row_idx += 1
 
+        # Store references to widgets for showing/hiding
+        self.rows = {}
+
         # Standard Params
         self.add_entry("angle_deg", 36.0, "Wedge Angle (deg):")
         self.add_entry("height_mm", 15.0, "Height @ El.1 (mm):")
         self.vel_var = self.add_entry("velocity_ms", 2330.0, "Velocity (m/s):")
         self.add_entry("offset_mm", 0.0, "Probe Offset X (mm):")
+
+        # Conditional Dual Params
+        dual_params = [
+            ("array_sep_mm", 0.0, "Array Separation (mm):"),
+            ("roof_angle_deg", 0.0, "Roof Angle (deg):")
+        ]
+        for key, default_val, label_text in dual_params:
+            lbl = ttk.Label(self, text=label_text)
+            lbl.grid(row=self.row_idx, column=0, sticky="e", padx=5, pady=2)
+            var = tk.DoubleVar(value=default_val)
+            entry = ttk.Entry(self, textvariable=var, width=10)
+            entry.grid(row=self.row_idx, column=1, sticky="w", padx=5, pady=2)
+            self.entries[key] = var
+            self.rows[key] = (lbl, entry)
+            self.row_idx += 1
+            
+        # Hide dual params initially
+        for lbl, entry in self.rows.values():
+            lbl.grid_remove()
+            entry.grid_remove()
+
+    def update_visibility(self, probe_type):
+        is_dual = probe_type in ["Dual Linear", "Dual Matrix"]
+        for key, (lbl, entry) in self.rows.items():
+            if is_dual:
+                lbl.grid()
+                entry.grid()
+            else:
+                lbl.grid_remove()
+                entry.grid_remove()
 
     def on_material_select(self, event):
         name = self.mat_var.get()
@@ -135,15 +230,68 @@ class ScanPanel(ttk.LabelFrame):
         cb_wave.grid(row=row, column=1, sticky="w", padx=5, pady=2)
         row += 1
         
+        self.rows = {}
+        
         # Standard Params
-        # Start/End/Step
+        # Start/End/Step Angle
         for key, val, txt in [("start_angle", 40.0, "Start Angle (deg):"), 
                               ("end_angle", 70.0, "End Angle (deg):"), 
                               ("step_angle", 1.0, "Step (deg):")]:
-            ttk.Label(self, text=txt).grid(row=row, column=0, sticky="e", padx=5, pady=2)
+            lbl = ttk.Label(self, text=txt)
+            lbl.grid(row=row, column=0, sticky="e", padx=5, pady=2)
             var = tk.DoubleVar(value=val)
-            ttk.Entry(self, textvariable=var, width=10).grid(row=row, column=1, sticky="w", padx=5, pady=2)
+            entry = ttk.Entry(self, textvariable=var, width=10)
+            entry.grid(row=row, column=1, sticky="w", padx=5, pady=2)
             self.entries[key] = var
+            row += 1
+
+        # Skew Params (Matrix / Dual Matrix only)
+        for key, val, txt in [("start_skew", 0.0, "Start Skew (deg):"),
+                              ("end_skew", 0.0, "End Skew (deg):"),
+                              ("step_skew", 1.0, "Skew Step (deg):")]:
+            lbl = ttk.Label(self, text=txt)
+            lbl.grid(row=row, column=0, sticky="e", padx=5, pady=2)
+            var = tk.DoubleVar(value=val)
+            entry = ttk.Entry(self, textvariable=var, width=10)
+            entry.grid(row=row, column=1, sticky="w", padx=5, pady=2)
+            self.entries[key] = var
+            self.rows[key] = (lbl, entry)
+            row += 1
+            
+        # Hide skew params initially
+        for lbl, entry in self.rows.values():
+            lbl.grid_remove()
+            entry.grid_remove()
+            
+        # Y Focus Settings
+        self.lbl_y_focus = ttk.Label(self, text="Y Focus Mode:")
+        self.lbl_y_focus.grid(row=row, column=0, sticky="e", padx=5, pady=2)
+        self.y_focus_mode = tk.StringVar(value="Derived from Skew")
+        self.cb_y_focus = ttk.Combobox(self, textvariable=self.y_focus_mode, 
+                                       values=["Derived from Skew", "Fixed Y", "Y Sweep"], 
+                                       state="readonly", width=18)
+        self.cb_y_focus.grid(row=row, column=1, sticky="w", padx=5, pady=2)
+        self.cb_y_focus.bind("<<ComboboxSelected>>", self.on_y_mode_changed)
+        self.row_y_focus = row
+        row += 1
+        
+        # Y Focus Params
+        self.y_rows = {}
+        y_params = [
+            ("target_y_mm", 0.0, "Target Y (mm):", ["Fixed Y"]),
+            ("y_start_mm", 0.0, "Y Start (mm):", ["Y Sweep"]),
+            ("y_end_mm", 0.0, "Y End (mm):", ["Y Sweep"]),
+            ("y_step_mm", 1.0, "Y Step (mm):", ["Y Sweep"])
+        ]
+        
+        for key, val, txt, active_modes in y_params:
+            lbl = ttk.Label(self, text=txt)
+            lbl.grid(row=row, column=0, sticky="e", padx=5, pady=2)
+            var = tk.DoubleVar(value=val)
+            entry = ttk.Entry(self, textvariable=var, width=10)
+            entry.grid(row=row, column=1, sticky="w", padx=5, pady=2)
+            self.entries[key] = var
+            self.y_rows[key] = (lbl, entry, active_modes)
             row += 1
 
         # Dynamic Focus Parameter
@@ -159,15 +307,62 @@ class ScanPanel(ttk.LabelFrame):
         mode = self.focus_mode.get()
         if mode == "Constant Depth":
             self.lbl_focus.config(text="Target Depth (mm):")
+            # Enable Fixed Y
+            self.cb_y_focus.config(values=["Derived from Skew", "Fixed Y", "Y Sweep"])
         elif mode == "Vertical Line":
             self.lbl_focus.config(text="Target X (Global, mm):")
+            self.cb_y_focus.config(values=["Derived from Skew", "Fixed Y", "Y Sweep"])
         elif mode == "Constant Sound Path":
             self.lbl_focus.config(text="Focal Distance (mm):")
+            # Disable Fixed Y (overconstrains sphere)
+            self.cb_y_focus.config(values=["Derived from Skew", "Y Sweep"])
+            if self.y_focus_mode.get() == "Fixed Y":
+                self.y_focus_mode.set("Derived from Skew")
+                self.on_y_mode_changed()
+                
+    def on_y_mode_changed(self, event=None):
+        mode = self.y_focus_mode.get()
+        # For matrix/dual matrix, toggle sub-fields
+        ptype = self.master.probe_type if hasattr(self.master, "probe_type") else "Matrix" # Handled in update_visibility
+        
+        for key, (lbl, entry, active_modes) in self.y_rows.items():
+            if mode in active_modes and self.has_skew:
+                lbl.grid()
+                entry.grid()
+            else:
+                lbl.grid_remove()
+                entry.grid_remove()
+            
+    def update_visibility(self, probe_type):
+        self.master.probe_type = probe_type
+        self.has_skew = probe_type in ["Matrix", "Dual Matrix"]
+        
+        # Toggle Skew fields
+        for key, (lbl, entry) in self.rows.items():
+            if self.has_skew:
+                lbl.grid()
+                entry.grid()
+            else:
+                lbl.grid_remove()
+                entry.grid_remove()
+                
+                # Toggle Y Focus Combobox
+        cb_widgets = [self.cb_y_focus, self.lbl_y_focus]
+                
+        for w in cb_widgets:
+            if self.has_skew:
+                w.grid()
+            else:
+                w.grid_remove()
+                
+        # Toggle Y Focus Sub-fields
+        self.on_y_mode_changed()
     
     def get_values(self):
         vals = {key: var.get() for key, var in self.entries.items()}
         vals["focus_mode"] = self.focus_mode.get()
         vals["wave_type"] = self.wave_type.get()
+        vals["y_focus_mode"] = self.y_focus_mode.get()
         return vals
 
     def set_values(self, values):
