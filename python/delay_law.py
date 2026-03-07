@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.optimize import minimize
 from material import Material
 from probe import Probe
 from wedge import Wedge
@@ -98,27 +99,107 @@ class DelayLaw:
             
         return best_u + x1
 
-    def calculate_law(self, focal_point_x: float, focal_point_z: float, wave_type: str = 'longitudinal'):
+    def solve_fermat_point_3d(self, p_start, p_end, v1, v2):
+        """
+        Finds the point P(x_i, y_i, 0) on the interface that minimizes travel time 
+        from p_start(x1, y1, z1) to p_end(x2, y2, z2).
+
+        Args:
+            p_start: (x, y, z) of element (z usually < 0)
+            p_end: (x, y, z) of focus (z usually > 0)
+            v1: velocity in wedge
+            v2: velocity in component
+
+        Returns:
+            (x_i, y_i): The interface coordinates.
+        """
+        x1, y1, z1 = p_start
+        x2, y2, z2 = p_end
+        
+        # Guard for degenerate geometry (element directly above/below focus)
+        if np.linalg.norm(p_start[:2] - p_end[:2]) < 1e-9:
+            return x1, y1
+
+        # Initial guess via linear interpolation
+        h1 = abs(z1)
+        h2 = abs(z2)
+        ratio = h1 / (h1 + h2) if (h1 + h2) > 0 else 0.5
+        x0 = x1 + (x2 - x1) * ratio
+        y0 = y1 + (y2 - y1) * ratio
+        u0 = np.array([x0, y0])
+
+        def time_func(u):
+            dx1, dy1 = u[0] - x1, u[1] - y1
+            dx2, dy2 = x2 - u[0], y2 - u[1]
+            d1 = np.sqrt(dx1**2 + dy1**2 + z1**2)
+            d2 = np.sqrt(dx2**2 + dy2**2 + z2**2)
+            return d1 / v1 + d2 / v2
+
+        def grad_func(u):
+            dx1, dy1 = u[0] - x1, u[1] - y1
+            dx2, dy2 = x2 - u[0], y2 - u[1]
+            d1 = np.sqrt(dx1**2 + dy1**2 + z1**2)
+            d2 = np.sqrt(dx2**2 + dy2**2 + z2**2)
+            
+            gx = dx1 / (v1 * d1) - dx2 / (v2 * d2)
+            gy = dy1 / (v1 * d1) - dy2 / (v2 * d2)
+            return np.array([gx, gy])
+            
+        def hessian_func(u):
+            dx1, dy1 = u[0] - x1, u[1] - y1
+            dx2, dy2 = x2 - u[0], y2 - u[1]
+            
+            d1_2 = dx1**2 + dy1**2 + z1**2 + 1e-12
+            d2_2 = dx2**2 + dy2**2 + z2**2 + 1e-12
+            d1_3 = d1_2 * np.sqrt(d1_2)
+            d2_3 = d2_2 * np.sqrt(d2_2)
+            
+            hxx = (d1_2 - dx1**2) / (v1 * d1_3) + (d2_2 - dx2**2) / (v2 * d2_3)
+            hyy = (d1_2 - dy1**2) / (v1 * d1_3) + (d2_2 - dy2**2) / (v2 * d2_3)
+            hxy = -dx1 * dy1 / (v1 * d1_3) - dx2 * dy2 / (v2 * d2_3)
+            
+            return np.array([[hxx, hxy], [hxy, hyy]])
+
+        # Newton-Raphson
+        u = u0
+        max_iter = 20
+        tol = 1e-12
+        for _ in range(max_iter):
+            g = grad_func(u)
+            if np.linalg.norm(g) < tol:
+                return float(u[0]), float(u[1])
+            H = hessian_func(u)
+            try:
+                du = np.linalg.solve(H, -g)
+                u = u + du
+            except np.linalg.LinAlgError:
+                break
+                
+        # Fallback to scipy if NR fails to converge
+        res = minimize(time_func, u0, method='L-BFGS-B', jac=grad_func)
+        return float(res.x[0]), float(res.x[1])
+
+    def calculate_law(self, focal_point_x: float, focal_point_y: float, focal_point_z: float, wave_type: str = 'longitudinal'):
         """
         Computes the delay law for a single focal point.
         
         Args:
-            focal_point_x, focal_point_z: Target coordinates.
+            focal_point_x, focal_point_y, focal_point_z: Target coordinates.
             wave_type: 'longitudinal' or 'shear'.
         
         Returns dictionary with:
             'delays': np.ndarray (seconds)
             'tof': np.ndarray (seconds)
-            'interface_points': np.ndarray (N, 2)
+            'interface_points': np.ndarray (N, 3)
         """
         # 1. Get Element Positions in Global Frame
         elements = self.wedge.get_transformed_elements(self.probe)
         
-        num_els = self.probe.num_elements
+        num_els = self.probe.total_elements
         tofs = np.zeros(num_els)
-        interface_points = np.zeros((num_els, 2))
+        interface_points = np.zeros((num_els, 3))
         
-        target = np.array([focal_point_x, focal_point_z])
+        target = np.array([focal_point_x, focal_point_y, focal_point_z])
         
         # Velocities
         v_wedge = self.wedge.velocity
@@ -128,13 +209,21 @@ class DelayLaw:
         else:
             v_mat = self.material.velocity_longitudinal
         
+        is_2d = (self.probe.num_elements_y == 1 and abs(focal_point_y) < 1e-9)
+        
         # 2. Iterate elements and solve path
         for i in range(num_els):
             # Element pos
             p_el = elements[i]
             
-            p_int_x = self.solve_fermat_point(p_el, target, v_wedge, v_mat)
-            p_int = np.array([p_int_x, 0.0]) # Interface is z=0
+            if is_2d:
+                p_start_2d = np.array([p_el[0], p_el[2]])
+                target_2d = np.array([target[0], target[2]])
+                p_int_x = self.solve_fermat_point(p_start_2d, target_2d, v_wedge, v_mat)
+                p_int = np.array([p_int_x, 0.0, 0.0])
+            else:
+                p_int_x, p_int_y = self.solve_fermat_point_3d(p_el, target, v_wedge, v_mat)
+                p_int = np.array([p_int_x, p_int_y, 0.0]) # Interface is z=0
             
             interface_points[i] = p_int
             
@@ -143,6 +232,9 @@ class DelayLaw:
             dist_mat = np.linalg.norm(target - p_int)
             
             tofs[i] = dist_wedge / v_wedge + dist_mat / v_mat
+            
+            # Guard against NaN/Inf
+            assert np.isfinite(tofs[i]), f"Calculated TOF is not finite for element {i}"
             
         # 3. Compute Delays
         max_tof = np.max(tofs)
@@ -158,7 +250,7 @@ class DelayLaw:
 
     def export_element_positions(self, filename: str):
         """
-        Exports the global (x, z) coordinates of the probe elements to a CSV or MAT file.
+        Exports the global (x, y, z) coordinates of the probe elements to a CSV or MAT file.
         """
         import os
         elements = self.wedge.get_transformed_elements(self.probe)
@@ -174,7 +266,8 @@ class DelayLaw:
             data = {
                 'ElementID': np.arange(1, len(coords_mm) + 1),
                 'Global_X_mm': coords_mm[:, 0],
-                'Global_Z_mm': coords_mm[:, 1],
+                'Global_Y_mm': coords_mm[:, 1],
+                'Global_Z_mm': coords_mm[:, 2],
                 'Coordinates_mm': coords_mm
             }
             scipy.io.savemat(filename, data)
@@ -183,16 +276,17 @@ class DelayLaw:
                 f.write("% Element Positions (mm)\n")
                 f.write(f"ElementID = [ {', '.join(map(str, range(1, len(coords_mm)+1)))} ];\n")
                 f.write(f"Global_X_mm = [ {', '.join(map(str, coords_mm[:, 0]))} ];\n")
-                f.write(f"Global_Z_mm = [ {', '.join(map(str, coords_mm[:, 1]))} ];\n")
+                f.write(f"Global_Y_mm = [ {', '.join(map(str, coords_mm[:, 1]))} ];\n")
+                f.write(f"Global_Z_mm = [ {', '.join(map(str, coords_mm[:, 2]))} ];\n")
                 
                 f.write("Coordinates_mm = [\n")
-                for x, z in coords_mm:
-                    f.write(f"    {x}, {z};\n")
+                for x, y, z in coords_mm:
+                    f.write(f"    {x}, {y}, {z};\n")
                 f.write("];\n")
         else:
             import csv
             with open(filename, 'w', newline='') as f:
                 writer = csv.writer(f)
-                writer.writerow(['ElementID', 'Global_X_mm', 'Global_Z_mm'])
-                for i, (x, z) in enumerate(coords_mm):
-                    writer.writerow([i + 1, x, z])
+                writer.writerow(['ElementID', 'Global_X_mm', 'Global_Y_mm', 'Global_Z_mm'])
+                for i, (x, y, z) in enumerate(coords_mm):
+                    writer.writerow([i + 1, x, y, z])

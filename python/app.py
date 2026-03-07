@@ -8,7 +8,7 @@ import numpy as np
 
 # from material import Material
 from material import Material
-from probe import Probe
+from probe import Probe, DualProbe, create_probe_assembly
 from wedge import Wedge
 from delay_law import DelayLaw
 
@@ -105,6 +105,9 @@ class App(tk.Tk):
         self.status_var = tk.StringVar(value="Ready.")
         ttk.Label(left_container, textvariable=self.status_var, relief=tk.SUNKEN).pack(side=tk.BOTTOM, fill=tk.X, pady=(5, 0))
 
+        # Wire up dynamic panel visibility based on Probe Type
+        self.probe_panel.bind("<<ProbeTypeChanged>>", self.on_probe_type_changed)
+        
         # --- Right Area ---
         # Notebook for Plot and Data
         self.notebook = ttk.Notebook(right_frame)
@@ -123,24 +126,28 @@ class App(tk.Tk):
         self.notebook.add(self.hist_tab, text="Delays")
 
         # Treeview setup (Tab 2 content)
-        cols = ("ID", "Angle", "Fx", "Fz", "MinD", "MaxD")
+        cols = ("ID", "Angle", "Skew", "Fx", "Fy", "Fz", "MinD", "MaxD")
         self.tree = ttk.Treeview(self.data_tab, columns=cols, show="headings")
         
         # Headers
         self.tree.heading("ID", text="#")
         self.tree.heading("Angle", text="Angle (°)")
+        self.tree.heading("Skew", text="Skew (°)")
         self.tree.heading("Fx", text="Fx (mm)")
+        self.tree.heading("Fy", text="Fy (mm)")
         self.tree.heading("Fz", text="Fz (mm)")
         self.tree.heading("MinD", text="Min Delay (µs)")
         self.tree.heading("MaxD", text="Max Delay (µs)")
         
         # Column width
         self.tree.column("ID", width=40, anchor="center")
-        self.tree.column("Angle", width=70, anchor="center")
-        self.tree.column("Fx", width=70, anchor="center")
-        self.tree.column("Fz", width=70, anchor="center")
-        self.tree.column("MinD", width=90, anchor="center")
-        self.tree.column("MaxD", width=90, anchor="center")
+        self.tree.column("Angle", width=60, anchor="center")
+        self.tree.column("Skew", width=60, anchor="center")
+        self.tree.column("Fx", width=60, anchor="center")
+        self.tree.column("Fy", width=60, anchor="center")
+        self.tree.column("Fz", width=60, anchor="center")
+        self.tree.column("MinD", width=80, anchor="center")
+        self.tree.column("MaxD", width=80, anchor="center")
         
         # Scrollbar
         vsb = ttk.Scrollbar(self.data_tab, orient="vertical", command=self.tree.yview)
@@ -153,6 +160,12 @@ class App(tk.Tk):
         self.tree.bind("<<TreeviewSelect>>", self.on_table_select)
 
         self.last_results = None
+
+    def on_probe_type_changed(self, event=None):
+        vals = self.probe_panel.get_values()
+        ptype = vals.get("probe_type", "Linear")
+        self.wedge_panel.update_visibility(ptype)
+        self.scan_panel.update_visibility(ptype)
 
     def create_menu(self):
         menubar = tk.Menu(self)
@@ -236,10 +249,17 @@ class App(tk.Tk):
     def get_solver(self):
         # 1. Probe
         pv = self.probe_panel.get_values()
-        probe = Probe(
+        wv = self.wedge_panel.get_values()
+        
+        ptype = pv.get("probe_type", "Linear")
+        probe = create_probe_assembly(
+            probe_type=ptype,
             num_elements=int(pv["num_elements"]),
             pitch=pv["pitch_mm"] * 1e-3,
-            frequency=pv["freq_mhz"] * 1e6
+            freq=pv["freq_mhz"] * 1e6,
+            num_elements_y=int(pv.get("num_elements_y", 1)),
+            pitch_y=pv.get("pitch_y_mm", 0.0) * 1e-3,
+            array_separation=wv.get("array_sep_mm", 0.0) * 1e-3
         )
         
         # 2. Material
@@ -250,12 +270,12 @@ class App(tk.Tk):
         )
         
         # 3. Wedge
-        wv = self.wedge_panel.get_values()
         wedge = Wedge(
             angle_degrees=wv["angle_deg"],
             height_at_element1=wv["height_mm"] * 1e-3,
             velocity=wv["velocity_ms"],
-            probe_offset_x=wv["offset_mm"] * 1e-3
+            probe_offset_x=wv["offset_mm"] * 1e-3,
+            roof_angle_degrees=wv.get("roof_angle_deg", 0.0)
         )
         
         return DelayLaw(probe, wedge, mat)
@@ -268,6 +288,44 @@ class App(tk.Tk):
             start = sv["start_angle"]
             end = sv["end_angle"]
             step = sv["step_angle"]
+            
+            # Determine skew angles based on probe type
+            ptype = self.probe_panel.get_values().get("probe_type", "Linear")
+            is_matrix = ptype in ["Matrix", "Dual Matrix"]
+            
+            if is_matrix:
+                s_start = sv.get("start_skew", 0.0)
+                s_end = sv.get("end_skew", 0.0)
+                s_step = sv.get("step_skew", 1.0)
+            else:
+                s_start, s_end, s_step = 0.0, 0.0, 1.0
+                
+            skew_angles = []
+            if s_step > 0:
+                skew_angles = np.arange(s_start, s_end + s_step, s_step)
+                if skew_angles[-1] < s_end:
+                    skew_angles = np.append(skew_angles, s_end)
+            else:
+                skew_angles = np.array([s_start])
+
+            # Determine Y Focus targets
+            y_mode = sv.get("y_focus_mode", "Derived from Skew")
+            fy_overrides = None
+            if is_matrix:
+                if y_mode == "Fixed Y":
+                    fy_overrides = [sv.get("target_y_mm", 0.0) * 1e-3]
+                elif y_mode == "Y Sweep":
+                    y_s = sv.get("y_start_mm", 0.0) * 1e-3
+                    y_e = sv.get("y_end_mm", 0.0) * 1e-3
+                    y_st = sv.get("y_step_mm", 1.0) * 1e-3
+                    if y_st > 0:
+                        y_sweep = np.arange(y_s, y_e + y_st, y_st)
+                        if y_sweep[-1] < y_e:
+                            y_sweep = np.append(y_sweep, y_e)
+                        fy_overrides = y_sweep.tolist()
+                    else:
+                        fy_overrides = [y_s]
+            
             param_val = sv["param_val"] * 1e-3 # Convert mm to meters
             
             focus_mode = sv["focus_mode"]
@@ -283,7 +341,8 @@ class App(tk.Tk):
             # 1. Find Probe Center (Geometric Center of Array)
             elements = solver.wedge.get_transformed_elements(solver.probe)
             center_x = np.mean(elements[:, 0])
-            center_z = np.mean(elements[:, 1])
+            center_y = np.mean(elements[:, 1])
+            center_z = np.mean(elements[:, 2])
             
             # Dist to Interface (Vertical)
             h_wedge = abs(center_z) 
@@ -313,7 +372,8 @@ class App(tk.Tk):
                  
                  if abs(sin_alpha) > 1.0:
                      # Critical Angle Exceeded
-                     self.tree.insert("", "end", values=(i+1, f"{ang:.1f}", "Err", "Brit", "-", "-"))
+                     for skew_deg in skew_angles:
+                         self.tree.insert("", "end", values=(len(results)+1, f"{ang:.1f}", f"{skew_deg:.1f}", "Err", "Brit", "-", "-", "-"))
                      continue
                  
                  alpha_rad = np.arcsin(sin_alpha)
@@ -321,44 +381,100 @@ class App(tk.Tk):
                  # 3. Beam Entry Point (P_int)
                  x_int = center_x + h_wedge * np.tan(alpha_rad)
                  
-                 # 4. Focal Point (F)
+                 # 4. Focal Point (F) base
                  if focus_mode == "Constant Depth":
                      fz = param_val
-                     fx = x_int + fz * np.tan(beta_rad)
+                     f_primary = fz * np.tan(beta_rad)
                      
                  elif focus_mode == "Vertical Line":
                      fx = param_val
                      if abs(np.tan(beta_rad)) < 1e-9:
-                         fz = 1e6 
+                         fz = 1e6
+                         f_primary = 0
                      else:
-                         fz = (fx - x_int) / np.tan(beta_rad)
+                         f_primary = fx - x_int
+                         fz = f_primary / np.tan(beta_rad)
                          
                  else: # Constant Sound Path
                      R = param_val
-                     fx = x_int + R * np.sin(beta_rad)
                      fz = R * np.cos(beta_rad)
+                     f_primary = R * np.sin(beta_rad)
                  
                  if fz < 0:
-                     self.tree.insert("", "end", values=(i+1, f"{ang:.1f}", "Err", "Z<0", "-", "-"))
+                     for skew_deg in skew_angles:
+                         self.tree.insert("", "end", values=(len(results)+1, f"{ang:.1f}", f"{skew_deg:.1f}", "Err", "-", "Z<0", "-", "-"))
                      continue
 
-                 law = solver.calculate_law(fx, fz, wave_type=wave_type)
-                 delays_us = law['delays'] * 1e6
-                 
-                 res_entry = {
-                     'angle': ang,
-                     'fx': fx,
-                     'fz': fz,
-                     'delays_us': delays_us,
-                     'velocity_used': law['velocity_used']
-                 }
-                 results.append(res_entry)
-                 focal_points.append((fx, fz))
-                 
-                 min_d = np.min(delays_us)
-                 max_d = np.max(delays_us)
-                 
-                 self.tree.insert("", "end", values=(i+1, f"{ang:.1f}", f"{fx*1000:.2f}", f"{fz*1000:.2f}", f"{min_d:.2f}", f"{max_d:.2f}"), tags=(len(results)-1,))
+                 # Loop over skews (permutations)
+                 for skew_deg in skew_angles:
+                     skew_rad = np.radians(skew_deg)
+                     
+                     # Determine 3D Focal point coordinates based on Focus Mode and Y mode
+                     if focus_mode == "Constant Depth":
+                         lx = x_int + f_primary * np.cos(skew_rad)
+                         fy_list = fy_overrides if fy_overrides is not None else [center_y + f_primary * np.sin(skew_rad)]
+                         fz_current = fz
+                         
+                     elif focus_mode == "Vertical Line":
+                         # To keep X constant in 3D space, f_primary must extend further as skew increases
+                         lx = fx
+                         cos_s = np.cos(skew_rad)
+                         f_primary_3d = (fx - x_int) / cos_s if abs(cos_s) > 1e-9 else f_primary
+                         fz_current = f_primary_3d / np.tan(beta_rad) if abs(np.tan(beta_rad)) > 1e-9 else 1e6
+                         fy_list = fy_overrides if fy_overrides is not None else [center_y + f_primary_3d * np.sin(skew_rad)]
+                         
+                     else: # Constant Sound Path
+                         lx = x_int + f_primary * np.cos(skew_rad)
+                         fz_current = fz
+                         if fy_overrides is not None and y_mode == "Y Sweep":
+                             # y sweep bypasses the explicit skew angles array completely!
+                             fy_list = fy_overrides
+                         else:
+                             # default: derived from skew
+                             fy_list = [center_y + f_primary * np.sin(skew_rad)]
+                         
+                     for ly in fy_list:
+                         
+                         if focus_mode == "Constant Sound Path" and fy_overrides is not None and y_mode == "Y Sweep":
+                             # For Y sweep in const path, we back-calculate the effective skew for display
+                             # sin(skew) = (ly - center_y) / f_primary
+                             val = (ly - center_y) / f_primary if f_primary > 1e-9 else 0.0
+                             if abs(val) <= 1.0:
+                                 eff_skew_rad = np.arcsin(val)
+                                 eff_skew_deg = np.degrees(eff_skew_rad)
+                                 lx = x_int + f_primary * np.cos(eff_skew_rad)
+                             else:
+                                 # Y target unreachable with this path length
+                                 self.tree.insert("", "end", values=(len(results)+1, f"{ang:.1f}", "-", "Err", "Y out", "of reach", "-", "-"))
+                                 continue
+                         else:
+                             eff_skew_deg = skew_deg
+
+                         law = solver.calculate_law(lx, ly, fz_current, wave_type=wave_type)
+                         delays_us = law['delays'] * 1e6
+                         
+                         res_entry = {
+                             'angle': ang,
+                             'skew': eff_skew_deg,
+                             'fx': lx,
+                             'fy': ly,
+                             'fz': fz_current,
+                             'delays_us': delays_us,
+                             'velocity_used': law['velocity_used']
+                         }
+                         results.append(res_entry)
+                         idx = len(results) - 1
+                         focal_points.append((lx, ly, fz_current))
+                         
+                         min_d = np.min(delays_us)
+                         max_d = np.max(delays_us)
+                         
+                         self.tree.insert("", "end", values=(idx+1, f"{ang:.1f}", f"{eff_skew_deg:.1f}", f"{lx*1000:.2f}", f"{ly*1000:.2f}", f"{fz_current*1000:.2f}", f"{min_d:.2f}", f"{max_d:.2f}"), tags=(idx,))
+                         
+                     if focus_mode == "Constant Sound Path" and fy_overrides is not None and y_mode == "Y Sweep":
+                         # In this specific case, the sweep handles all Ys for this angle, 
+                         # we don't need to iterate the outer explicit skew loop anymore.
+                         break
 
             self.last_results = results
             
@@ -371,8 +487,8 @@ class App(tk.Tk):
                     flat = np.concatenate(all_delays)
                     global_max_delay = np.max(flat)
                 
-                self.plot_tab.update_plot(solver, focal_points, wave_type)
-                self.hist_tab.update_plot(solver, focal_points, wave_type, global_max_delay=global_max_delay)
+                self.plot_tab.update_plot(solver, focal_points, wave_type, results=results, is_matrix=is_matrix)
+                self.hist_tab.update_plot(solver, focal_points, wave_type, global_max_delay=global_max_delay, results=results, is_matrix=is_matrix)
             else:
                 self.plot_tab.ax.clear()
                 self.plot_tab.canvas.draw()
@@ -398,19 +514,20 @@ class App(tk.Tk):
              return
         
         item = selected[0]
-        # Get index from tags
-        tags = self.tree.item(item, 'tags')
-        if tags:
-            try:
-                idx = int(tags[0])
-                # Update Both Plot Sliders
-                self.plot_tab.slider.set(idx)
-                self.plot_tab.on_slider_change(idx)
-                
-                self.hist_tab.slider.set(idx)
-                self.hist_tab.on_slider_change(idx)
-            except:
-                pass
+        # The values are: ID, Angle, Skew, Fx, Fy, Fz, MinD, MaxD
+        vals = self.tree.item(item, 'values')
+        
+        try:
+            angle_val = float(vals[1])
+            skew_val = float(vals[2])
+            
+            # Update Both Plot Sliders
+            if hasattr(self.plot_tab, 'set_sliders'):
+                self.plot_tab.set_sliders(angle_val, skew_val)
+            if hasattr(self.hist_tab, 'set_sliders'):
+                self.hist_tab.set_sliders(angle_val, skew_val)
+        except Exception:
+            pass
 
     def export_csv(self):
         if not self.last_results:
@@ -426,11 +543,11 @@ class App(tk.Tk):
                 sv = self.scan_panel.get_values()
                 num_els = len(self.last_results[0]['delays_us'])
                 
-                header = ['LawID', 'Angle_Deg', 'Fx_mm', 'Fz_mm', 'Velocity_m_s'] + [f'El_{i+1}_us' for i in range(num_els)]
+                header = ['LawID', 'Angle_Deg', 'Skew_Deg', 'Fx_mm', 'Fy_mm', 'Fz_mm', 'Velocity_m_s'] + [f'El_{i+1}_us' for i in range(num_els)]
                 writer.writerow(header)
                 
                 for i, res in enumerate(self.last_results):
-                    row = [i+1, res['angle'], res['fx']*1000, res['fz']*1000, res['velocity_used']]
+                    row = [i+1, res['angle'], res.get('skew', 0.0), res['fx']*1000, res.get('fy', 0.0)*1000, res['fz']*1000, res['velocity_used']]
                     row.extend(res['delays_us'])
                     writer.writerow(row)
             
