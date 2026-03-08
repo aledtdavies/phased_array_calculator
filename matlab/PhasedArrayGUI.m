@@ -3,216 +3,172 @@ function PhasedArrayGUI()
     % Supports Linear, Matrix, Dual Linear, and Dual Matrix probe types.
     % 3D focal law calculation with skew sweep and Y focus modes.
     
-    % Create Figure
+    % ===================== Figure =====================
+    figW = 1400; figH = 900;
     f = figure('Name', 'Phased Array Focal Law Calculator', ...
                'NumberTitle', 'off', ...
-               'Position', [50, 50, 1400, 900], ...
+               'Position', [50, 50, figW, figH], ...
                'MenuBar', 'none', ...
                'ToolBar', 'figure');
-               
-    % --- Helper Functions ---
+
+    % ===================== Layout constants =====================
+    R  = 24;    % row pitch (px)
+    LX = 10;    % label x
+    LW = 148;   % label width
+    FX = 162;   % field x
+    FW = 108;   % field width
+
+    % ===================== Helper functions =====================
     function h = addParam(y, label, val, tag)
         uicontrol(f, 'Style', 'text', 'String', label, ...
-                  'Position', [20, y, 140, 20], ...
-                  'HorizontalAlignment', 'right');
+                  'Position', [LX, y, LW, 20], 'HorizontalAlignment', 'right');
         h = uicontrol(f, 'Style', 'edit', 'String', num2str(val), ...
-                      'Position', [170, y, 100, 20], ...
+                      'Position', [FX, y, FW, 22], ...
                       'Tag', tag, 'BackgroundColor', 'white');
     end
 
     function h = addCombo(y, label, items, tag)
         uicontrol(f, 'Style', 'text', 'String', label, ...
-                  'Position', [20, y, 140, 20], ...
-                  'HorizontalAlignment', 'right');
+                  'Position', [LX, y, LW, 20], 'HorizontalAlignment', 'right');
         h = uicontrol(f, 'Style', 'popupmenu', 'String', items, ...
-                      'Position', [170, y, 100, 20], ...
-                      'Tag', tag);
+                      'Position', [FX, y, FW, 22], 'Tag', tag);
+    end
+
+    function addSec(y, txt)
+        uicontrol(f, 'Style', 'text', 'String', txt, ...
+                  'Position', [LX, y, 270, 20], ...
+                  'FontWeight', 'bold', 'HorizontalAlignment', 'left');
     end
 
     % ===================== UI Layout =====================
-    
-    % --- Probe Settings ---
-    uicontrol(f, 'Style', 'text', 'String', 'Probe Settings', ...
-              'Position', [20, 860, 200, 20], ...
-              'FontWeight', 'bold', 'HorizontalAlignment', 'left');
-    y = 830;
-    
-    h_probeType = addCombo(y, 'Probe Type:', {'Linear', 'Matrix', 'Dual Linear', 'Dual Matrix'}, 'probeType');
-    set(h_probeType, 'Callback', @onProbeTypeChange);
-    y = y - 30;
-    
-    h_numEl = addParam(y, 'Num Elements:', 16, 'numEl');
-    y = y - 30;
-    h_pitch = addParam(y, 'Pitch (mm):', 0.6, 'pitch');
-    y = y - 30;
-    
-    % Matrix-only fields
-    lbl_nElY = uicontrol(f, 'Style', 'text', 'String', 'Passive Els (Y):', ...
-                         'Position', [20, y, 140, 20], 'HorizontalAlignment', 'right');
-    h_nElY = uicontrol(f, 'Style', 'edit', 'String', '1', ...
-                       'Position', [170, y, 100, 20], 'BackgroundColor', 'white');
-    y = y - 30;
-    
-    lbl_pitchY = uicontrol(f, 'Style', 'text', 'String', 'Passive Pitch (mm):', ...
-                           'Position', [20, y, 140, 20], 'HorizontalAlignment', 'right');
-    h_pitchY = uicontrol(f, 'Style', 'edit', 'String', '0.6', ...
-                         'Position', [170, y, 100, 20], 'BackgroundColor', 'white');
-    y = y - 30;
-    
-    % --- Wedge Settings ---
-    uicontrol(f, 'Style', 'text', 'String', 'Wedge Settings', ...
-              'Position', [20, y, 200, 20], ...
-              'FontWeight', 'bold', 'HorizontalAlignment', 'left');
-    y = y - 30;
-    
-    h_wAngle = addParam(y, 'Angle (deg):', 36.0, 'wAngle');
-    y = y - 30;
-    h_wHeight = addParam(y, 'Height @ El.1 (mm):', 15.0, 'wHeight');
-    y = y - 30;
-    h_wVel = addParam(y, 'Velocity (m/s):', 2330.0, 'wVel');
-    y = y - 30;
-    
-    % Dual-only fields
-    lbl_arraySep = uicontrol(f, 'Style', 'text', 'String', 'Array Sep. (mm):', ...
-                             'Position', [20, y, 140, 20], 'HorizontalAlignment', 'right');
-    h_arraySep = uicontrol(f, 'Style', 'edit', 'String', '0.0', ...
-                           'Position', [170, y, 100, 20], 'BackgroundColor', 'white');
-    y = y - 30;
-    
-    lbl_roofAng = uicontrol(f, 'Style', 'text', 'String', 'Roof Angle (deg):', ...
-                            'Position', [20, y, 140, 20], 'HorizontalAlignment', 'right');
-    h_roofAng = uicontrol(f, 'Style', 'edit', 'String', '0.0', ...
-                          'Position', [170, y, 100, 20], 'BackgroundColor', 'white');
-    y = y - 30;
-    
-    % --- Material Settings ---
-    uicontrol(f, 'Style', 'text', 'String', 'Material Settings', ...
-              'Position', [20, y, 200, 20], ...
-              'FontWeight', 'bold', 'HorizontalAlignment', 'left');
-    y = y - 30;
-    
-    h_mVelL = addParam(y, 'L-Wave Vel (m/s):', 5920.0, 'mVelL');
-    y = y - 30;
-    h_mVelS = addParam(y, 'S-Wave Vel (m/s):', 3240.0, 'mVelS');
-    y = y - 30;
-    
-    % --- Scan Settings ---
-    uicontrol(f, 'Style', 'text', 'String', 'Scan Settings', ...
-              'Position', [20, y, 200, 20], ...
-              'FontWeight', 'bold', 'HorizontalAlignment', 'left');
-    y = y - 30;
-    
-    h_focusMode = addCombo(y, 'Focus Type:', {'Constant Depth', 'Vertical Line', 'Constant Sound Path'}, 'focusMode');
-    y = y - 30;
-    h_waveType = addCombo(y, 'Wave Type:', {'Longitudinal', 'Shear'}, 'waveType');
-    y = y - 30;
-    
-    h_startAng = addParam(y, 'Start Angle (deg):', 40.0, 'startAng');
-    y = y - 30;
-    h_endAng = addParam(y, 'End Angle (deg):', 70.0, 'endAng');
-    y = y - 30;
-    h_stepAng = addParam(y, 'Step (deg):', 1.0, 'stepAng');
-    y = y - 30;
-    
-    % Skew fields (Matrix / Dual Matrix only)
-    lbl_startSkew = uicontrol(f, 'Style', 'text', 'String', 'Start Skew (deg):', ...
-                              'Position', [20, y, 140, 20], 'HorizontalAlignment', 'right');
-    h_startSkew = uicontrol(f, 'Style', 'edit', 'String', '0.0', ...
-                            'Position', [170, y, 100, 20], 'BackgroundColor', 'white');
-    y = y - 30;
-    lbl_endSkew = uicontrol(f, 'Style', 'text', 'String', 'End Skew (deg):', ...
-                            'Position', [20, y, 140, 20], 'HorizontalAlignment', 'right');
-    h_endSkew = uicontrol(f, 'Style', 'edit', 'String', '0.0', ...
-                          'Position', [170, y, 100, 20], 'BackgroundColor', 'white');
-    y = y - 30;
-    lbl_stepSkew = uicontrol(f, 'Style', 'text', 'String', 'Skew Step (deg):', ...
-                             'Position', [20, y, 140, 20], 'HorizontalAlignment', 'right');
-    h_stepSkew = uicontrol(f, 'Style', 'edit', 'String', '1.0', ...
-                           'Position', [170, y, 100, 20], 'BackgroundColor', 'white');
-    y = y - 30;
-    
-    h_target = addParam(y, 'Target (mm):', 50.0, 'targetVal');
-    y = y - 40;
-    
-    % --- Sub-Aperture Settings ---
-    uicontrol(f, 'Style', 'text', 'String', 'Sub-Aperture', ...
-              'Position', [20, y, 200, 20], ...
-              'FontWeight', 'bold', 'HorizontalAlignment', 'left');
-    y = y - 30;
-    
-    h_startEl = addParam(y, 'Start Element:', 1, 'startEl');
-    y = y - 30;
-    h_numActive = addParam(y, 'Active Elements:', 0, 'numActive');
-    y = y - 5;
-    uicontrol(f, 'Style', 'text', 'String', '(0 = All)', ...
-              'Position', [170, y, 100, 15], 'FontSize', 7, 'HorizontalAlignment', 'left');
-    y = y - 25;
-    
-    lbl_elOrder = uicontrol(f, 'Style', 'text', 'String', 'Element Order:', ...
-                            'Position', [20, y, 140, 20], 'HorizontalAlignment', 'right');
-    h_elOrder = uicontrol(f, 'Style', 'popupmenu', 'String', {'Column-first', 'Row-first'}, ...
-                          'Position', [170, y, 100, 20]);
-    y = y - 40;
-    
-    % --- Buttons & Status ---
-    lbl_status = uicontrol(f, 'Style', 'text', 'String', 'Ready.', ...
-                           'Position', [20, y, 250, 20], ...
-                           'FontWeight', 'bold', 'ForegroundColor', [0 0.5 0], ...
-                           'HorizontalAlignment', 'center');
-    
-    y = y - 40;
-    uicontrol(f, 'Style', 'pushbutton', 'String', 'Calculate', ...
-              'Position', [100, y, 150, 40], ...
-              'Callback', @runCalculation, ...
-              'FontWeight', 'bold', 'FontSize', 12);
+    % Start near top of 900px figure; 24px rows let everything fit
+    y = figH - 26;
 
-    y = y - 40;
+    % --- Probe Settings ---
+    addSec(y, 'Probe Settings'); y = y - R;
+    h_probeType = addCombo(y, 'Probe Type:', {'Linear', 'Matrix', 'Dual Linear', 'Dual Matrix'}, 'probeType');
+    set(h_probeType, 'Callback', @onProbeTypeChange); y = y - R;
+    h_numEl = addParam(y, 'Num Elements:', 16, 'numEl');  y = y - R;
+    h_pitch  = addParam(y, 'Pitch (mm):', 0.6, 'pitch');  y = y - R;
+
+    % Matrix-only
+    lbl_nElY = uicontrol(f, 'Style', 'text', 'String', 'Passive Els (Y):', ...
+                         'Position', [LX, y, LW, 20], 'HorizontalAlignment', 'right');
+    h_nElY   = uicontrol(f, 'Style', 'edit', 'String', '1', ...
+                         'Position', [FX, y, FW, 22], 'BackgroundColor', 'white'); y = y - R;
+    lbl_pitchY = uicontrol(f, 'Style', 'text', 'String', 'Passive Pitch (mm):', ...
+                           'Position', [LX, y, LW, 20], 'HorizontalAlignment', 'right');
+    h_pitchY   = uicontrol(f, 'Style', 'edit', 'String', '0.6', ...
+                           'Position', [FX, y, FW, 22], 'BackgroundColor', 'white'); y = y - R;
+
+    % --- Wedge Settings ---
+    addSec(y, 'Wedge Settings'); y = y - R;
+    h_wAngle  = addParam(y, 'Angle (deg):', 36.0, 'wAngle');        y = y - R;
+    h_wHeight = addParam(y, 'Height @ El.1 (mm):', 15.0, 'wHeight'); y = y - R;
+    h_wVel    = addParam(y, 'Velocity (m/s):', 2330.0, 'wVel');     y = y - R;
+
+    % Dual-only
+    lbl_arraySep = uicontrol(f, 'Style', 'text', 'String', 'Array Sep. (mm):', ...
+                             'Position', [LX, y, LW, 20], 'HorizontalAlignment', 'right');
+    h_arraySep   = uicontrol(f, 'Style', 'edit', 'String', '0.0', ...
+                             'Position', [FX, y, FW, 22], 'BackgroundColor', 'white'); y = y - R;
+    lbl_roofAng = uicontrol(f, 'Style', 'text', 'String', 'Roof Angle (deg):', ...
+                            'Position', [LX, y, LW, 20], 'HorizontalAlignment', 'right');
+    h_roofAng   = uicontrol(f, 'Style', 'edit', 'String', '0.0', ...
+                            'Position', [FX, y, FW, 22], 'BackgroundColor', 'white'); y = y - R;
+
+    % --- Material Settings ---
+    addSec(y, 'Material Settings'); y = y - R;
+    h_mVelL = addParam(y, 'L-Wave Vel (m/s):', 5920.0, 'mVelL'); y = y - R;
+    h_mVelS = addParam(y, 'S-Wave Vel (m/s):', 3240.0, 'mVelS'); y = y - R;
+
+    % --- Scan Settings ---
+    addSec(y, 'Scan Settings'); y = y - R;
+    h_focusMode = addCombo(y, 'Focus Type:', {'Constant Depth', 'Vertical Line', 'Constant Sound Path'}, 'focusMode'); y = y - R;
+    h_waveType  = addCombo(y, 'Wave Type:', {'Longitudinal', 'Shear'}, 'waveType'); y = y - R;
+    h_startAng  = addParam(y, 'Start Angle (deg):', 40.0, 'startAng'); y = y - R;
+    h_endAng    = addParam(y, 'End Angle (deg):', 70.0, 'endAng');    y = y - R;
+    h_stepAng   = addParam(y, 'Step (deg):', 1.0, 'stepAng');         y = y - R;
+
+    % Skew (Matrix / Dual Matrix only)
+    lbl_startSkew = uicontrol(f, 'Style', 'text', 'String', 'Start Skew (deg):', ...
+                              'Position', [LX, y, LW, 20], 'HorizontalAlignment', 'right');
+    h_startSkew   = uicontrol(f, 'Style', 'edit', 'String', '0.0', ...
+                              'Position', [FX, y, FW, 22], 'BackgroundColor', 'white'); y = y - R;
+    lbl_endSkew = uicontrol(f, 'Style', 'text', 'String', 'End Skew (deg):', ...
+                            'Position', [LX, y, LW, 20], 'HorizontalAlignment', 'right');
+    h_endSkew   = uicontrol(f, 'Style', 'edit', 'String', '0.0', ...
+                            'Position', [FX, y, FW, 22], 'BackgroundColor', 'white'); y = y - R;
+    lbl_stepSkew = uicontrol(f, 'Style', 'text', 'String', 'Skew Step (deg):', ...
+                             'Position', [LX, y, LW, 20], 'HorizontalAlignment', 'right');
+    h_stepSkew   = uicontrol(f, 'Style', 'edit', 'String', '1.0', ...
+                             'Position', [FX, y, FW, 22], 'BackgroundColor', 'white'); y = y - R;
+
+    h_target = addParam(y, 'Target (mm):', 50.0, 'targetVal'); y = y - R;
+
+    % --- Sub-Aperture Settings ---
+    addSec(y, 'Sub-Aperture Settings'); y = y - R;
+    h_startEl   = addParam(y, 'Start Element:', 1, 'startEl'); y = y - R;
+    h_numActive = addParam(y, 'Active Elements:', 0, 'numActive');
+    uicontrol(f, 'Style', 'text', 'String', '(0 = All)', ...
+              'Position', [FX + FW + 2, y, 60, 18], 'FontSize', 7); y = y - R;
+    lbl_elOrder = uicontrol(f, 'Style', 'text', 'String', 'Element Order:', ...
+                            'Position', [LX, y, LW, 20], 'HorizontalAlignment', 'right');
+    h_elOrder   = uicontrol(f, 'Style', 'popupmenu', 'String', {'Column-first', 'Row-first'}, ...
+                            'Position', [FX, y, FW, 22]); y = y - R;
+
+    % --- Status & Buttons ---
+    lbl_status = uicontrol(f, 'Style', 'text', 'String', 'Ready.', ...
+                           'Position', [LX, y, 270, 20], ...
+                           'FontWeight', 'bold', 'ForegroundColor', [0 0.5 0], ...
+                           'HorizontalAlignment', 'center'); y = y - (R + 4);
+
+    uicontrol(f, 'Style', 'pushbutton', 'String', 'Calculate', ...
+              'Position', [55, y, 170, 32], ...
+              'Callback', @runCalculation, ...
+              'FontWeight', 'bold', 'FontSize', 11); y = y - (R + 4);
+
     uicontrol(f, 'Style', 'text', 'String', 'Export Format:', ...
-              'Position', [20, y, 100, 20], ...
-              'HorizontalAlignment', 'right');
+              'Position', [LX, y, LW, 20], 'HorizontalAlignment', 'right');
     h_exportType = uicontrol(f, 'Style', 'popupmenu', 'String', {'CSV', 'MAT'}, ...
-                             'Position', [130, y, 100, 20]);
-    
-    y = y - 40;
+                             'Position', [FX, y, FW, 22]); y = y - R;
+
     btn_export = uicontrol(f, 'Style', 'pushbutton', 'String', 'Export Laws', ...
-                           'Position', [40, y, 110, 30], ...
-                           'Callback', @exportLaws, ...
-                           'Enable', 'off', 'FontWeight', 'bold');
-                           
+                           'Position', [LX + 4, y, 118, 26], ...
+                           'Callback', @exportLaws, 'Enable', 'off', 'FontWeight', 'bold');
     btn_exportEls = uicontrol(f, 'Style', 'pushbutton', 'String', 'Export Elements', ...
-                              'Position', [160, y, 110, 30], ...
-                              'Callback', @exportElements, ...
-                              'Enable', 'off', 'FontWeight', 'bold');
+                              'Position', [LX + 130, y, 138, 26], ...
+                              'Callback', @exportElements, 'Enable', 'off', 'FontWeight', 'bold');
 
     % ===================== Plot Axes =====================
-    % X-Z Ray Tracing (main)
-    ax_xz = axes(f, 'Position', [0.28, 0.35, 0.34, 0.55]);
-    grid(ax_xz, 'on'); axis(ax_xz, 'equal');
-    set(ax_xz, 'YDir', 'reverse');
+    sideN = 0.206;   % sidebar normalised width (280 / 1400 ≈ 0.20, +margin)
+
+    ax_xz = axes(f, 'Position', [sideN + 0.01, 0.33, 0.375, 0.58]);
+    grid(ax_xz, 'on'); axis(ax_xz, 'equal'); set(ax_xz, 'YDir', 'reverse');
     xlabel(ax_xz, 'X (mm)'); ylabel(ax_xz, 'Z Depth (mm)');
     title(ax_xz, 'Ray Tracing X-Z');
-    
-    % Y-Z Ray Tracing (shown for non-linear probes)
-    ax_yz = axes(f, 'Position', [0.65, 0.35, 0.34, 0.55]);
-    grid(ax_yz, 'on'); axis(ax_yz, 'equal');
-    set(ax_yz, 'YDir', 'reverse');
+
+    ax_yz = axes(f, 'Position', [sideN + 0.405, 0.33, 0.375, 0.58]);
+    grid(ax_yz, 'on'); axis(ax_yz, 'equal'); set(ax_yz, 'YDir', 'reverse');
     xlabel(ax_yz, 'Y (mm)'); ylabel(ax_yz, 'Z Depth (mm)');
     title(ax_yz, 'Ray Tracing Y-Z');
-    
+
     % Azimuth Slider
+    sliderX = round(sideN * figW) + 10;
+    sliderW = figW - sliderX - 20;
     lbl_az = uicontrol(f, 'Style', 'text', 'String', 'Angle: 0.0 deg', ...
-                       'Position', [340, 225, 120, 20], 'HorizontalAlignment', 'left');
-    slider_az = uicontrol(f, 'Style', 'slider', 'Position', [470, 225, 400, 20], ...
-                          'Min', 0, 'Max', 1, 'Value', 0, ...
-                          'Callback', @onSliderChange);
-    
+                       'Position', [sliderX, 225, 120, 20], 'HorizontalAlignment', 'left');
+    slider_az = uicontrol(f, 'Style', 'slider', ...
+                          'Position', [sliderX + 130, 225, sliderW - 130, 20], ...
+                          'Min', 0, 'Max', 1, 'Value', 0, 'Callback', @onSliderChange);
+
     % Skew Slider
     lbl_sk = uicontrol(f, 'Style', 'text', 'String', 'Skew: 0.0 deg', ...
-                       'Position', [340, 195, 120, 20], 'HorizontalAlignment', 'left');
-    slider_sk = uicontrol(f, 'Style', 'slider', 'Position', [470, 195, 400, 20], ...
-                          'Min', 0, 'Max', 1, 'Value', 0, ...
-                          'Callback', @onSliderChange);
-    
+                       'Position', [sliderX, 198, 120, 20], 'HorizontalAlignment', 'left');
+    slider_sk = uicontrol(f, 'Style', 'slider', ...
+                          'Position', [sliderX + 130, 198, sliderW - 130, 20], ...
+                          'Min', 0, 'Max', 1, 'Value', 0, 'Callback', @onSliderChange);
+
     % --- State Variables ---
     lastScanData = [];
     lastSolver = [];
@@ -262,10 +218,10 @@ function PhasedArrayGUI()
         % Y-Z axes
         if isLinear
             set(ax_yz, 'Visible', 'off');
-            set(ax_xz, 'Position', [0.28, 0.35, 0.70, 0.55]);
+            set(ax_xz, 'Position', [0.216, 0.33, 0.767, 0.58]);
         else
             set(ax_yz, 'Visible', 'on');
-            set(ax_xz, 'Position', [0.28, 0.35, 0.34, 0.55]);
+            set(ax_xz, 'Position', [0.216, 0.33, 0.375, 0.58]);
         end
     end
     
