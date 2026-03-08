@@ -134,6 +134,26 @@ function PhasedArrayGUI()
     h_target = addParam(y, 'Target (mm):', 50.0, 'targetVal');
     y = y - 40;
     
+    % --- Sub-Aperture Settings ---
+    uicontrol(f, 'Style', 'text', 'String', 'Sub-Aperture', ...
+              'Position', [20, y, 200, 20], ...
+              'FontWeight', 'bold', 'HorizontalAlignment', 'left');
+    y = y - 30;
+    
+    h_startEl = addParam(y, 'Start Element:', 1, 'startEl');
+    y = y - 30;
+    h_numActive = addParam(y, 'Active Elements:', 0, 'numActive');
+    y = y - 5;
+    uicontrol(f, 'Style', 'text', 'String', '(0 = All)', ...
+              'Position', [170, y, 100, 15], 'FontSize', 7, 'HorizontalAlignment', 'left');
+    y = y - 25;
+    
+    lbl_elOrder = uicontrol(f, 'Style', 'text', 'String', 'Element Order:', ...
+                            'Position', [20, y, 140, 20], 'HorizontalAlignment', 'right');
+    h_elOrder = uicontrol(f, 'Style', 'popupmenu', 'String', {'Column-first', 'Row-first'}, ...
+                          'Position', [170, y, 100, 20]);
+    y = y - 40;
+    
     % --- Buttons & Status ---
     lbl_status = uicontrol(f, 'Style', 'text', 'String', 'Ready.', ...
                            'Position', [20, y, 250, 20], ...
@@ -231,6 +251,9 @@ function PhasedArrayGUI()
         set(lbl_startSkew, 'Visible', vis); set(h_startSkew, 'Visible', vis);
         set(lbl_endSkew, 'Visible', vis);   set(h_endSkew, 'Visible', vis);
         set(lbl_stepSkew, 'Visible', vis);  set(h_stepSkew, 'Visible', vis);
+        
+        % Element Order (matrix only)
+        set(lbl_elOrder, 'Visible', vis); set(h_elOrder, 'Visible', vis);
         
         % Skew slider
         vis = 'off'; if isMatrix; vis = 'on'; end
@@ -399,11 +422,18 @@ function PhasedArrayGUI()
                 roofAng = str2double(get(h_roofAng, 'String'));
             end
             
+            % Sub-aperture
+            startEl = str2double(get(h_startEl, 'String'));
+            numActive = str2double(get(h_numActive, 'String'));
+            elOrderIdx = get(h_elOrder, 'Value');
+            elOrderOpts = {'column-first', 'row-first'};
+            elOrder = elOrderOpts{elOrderIdx};
+            
             % 2. Setup Objects
             if ismember(pType, {'Dual Linear', 'Dual Matrix'})
-                probe = DualProbe(nEl, pPitch, 5e6, nElY, pitchY, arraySep);
+                probe = DualProbe(nEl, pPitch, 5e6, nElY, pitchY, arraySep, startEl, numActive, elOrder);
             else
-                probe = Probe(nEl, pPitch, 5e6, nElY, pitchY);
+                probe = Probe(nEl, pPitch, 5e6, nElY, pitchY, startEl, numActive, elOrder);
             end
             
             wedge = Wedge(wAng, wH, wV, 0, roofAng);

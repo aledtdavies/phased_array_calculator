@@ -379,3 +379,82 @@ class ScanPanel(ttk.LabelFrame):
             
         if "wave_type" in values:
             self.wave_type.set(values["wave_type"])
+
+class SubAperturePanel(ttk.LabelFrame):
+    """
+    Panel for sub-aperture element selection settings.
+    """
+    def __init__(self, parent):
+        super().__init__(parent, text="Sub-Aperture Settings", padding=10)
+        self.entries = {}
+        self.rows = {}
+        row = 0
+        
+        # Start Element (1-indexed)
+        ttk.Label(self, text="Start Element:").grid(row=row, column=0, sticky="e", padx=5, pady=2)
+        self.start_el_var = tk.IntVar(value=1)
+        ttk.Entry(self, textvariable=self.start_el_var, width=10).grid(row=row, column=1, sticky="w", padx=5, pady=2)
+        self.entries["start_element"] = self.start_el_var
+        row += 1
+        
+        # Number of Active Elements (0 = All)
+        ttk.Label(self, text="Active Elements:").grid(row=row, column=0, sticky="e", padx=5, pady=2)
+        self.num_active_var = tk.IntVar(value=0)
+        entry_active = ttk.Entry(self, textvariable=self.num_active_var, width=10)
+        entry_active.grid(row=row, column=1, sticky="w", padx=5, pady=2)
+        self.entries["num_active_elements"] = self.num_active_var
+        row += 1
+        
+        # Hint label
+        self.hint_lbl = ttk.Label(self, text="(0 = All elements)", font=("Segoe UI", 8))
+        self.hint_lbl.grid(row=row, column=0, columnspan=2, sticky="w", padx=5)
+        row += 1
+        
+        # Element Order (Matrix probes only)
+        self.lbl_order = ttk.Label(self, text="Element Order:")
+        self.lbl_order.grid(row=row, column=0, sticky="e", padx=5, pady=2)
+        self.element_order_var = tk.StringVar(value="Column-first")
+        self.cb_order = ttk.Combobox(self, textvariable=self.element_order_var, 
+                                      values=["Column-first", "Row-first"], 
+                                      state="readonly", width=15)
+        self.cb_order.grid(row=row, column=1, sticky="w", padx=5, pady=2)
+        self.rows["element_order"] = (self.lbl_order, self.cb_order)
+        row += 1
+        
+        # Hide element order initially (linear probes)
+        self.lbl_order.grid_remove()
+        self.cb_order.grid_remove()
+        
+    def update_visibility(self, probe_type):
+        """Show/hide Element Order based on probe type."""
+        is_matrix = probe_type in ["Matrix", "Dual Matrix"]
+        for key, (lbl, widget) in self.rows.items():
+            if is_matrix:
+                lbl.grid()
+                widget.grid()
+            else:
+                lbl.grid_remove()
+                widget.grid_remove()
+                
+    def get_values(self):
+        return {
+            "start_element": self.start_el_var.get(),
+            "num_active_elements": self.num_active_var.get(),
+            "element_order": self.element_order_var.get().lower()
+        }
+        
+    def set_values(self, values):
+        if "start_element" in values:
+            self.start_el_var.set(int(values["start_element"]))
+        if "num_active_elements" in values:
+            self.num_active_var.set(int(values["num_active_elements"]))
+        if "element_order" in values:
+            # Accept either 'column-first' or 'Column-first'
+            val = values["element_order"]
+            display_val = val.capitalize() if val[0].islower() else val
+            # Normalize to title case for combobox
+            if display_val.lower() == "column-first":
+                self.element_order_var.set("Column-first")
+            elif display_val.lower() == "row-first":
+                self.element_order_var.set("Row-first")
+

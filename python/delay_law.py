@@ -196,7 +196,9 @@ class DelayLaw:
         elements = self.wedge.get_transformed_elements(self.probe)
         
         num_els = self.probe.total_elements
-        tofs = np.zeros(num_els)
+        active_indices = self.probe.get_active_element_indices()
+        
+        tofs = np.full(num_els, np.nan)
         interface_points = np.zeros((num_els, 3))
         
         target = np.array([focal_point_x, focal_point_y, focal_point_z])
@@ -211,8 +213,8 @@ class DelayLaw:
         
         is_2d = (self.probe.num_elements_y == 1 and abs(focal_point_y) < 1e-9)
         
-        # 2. Iterate elements and solve path
-        for i in range(num_els):
+        # 2. Iterate active elements only and solve path
+        for i in active_indices:
             # Element pos
             p_el = elements[i]
             
@@ -236,16 +238,20 @@ class DelayLaw:
             # Guard against NaN/Inf
             assert np.isfinite(tofs[i]), f"Calculated TOF is not finite for element {i}"
             
-        # 3. Compute Delays
-        max_tof = np.max(tofs)
-        delays = max_tof - tofs
+        # 3. Compute Delays (only over active elements)
+        active_tofs = tofs[active_indices]
+        max_tof = np.max(active_tofs)
+        
+        delays = np.full(num_els, np.nan)
+        delays[active_indices] = max_tof - tofs[active_indices]
         
         return {
             'delays': delays,
             'tof': tofs,
             'interface_points': interface_points,
             'focal_point': target,
-            'velocity_used': v_mat
+            'velocity_used': v_mat,
+            'active_indices': active_indices
         }
 
     def export_element_positions(self, filename: str):
