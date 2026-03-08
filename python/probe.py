@@ -4,7 +4,8 @@ class Probe:
     """
     Represents a linear phased array probe.
     """
-    def __init__(self, num_elements: int, pitch: float, frequency: float = 5e6, num_elements_y: int = 1, pitch_y: float = 0.0):
+    def __init__(self, num_elements: int, pitch: float, frequency: float = 5e6, num_elements_y: int = 1, pitch_y: float = 0.0,
+                 start_element: int = 1, num_active_elements: int = 0, element_order: str = 'column-first'):
         """
         Args:
             num_elements: Number of elements in the primary (X) axis.
@@ -12,6 +13,9 @@ class Probe:
             frequency: Nominal frequency in Hz.
             num_elements_y: Number of elements in the passive (Y) axis.
             pitch_y: Center-to-center distance between elements in Y axis (meters).
+            start_element: First active element (1-indexed).
+            num_active_elements: Number of active elements (0 = all).
+            element_order: 'column-first' or 'row-first' (matrix numbering convention).
         """
         if num_elements_y > 1 and pitch_y <= 0:
             raise ValueError("pitch_y must be > 0 when num_elements_y > 1")
@@ -21,13 +25,57 @@ class Probe:
         self.frequency = frequency
         self.num_elements_y = max(1, num_elements_y)
         self.pitch_y = pitch_y
+        self.start_element = max(1, start_element)
+        self.num_active_elements = max(0, num_active_elements)
+        self.element_order = element_order
 
     @property
     def total_elements(self) -> int:
         return self.num_elements * self.num_elements_y
 
     def get_element_of_interest_indices(self):
-        return np.arange(self.total_elements)
+        return self.get_active_element_indices()
+
+    def get_active_element_indices(self):
+        """
+        Returns 0-based indices of active elements in the sub-aperture,
+        mapped back to internal (column-first) storage order.
+        """
+        total = self.total_elements
+        num_active = self.num_active_elements if self.num_active_elements > 0 else total
+        start_0 = self.start_element - 1  # Convert to 0-based
+        
+        # Clip to valid range
+        start_0 = max(0, min(start_0, total - 1))
+        end_0 = min(start_0 + num_active, total)
+        
+        # Generate logical indices in the user's numbering convention
+        user_indices = np.arange(start_0, end_0)
+        
+        if self.element_order == 'row-first' and self.num_elements_y > 1:
+            # User numbering is row-first (Y varies fastest):
+            # user_idx -> (row, col) where row = user_idx % num_elements_y,
+            #                                col = user_idx // num_elements_y
+            # Internal storage is column-first (X varies fastest via meshgrid 'ij'):
+            # internal_idx = col * num_elements_y + row  (same as ix * Ny + iy)
+            # But since internal is already col-first: internal_idx = ix * Ny + iy
+            # From row-first user_idx: iy = user_idx % num_elements_y
+            #                          ix = user_idx // num_elements_y
+            # So internal_idx = ix * Ny + iy  (which equals user_idx) only if ordering matches.
+            # Actually internal (meshgrid 'ij') order: ix varies first.
+            # internal_idx for (ix, iy) = ix * Ny + iy    (X varies fastest)
+            # row-first user_idx for (ix, iy) = iy * Nx + ix  (Y varies fastest)
+            # So: given user_idx, iy = user_idx // Nx, ix = user_idx % Nx
+            #     internal_idx = ix * Ny + iy
+            Nx = self.num_elements
+            Ny = self.num_elements_y
+            iy = user_indices // Nx
+            ix = user_indices % Nx
+            internal_indices = ix * Ny + iy
+            return np.sort(internal_indices)
+        else:
+            # column-first: user numbering matches internal storage order
+            return user_indices
 
     def get_element_positions(self, center_at_origin: bool = True) -> np.ndarray:
         """
@@ -75,8 +123,10 @@ class DualProbe(Probe):
     """
     def __init__(self, num_elements: int, pitch: float, frequency: float = 5e6, 
                  num_elements_y: int = 1, pitch_y: float = 0.0,
-                 array_separation: float = 0.0):
-        super().__init__(num_elements, pitch, frequency, num_elements_y, pitch_y)
+                 array_separation: float = 0.0,
+                 start_element: int = 1, num_active_elements: int = 0, element_order: str = 'column-first'):
+        super().__init__(num_elements, pitch, frequency, num_elements_y, pitch_y,
+                         start_element, num_active_elements, element_order)
         self.array_separation = array_separation
 
     @property
@@ -105,18 +155,20 @@ class DualProbe(Probe):
 
 def create_probe_assembly(probe_type: str, num_elements: int, pitch: float, freq: float,
                           num_elements_y: int = 1, pitch_y: float = 0.0,
-                          array_separation: float = 0.0) -> Probe:
+                          array_separation: float = 0.0,
+                          start_element: int = 1, num_active_elements: int = 0,
+                          element_order: str = 'column-first') -> Probe:
     """
     Factory function to create the appropriate Probe object.
     """
     if probe_type == "Linear":
-        return Probe(num_elements, pitch, freq, 1, 0.0)
+        return Probe(num_elements, pitch, freq, 1, 0.0, start_element, num_active_elements, element_order)
     elif probe_type == "Matrix":
-        return Probe(num_elements, pitch, freq, num_elements_y, pitch_y)
+        return Probe(num_elements, pitch, freq, num_elements_y, pitch_y, start_element, num_active_elements, element_order)
     elif probe_type == "Dual Linear":
-        return DualProbe(num_elements, pitch, freq, 1, 0.0, array_separation)
+        return DualProbe(num_elements, pitch, freq, 1, 0.0, array_separation, start_element, num_active_elements, element_order)
     elif probe_type == "Dual Matrix":
-        return DualProbe(num_elements, pitch, freq, num_elements_y, pitch_y, array_separation)
+        return DualProbe(num_elements, pitch, freq, num_elements_y, pitch_y, array_separation, start_element, num_active_elements, element_order)
     else:
         raise ValueError(f"Unknown probe type: {probe_type}")
 
