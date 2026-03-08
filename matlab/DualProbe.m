@@ -5,7 +5,7 @@ classdef DualProbe < Probe
     end
     
     methods
-        function obj = DualProbe(numElements, pitch, frequency, numElementsY, pitchY, arraySeparation)
+        function obj = DualProbe(numElements, pitch, frequency, numElementsY, pitchY, arraySeparation, startEl, numActive, elOrder)
             if nargin < 3
                 frequency = 5e6;
             end
@@ -18,8 +18,17 @@ classdef DualProbe < Probe
             if nargin < 6
                 arraySeparation = 0.0;
             end
+            if nargin < 7
+                startEl = 1;
+            end
+            if nargin < 8
+                numActive = 0;
+            end
+            if nargin < 9
+                elOrder = 'column-first';
+            end
             
-            obj = obj@Probe(numElements, pitch, frequency, numElementsY, pitchY);
+            obj = obj@Probe(numElements, pitch, frequency, numElementsY, pitchY, startEl, numActive, elOrder);
             obj.ArraySeparation = arraySeparation;
         end
         
