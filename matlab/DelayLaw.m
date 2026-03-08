@@ -170,8 +170,9 @@ classdef DelayLaw
             
             elements = obj.Wedge.getTransformedElements(obj.Probe);
             numEls = size(elements, 1);
+            activeIndices = obj.Probe.getActiveElementIndices();
             
-            tofs = zeros(numEls, 1);
+            tofs = nan(numEls, 1);
             interfacePoints = zeros(numEls, 3);
             
             target = [focalX, focalY, focalZ];
@@ -187,7 +188,8 @@ classdef DelayLaw
             % Determine if 3D solver is needed
             hasY = any(abs(elements(:, 2)) > 1e-9) || abs(focalY) > 1e-9;
             
-            for i = 1:numEls
+            for k = 1:length(activeIndices)
+                i = activeIndices(k);
                 pEl = elements(i, :);
                 
                 if hasY
@@ -210,14 +212,18 @@ classdef DelayLaw
                 tofs(i) = distWedge / vWedge + distMat / vMat;
             end
             
-            maxTof = max(tofs);
-            delays = maxTof - tofs;
+            activeTofs = tofs(activeIndices);
+            maxTof = max(activeTofs);
+            
+            delays = nan(numEls, 1);
+            delays(activeIndices) = maxTof - tofs(activeIndices);
             
             result.Delays = delays;
             result.ToF = tofs;
             result.InterfacePoints = interfacePoints;
             result.FocalPoint = target;
             result.VelocityUsed = vMat;
+            result.ActiveIndices = activeIndices;
         end
         
         function exportElementPositions(obj, filename)
