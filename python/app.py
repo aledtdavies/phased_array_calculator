@@ -12,7 +12,7 @@ from probe import Probe, DualProbe, create_probe_assembly
 from wedge import Wedge
 from delay_law import DelayLaw
 
-from panels import ProbePanel, WedgePanel, MaterialPanel, ScanPanel
+from panels import ProbePanel, WedgePanel, MaterialPanel, ScanPanel, SubAperturePanel
 from plotting import PlottingPanel, DelayHistogramPanel
 
 
@@ -91,6 +91,9 @@ class App(tk.Tk):
         self.scan_panel = ScanPanel(left_frame)
         self.scan_panel.pack(fill=tk.X, pady=5)
         
+        self.sub_aperture_panel = SubAperturePanel(left_frame)
+        self.sub_aperture_panel.pack(fill=tk.X, pady=5)
+        
         # Calculate Button
         btn_frame = ttk.Frame(left_frame)
         btn_frame.pack(fill=tk.X, pady=20)
@@ -166,6 +169,7 @@ class App(tk.Tk):
         ptype = vals.get("probe_type", "Linear")
         self.wedge_panel.update_visibility(ptype)
         self.scan_panel.update_visibility(ptype)
+        self.sub_aperture_panel.update_visibility(ptype)
 
     def create_menu(self):
         menubar = tk.Menu(self)
@@ -187,7 +191,8 @@ class App(tk.Tk):
             "probe": self.probe_panel.get_values(),
             "wedge": self.wedge_panel.get_values(),
             "material": self.mat_panel.get_values(),
-            "scan": self.scan_panel.get_values()
+            "scan": self.scan_panel.get_values(),
+            "sub_aperture": self.sub_aperture_panel.get_values()
         }
         
         fpath = filedialog.asksaveasfilename(
@@ -215,6 +220,7 @@ class App(tk.Tk):
                 if "wedge" in config: self.wedge_panel.set_values(config["wedge"])
                 if "material" in config: self.mat_panel.set_values(config["material"])
                 if "scan" in config: self.scan_panel.set_values(config["scan"])
+                if "sub_aperture" in config: self.sub_aperture_panel.set_values(config["sub_aperture"])
                 
                 self.status_var.set(f"Configuration loaded from {os.path.basename(fpath)}")
             except Exception as e:
@@ -250,6 +256,7 @@ class App(tk.Tk):
         # 1. Probe
         pv = self.probe_panel.get_values()
         wv = self.wedge_panel.get_values()
+        sav = self.sub_aperture_panel.get_values()
         
         ptype = pv.get("probe_type", "Linear")
         probe = create_probe_assembly(
@@ -259,7 +266,10 @@ class App(tk.Tk):
             freq=pv["freq_mhz"] * 1e6,
             num_elements_y=int(pv.get("num_elements_y", 1)),
             pitch_y=pv.get("pitch_y_mm", 0.0) * 1e-3,
-            array_separation=wv.get("array_sep_mm", 0.0) * 1e-3
+            array_separation=wv.get("array_sep_mm", 0.0) * 1e-3,
+            start_element=sav.get("start_element", 1),
+            num_active_elements=sav.get("num_active_elements", 0),
+            element_order=sav.get("element_order", "column-first")
         )
         
         # 2. Material
