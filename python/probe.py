@@ -141,6 +141,11 @@ class DualProbe(Probe):
         """
         # Get coordinates for a single sub-array
         base_coords = super().get_element_positions(center_at_origin)
+
+        if not center_at_origin:
+            # Keep dual-array separation symmetric about y=0 even when element 1
+            # anchoring is used for X/Z transformations.
+            base_coords[:, 1] -= np.mean(base_coords[:, 1])
         
         # Sub-array 1
         coords1 = base_coords.copy()

@@ -57,8 +57,16 @@ classdef Wedge
             rotZ1 = -localX .* s1 - localZ .* c1;
             
             % 3. Rotate around X axis (Roof/Roll)
-            c2 = cos(obj.RoofAngleRad);
-            s2 = sin(obj.RoofAngleRad);
+            if isa(probe, 'DualProbe')
+                % For dual probes, enforce symmetric roof: TX = -roof, RX = +roof.
+                nHalf = probe.totalElements() / 2;
+                roofAngles = [-obj.RoofAngleRad * ones(nHalf, 1); obj.RoofAngleRad * ones(nHalf, 1)];
+                c2 = cos(roofAngles);
+                s2 = sin(roofAngles);
+            else
+                c2 = cos(obj.RoofAngleRad);
+                s2 = sin(obj.RoofAngleRad);
+            end
             
             rotX2 = rotX1;
             rotY2 = rotY1 .* c2 - rotZ1 .* s2;
