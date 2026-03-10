@@ -1,5 +1,5 @@
 import numpy as np
-from probe import Probe
+from probe import Probe, DualProbe
 
 class Wedge:
     """
@@ -57,9 +57,19 @@ class Wedge:
         rot_z1 = -local_x * s1 - local_z * c1
         
         # 3. Rotate (around X axis - Roof/Roll)
-        c2 = np.cos(self.roof_angle_rad)
-        s2 = np.sin(self.roof_angle_rad)
-        
+        if isinstance(probe, DualProbe):
+            # For dual probes, enforce symmetric roof: TX = -roof, RX = +roof.
+            n_half = probe.total_elements // 2
+            roof_angles = np.concatenate((
+                np.full(n_half, -self.roof_angle_rad),
+                np.full(n_half, self.roof_angle_rad)
+            ))
+            c2 = np.cos(roof_angles)
+            s2 = np.sin(roof_angles)
+        else:
+            c2 = np.cos(self.roof_angle_rad)
+            s2 = np.sin(self.roof_angle_rad)
+
         rot_x2 = rot_x1
         rot_y2 = rot_y1 * c2 - rot_z1 * s2
         rot_z2 = rot_y1 * s2 + rot_z1 * c2

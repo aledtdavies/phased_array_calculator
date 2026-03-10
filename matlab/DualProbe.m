@@ -43,6 +43,12 @@ classdef DualProbe < Probe
             end
             
             baseCoords = getElementPositions@Probe(obj, centerAtOrigin);
+
+            if ~centerAtOrigin
+                % Keep dual-array separation symmetric about y=0 even when
+                % element-1 anchoring is used for X/Z transformations.
+                baseCoords(:, 2) = baseCoords(:, 2) - mean(baseCoords(:, 2));
+            end
             
             % Sub-array 1: offset -sep/2 in Y
             coords1 = baseCoords;
