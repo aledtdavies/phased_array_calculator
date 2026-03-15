@@ -492,9 +492,7 @@ class App(tk.Tk):
                 global_max_delay = 0.0
                 if results:
                     # results stores 'delays_us'
-                    all_delays = [r['delays_us'] for r in results]
-                    flat = np.concatenate(all_delays)
-                    global_max_delay = np.max(flat)
+                    global_max_delay = max(np.max(r['delays_us']) for r in results)
                 
                 self.plot_tab.update_plot(solver, focal_points, wave_type, results=results, is_matrix=is_matrix)
                 self.hist_tab.update_plot(solver, focal_points, wave_type, global_max_delay=global_max_delay, results=results, is_matrix=is_matrix)
