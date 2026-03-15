@@ -1,6 +1,5 @@
 import numpy as np
 import csv
-import os
 from material import Material
 from probe import Probe
 from wedge import Wedge
