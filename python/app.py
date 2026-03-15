@@ -6,7 +6,6 @@ import csv
 import json
 import numpy as np
 
-# from material import Material
 from material import Material
 from probe import Probe, DualProbe, create_probe_assembly
 from wedge import Wedge
