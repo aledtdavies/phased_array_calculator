@@ -8,7 +8,7 @@ import numpy as np
 
 # from material import Material
 from material import Material
-from probe import Probe, DualProbe, create_probe_assembly
+from probe import Probe, create_probe_assembly
 from wedge import Wedge
 from delay_law import DelayLaw
 
