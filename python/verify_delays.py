@@ -6,6 +6,26 @@ from wedge import Wedge
 from material import Material
 from delay_law import DelayLaw
 
+def calculate_target_delays(solver, x_int, depth, angle_rad, field_name):
+    fx = x_int + depth * np.tan(angle_rad)
+    fz = depth
+    print(f"Calculating {field_name} Law...")
+    law = solver.calculate_law(fx, fz, 'longitudinal')
+    return law['delays'] * 1e6
+
+def plot_delay_curve(delays_us, depth, label, subplot_idx, show_ylabel=False):
+    plt.subplot(1, 2, subplot_idx)
+    plt.plot(delays_us, 'o-', label='Calculated')
+    x = np.arange(len(delays_us))
+    fit = np.poly1d(np.polyfit(x, delays_us, 1))(x)
+    plt.plot(fit, 'r--', label='Linear Fit')
+    plt.title(f'Focused at {depth*1000}mm ({label})')
+    plt.xlabel('Element')
+    if show_ylabel:
+        plt.ylabel('Delay (us)')
+        plt.legend()
+    plt.grid(True)
+
 def check_curvature():
     # Setup
     probe = Probe(num_elements=32, pitch=0.5e-3, frequency=5e6) # 32 Elements for clearer curve
@@ -39,50 +59,17 @@ def check_curvature():
     dist_to_int = abs(p_center[1])
     x_int = p_center[0] + dist_to_int * np.tan(alpha)
     
-    # Target 1: Near
-    fx1 = x_int + depth_near * np.tan(angle_rad)
-    fz1 = depth_near
-    
     # Target 2: Far (Plane wave approximation)
     depth_far = 5000e-3 # 5 meters
-    fx2 = x_int + depth_far * np.tan(angle_rad)
-    fz2 = depth_far
-    
-    print("Calculating Near Field Law...")
-    law1 = solver.calculate_law(fx1, fz1, 'longitudinal')
-    delays1_us = law1['delays'] * 1e6
-    
-    print("Calculating Far Field Law...")
-    law2 = solver.calculate_law(fx2, fz2, 'longitudinal')
-    delays2_us = law2['delays'] * 1e6
-    
+
+    delays1_us = calculate_target_delays(solver, x_int, depth_near, angle_rad, "Near Field")
+    delays2_us = calculate_target_delays(solver, x_int, depth_far, angle_rad, "Far Field")
+
     # Plotting
     plt.figure(figsize=(10, 6))
-    
-    # Plot 1
-    plt.subplot(1, 2, 1)
-    plt.plot(delays1_us, 'o-', label='Calculated')
-    
-    # Linear Fit
-    x = np.arange(len(delays1_us))
-    fit1 = np.poly1d(np.polyfit(x, delays1_us, 1))(x)
-    plt.plot(fit1, 'r--', label='Linear Fit')
-    plt.title(f'Focused at {depth_near*1000}mm (Near)')
-    plt.xlabel('Element')
-    plt.ylabel('Delay (us)')
-    plt.legend()
-    plt.grid(True)
-    
-    # Plot 2
-    plt.subplot(1, 2, 2)
-    plt.plot(delays2_us, 'o-', label='Calculated')
-    
-    # Linear Fit
-    fit2 = np.poly1d(np.polyfit(x, delays2_us, 1))(x)
-    plt.plot(fit2, 'r--', label='Linear Fit')
-    plt.title(f'Focused at {depth_far*1000}mm (Far)')
-    plt.xlabel('Element')
-    plt.grid(True)
+
+    plot_delay_curve(delays1_us, depth_near, 'Near', 1, show_ylabel=True)
+    plot_delay_curve(delays2_us, depth_far, 'Far', 2)
     
     plt.suptitle(f'Delay Laws for {angle_deg} Deg Beam')
     plt.tight_layout()
