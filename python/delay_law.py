@@ -13,7 +13,7 @@ class DelayLaw:
         self.wedge = wedge
         self.material = material
 
-    def solve_fermat_point(self, p_start, p_end, v1, v2):
+    def solve_fermat_point(self, p_start, p_end, v1, v2, C2=None):
         """
         Finds the point P(x, 0) on the interface that minimizes travel time 
         from p_start(x1, z1) to p_end(x2, z2).
@@ -23,6 +23,7 @@ class DelayLaw:
             p_end: (x, z) of focus (z usually > 0)
             v1: velocity in wedge
             v2: velocity in component
+            C2: optional pre-calculated squared velocity ratio (v2/v1)**2
 
         Returns:
             x_int: The x-coordinate of the interface point.
@@ -46,8 +47,9 @@ class DelayLaw:
         # Setting dT/du = 0 and squaring to remove roots leads to a quartic.
         # Coeffs for u based on u = x - x1:
         
-        C = v2 / v1
-        C2 = C ** 2
+        if C2 is None:
+            C = v2 / v1
+            C2 = C ** 2
         
         # Polynomial: a*u^4 + b*u^3 + c*u^2 + d*u + e = 0
         
@@ -210,6 +212,8 @@ class DelayLaw:
             v_mat = self.material.velocity_shear
         else:
             v_mat = self.material.velocity_longitudinal
+
+        C2_precalc = (v_mat / v_wedge) ** 2
         
         is_2d = (self.probe.num_elements_y == 1 and abs(focal_point_y) < 1e-9)
         
@@ -221,7 +225,7 @@ class DelayLaw:
             if is_2d:
                 p_start_2d = np.array([p_el[0], p_el[2]])
                 target_2d = np.array([target[0], target[2]])
-                p_int_x = self.solve_fermat_point(p_start_2d, target_2d, v_wedge, v_mat)
+                p_int_x = self.solve_fermat_point(p_start_2d, target_2d, v_wedge, v_mat, C2=C2_precalc)
                 p_int = np.array([p_int_x, 0.0, 0.0])
             else:
                 p_int_x, p_int_y = self.solve_fermat_point_3d(p_el, target, v_wedge, v_mat)
