@@ -125,15 +125,18 @@ classdef DelayLaw
                 hyy = (d1_2 - dy1^2) / (v1 * d1_3) + (d2_2 - dy2^2) / (v2 * d2_3);
                 hxy = -dx1 * dy1 / (v1 * d1_3) - dx2 * dy2 / (v2 * d2_3);
                 
-                H = [hxx, hxy; hxy, hyy];
+                % Explicit determinant and inversion (Cramer's rule for 2x2)
+                detH = hxx * hyy - hxy^2;
                 
-                % Newton step
-                if rcond(H) < 1e-15
+                % Check for singularity (equivalent to rcond(H) check)
+                if abs(detH) < 1e-25
                     break; % Singular Hessian — fall through to fminsearch
                 end
                 
-                du = H \ (-g);
-                u = u + du;
+                du_x = (-g(1) * hyy + g(2) * hxy) / detH;
+                du_y = (-g(2) * hxx + g(1) * hxy) / detH;
+
+                u = u + [du_x; du_y];
             end
             
             % Fallback to fminsearch if NR did not converge
