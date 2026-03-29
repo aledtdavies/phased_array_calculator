@@ -13,6 +13,11 @@ class DelayLaw:
         self.wedge = wedge
         self.material = material
 
+        # Cache properties to avoid repeated coordinate calculations and index fetching during the calculate_law loop
+        self.transformed_elements = self.wedge.get_transformed_elements(self.probe)
+        self.num_els = self.probe.total_elements
+        self.active_indices = self.probe.get_active_element_indices()
+
     def solve_fermat_point(self, p_start, p_end, v1, v2):
         """
         Finds the point P(x, 0) on the interface that minimizes travel time 
@@ -193,10 +198,10 @@ class DelayLaw:
             'interface_points': np.ndarray (N, 3)
         """
         # 1. Get Element Positions in Global Frame
-        elements = self.wedge.get_transformed_elements(self.probe)
+        elements = self.transformed_elements
         
-        num_els = self.probe.total_elements
-        active_indices = self.probe.get_active_element_indices()
+        num_els = self.num_els
+        active_indices = self.active_indices
         
         tofs = np.full(num_els, np.nan)
         interface_points = np.zeros((num_els, 3))
@@ -259,7 +264,7 @@ class DelayLaw:
         Exports the global (x, y, z) coordinates of the probe elements to a CSV or MAT file.
         """
         import os
-        elements = self.wedge.get_transformed_elements(self.probe)
+        elements = self.transformed_elements
         print(f"Exporting element positions to {filename}...")
         
         coords_mm = elements * 1000.0

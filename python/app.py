@@ -348,7 +348,7 @@ class App(tk.Tk):
                 v_mat = solver.material.velocity_longitudinal
             
             # 1. Find Probe Center (Geometric Center of Array)
-            elements = solver.wedge.get_transformed_elements(solver.probe)
+            elements = solver.transformed_elements
             center_x = np.mean(elements[:, 0])
             center_y = np.mean(elements[:, 1])
             center_z = np.mean(elements[:, 2])

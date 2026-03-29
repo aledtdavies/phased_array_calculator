@@ -12,7 +12,7 @@ def plot_setup(solver, focal_point_x, focal_point_z, filename="visual_check.png"
     # 1. Calculate Rays
     law = solver.calculate_law(focal_point_x, focal_point_z)
     
-    elements = solver.wedge.get_transformed_elements(solver.probe)
+    elements = solver.transformed_elements
     interfaces = law['interface_points']
     target = law['focal_point']
     
@@ -83,7 +83,8 @@ def main():
     sin_alpha = (v_wedge / v_mat) * np.sin(beta_rad)
     alpha_rad = np.arcsin(sin_alpha)
     
-    elements = wedge.get_transformed_elements(probe)
+    solver = DelayLaw(probe, wedge, mat)
+    elements = solver.transformed_elements
     center_x = np.mean(elements[:, 0])
     center_z = np.mean(elements[:, 1])
     h_wedge = abs(center_z)

@@ -44,7 +44,7 @@ def check_curvature():
     # Calculate target x roughly (ignoring exact interface for simple target gen)
     # We just need physical points.
     # Let's use the solver's own method to find a valid beam path for the Center element
-    elements = wedge.get_transformed_elements(probe)
+    elements = solver.transformed_elements
     center_el_idx = probe.num_elements // 2
     p_center = elements[center_el_idx]
     
