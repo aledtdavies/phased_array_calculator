@@ -136,15 +136,15 @@ class DualProbe(Probe):
     def get_element_positions(self, center_at_origin: bool = True) -> np.ndarray:
         """
         Returns the (x, y, z) coordinates of both sub-arrays.
-        Sub-array 1 is offset by -separation/2 in Y.
-        Sub-array 2 is offset by +separation/2 in Y.
+        Sub-array 1 is offset by negative half the separation distance in the Y axis.
+        Sub-array 2 is offset by positive half the separation distance in the Y axis.
         """
-        # Get coordinates for a single sub-array
+        # Retrieve base element coordinates
         base_coords = super().get_element_positions(center_at_origin)
 
         if not center_at_origin:
-            # Keep dual-array separation symmetric about y=0 even when element 1
-            # anchoring is used for X/Z transformations.
+            # Maintain symmetry across the Y axis even when the first element
+            # is anchored for coordinate system transformations.
             base_coords[:, 1] -= np.mean(base_coords[:, 1])
         
         # Sub-array 1
