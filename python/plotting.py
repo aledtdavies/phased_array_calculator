@@ -11,6 +11,27 @@ class PlottingPanel(ttk.Frame):
     def __init__(self, parent):
         super().__init__(parent)
         
+        self._setup_plot_area()
+        self._setup_controls()
+
+        # Internal State
+        self.solver = None
+        self.focal_points = []
+        self.wave_type = 'longitudinal'
+        self.current_idx = 0
+        self.anim_job = None
+        self.is_playing = False
+
+        self.results = []
+        self.angle_values = []
+        self.skew_values = []
+        self.index_map = {}
+        self.is_matrix = False
+
+        # Initial empty plot setup
+        self._setup_axes()
+
+    def _setup_plot_area(self):
         # 1. Plot Area
         self.figure = plt.Figure(figsize=(6, 5), dpi=100)
         self.ax = self.figure.add_subplot(111)
@@ -18,7 +39,8 @@ class PlottingPanel(ttk.Frame):
         self.canvas = FigureCanvasTkAgg(self.figure, master=self)
         self.canvas.draw()
         self.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
-        
+
+    def _setup_controls(self):
         # 2. Controls Area (Grid)
         controls = ttk.Frame(self)
         controls.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=5)
@@ -45,23 +67,6 @@ class PlottingPanel(ttk.Frame):
         self.slider_skew.grid(row=1, column=1, sticky="ew", padx=5)
         
         controls.columnconfigure(1, weight=1)
-        
-        # Internal State
-        self.solver = None
-        self.focal_points = []
-        self.wave_type = 'longitudinal'
-        self.current_idx = 0
-        self.anim_job = None
-        self.is_playing = False
-        
-        self.results = []
-        self.angle_values = []
-        self.skew_values = []
-        self.index_map = {}
-        self.is_matrix = False
-        
-        # Initial empty plot setup
-        self._setup_axes()
 
     def _setup_axes(self):
         self.ax.clear()
