@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
-from matplotlib.patches import Polygon
 import numpy as np
 
 class PlottingPanel(ttk.Frame):
