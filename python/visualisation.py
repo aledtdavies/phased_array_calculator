@@ -83,9 +83,9 @@ def main():
     sin_alpha = (v_wedge / v_mat) * np.sin(beta_rad)
     alpha_rad = np.arcsin(sin_alpha)
     
-    elements = wedge.get_transformed_elements(probe)
-    center_x = np.mean(elements[:, 0])
-    center_z = np.mean(elements[:, 1])
+    center = wedge.get_probe_center(probe)
+    center_x = center[0]
+    center_z = center[1]
     h_wedge = abs(center_z)
     
     x_int = center_x + h_wedge * np.tan(alpha_rad)

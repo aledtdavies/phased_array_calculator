@@ -80,3 +80,10 @@ class Wedge:
         global_z = rot_z2 - self.height_at_element1
         
         return np.column_stack((global_x, global_y, global_z))
+
+    def get_probe_center(self, probe: Probe) -> np.ndarray:
+        """
+        Computes the geometric center of the probe elements in the GLOBAL frame.
+        """
+        elements = self.get_transformed_elements(probe)
+        return np.mean(elements, axis=0)

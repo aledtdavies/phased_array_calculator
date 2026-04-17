@@ -20,9 +20,9 @@ def generate_sector_scan(delay_law_solver, depth, start_angle, end_angle, step):
     print(f"Generating {len(angles)} laws for Sector Scan...")
     
     # 1. Probe Center Logic
-    elements = delay_law_solver.wedge.get_transformed_elements(delay_law_solver.probe)
-    center_x = np.mean(elements[:, 0])
-    center_z = np.mean(elements[:, 1])
+    center = delay_law_solver.wedge.get_probe_center(delay_law_solver.probe)
+    center_x = center[0]
+    center_z = center[1]
     h_wedge = abs(center_z)
     
     v_wedge = delay_law_solver.wedge.velocity
