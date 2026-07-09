@@ -559,7 +559,9 @@ class App(tk.Tk):
                     # results stores 'delays_us'
                     global_max_delay = max(np.max(r['delays_us']) for r in results)
                 
-                self.plot_tab.update_plot(solver, focal_points, wave_type, results=results, is_matrix=is_matrix)
+                thickness_mm = self.mat_panel.get_values().get("thickness_mm", 0.0)
+                self.plot_tab.update_plot(solver, focal_points, wave_type, results=results, is_matrix=is_matrix,
+                                          component_thickness_mm=thickness_mm)
                 self.hist_tab.update_plot(solver, focal_points, wave_type, global_max_delay=global_max_delay, results=results, is_matrix=is_matrix)
             else:
                 self.plot_tab.ax.clear()
