@@ -10,7 +10,7 @@ def plot_setup(solver, focal_point_x, focal_point_z, filename="visual_check.png"
     Plots the Probe, Wedge, Ray Paths, and Focal Point.
     """
     # 1. Calculate Rays
-    law = solver.calculate_law(focal_point_x, focal_point_z)
+    law = solver.calculate_law(focal_point_x, 0.0, focal_point_z)
     
     elements = solver.wedge.get_transformed_elements(solver.probe)
     interfaces = law['interface_points']

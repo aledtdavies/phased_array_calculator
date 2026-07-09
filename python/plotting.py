@@ -1,8 +1,8 @@
 import tkinter as tk
 from tkinter import ttk
+import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 from matplotlib.patches import Polygon
 import numpy as np
@@ -178,10 +178,27 @@ class PlottingPanel(ttk.Frame):
         # Schedule next frame (e.g., 100ms)
         self.anim_job = self.after(100, self.animate)
 
+    def _get_law_data(self, idx):
+        """
+        Returns (interface_points, target_mm) for focal_points[idx].
+        Reuses the delay law already computed by App.run_calculation
+        (cached in self.results) instead of re-solving the Fermat
+        problem for every element on every redraw.
+        """
+        fp = self.focal_points[idx]
+        if idx < len(self.results) and 'interface_points' in self.results[idx]:
+            int_pts = self.results[idx]['interface_points']
+            target = np.array(fp) * 1000
+        else:
+            law = self.solver.calculate_law(fp[0], fp[1], fp[2], wave_type=self.wave_type)
+            int_pts = law['interface_points']
+            target = law['focal_point'] * 1000
+        return int_pts, target
+
     def refresh_plot(self):
         if not self.solver or not self.focal_points:
             return
-            
+
         self.figure.clear()
         
         # Check probe type logic
@@ -210,7 +227,7 @@ class PlottingPanel(ttk.Frame):
         else:
             indices = [self.current_idx]
             
-        cmap = cm.get_cmap('jet')
+        cmap = matplotlib.colormaps['jet']
         norm = mcolors.Normalize(vmin=0, vmax=max(1, num_points-1))
         
         for ax, dim_idx in axes_list:
@@ -230,8 +247,6 @@ class PlottingPanel(ttk.Frame):
             
             # Plot Rays
             for idx in indices:
-                fp = self.focal_points[idx]
-                
                 if show_all:
                     c = cmap(norm(idx))
                     alpha = 0.5
@@ -239,10 +254,8 @@ class PlottingPanel(ttk.Frame):
                     c = 'b'
                     alpha = 1.0
                 
-                law = self.solver.calculate_law(fp[0], fp[1], fp[2], wave_type=self.wave_type)
-                int_pts = law['interface_points']
-                target = law['focal_point'] * 1000
-                
+                int_pts, target = self._get_law_data(idx)
+
                 # Outer Elements
                 p_el_start = elements[0] * 1000
                 p_int_start = int_pts[0] * 1000
@@ -434,10 +447,14 @@ class DelayHistogramPanel(ttk.Frame):
             
         self.ax.clear()
         
-        # Get Current Law
-        fp = self.focal_points[self.current_idx]
-        law = self.solver.calculate_law(fp[0], fp[1], fp[2], wave_type=self.wave_type)
-        delays = law['delays'] * 1e6 # Convert to microseconds
+        # Get Current Law (reuse delays already computed by App.run_calculation
+        # instead of re-solving the Fermat problem for every element)
+        if self.current_idx < len(self.results) and 'delays_us' in self.results[self.current_idx]:
+            delays = self.results[self.current_idx]['delays_us']
+        else:
+            fp = self.focal_points[self.current_idx]
+            law = self.solver.calculate_law(fp[0], fp[1], fp[2], wave_type=self.wave_type)
+            delays = law['delays'] * 1e6 # Convert to microseconds
         
         num_elements = len(delays)
         element_ids = range(1, num_elements + 1)
