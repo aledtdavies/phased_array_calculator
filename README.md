@@ -26,7 +26,7 @@ Computes element-level time delays (focal laws) for ultrasonic phased array insp
 **Requirements:** Python 3.9+, `numpy`, `scipy`, `matplotlib`
 
 ```bash
-pip install numpy scipy matplotlib
+pip install -r python/requirements.txt
 python python/app.py
 ```
 
