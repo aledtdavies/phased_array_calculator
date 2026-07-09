@@ -10,7 +10,7 @@ def calculate_target_delays(solver, x_int, depth, angle_rad, field_name):
     fx = x_int + depth * np.tan(angle_rad)
     fz = depth
     print(f"Calculating {field_name} Law...")
-    law = solver.calculate_law(fx, fz, 'longitudinal')
+    law = solver.calculate_law(fx, 0.0, fz, 'longitudinal')
     return law['delays'] * 1e6
 
 def plot_delay_curve(delays_us, depth, label, subplot_idx, show_ylabel=False):

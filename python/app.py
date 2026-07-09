@@ -469,7 +469,8 @@ class App(tk.Tk):
                              'fy': ly,
                              'fz': fz_current,
                              'delays_us': delays_us,
-                             'velocity_used': law['velocity_used']
+                             'velocity_used': law['velocity_used'],
+                             'interface_points': law['interface_points']
                          }
                          results.append(res_entry)
                          idx = len(results) - 1
