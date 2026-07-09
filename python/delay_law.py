@@ -13,6 +13,17 @@ class DelayLaw:
         self.wedge = wedge
         self.material = material
 
+        # Geometry and active-element indices are pure functions of probe/wedge
+        # state, which callers treat as immutable once a DelayLaw is built
+        # (a new probe/wedge/DelayLaw is always constructed for a new
+        # configuration). Caching them here avoids recomputing them on every
+        # calculate_law() call in a sweep (potentially thousands per scan).
+        # If probe/wedge attributes are ever mutated in place after
+        # construction, a new DelayLaw must be created to pick up the change.
+        self._cached_elements = self.wedge.get_transformed_elements(self.probe)
+        self._cached_num_els = self.probe.total_elements
+        self._cached_active_indices = self.probe.get_active_element_indices()
+
     def solve_fermat_point(self, p_start, p_end, v1, v2, C2=None):
         """
         Finds the point P(x, 0) on the interface that minimizes travel time 
@@ -195,10 +206,10 @@ class DelayLaw:
             'interface_points': np.ndarray (N, 3)
         """
         # 1. Get Element Positions in Global Frame
-        elements = self.wedge.get_transformed_elements(self.probe)
-        
-        num_els = self.probe.total_elements
-        active_indices = self.probe.get_active_element_indices()
+        elements = self._cached_elements
+
+        num_els = self._cached_num_els
+        active_indices = self._cached_active_indices
         
         tofs = np.full(num_els, np.nan)
         interface_points = np.zeros((num_els, 3))
