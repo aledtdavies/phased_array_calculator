@@ -24,6 +24,11 @@ class DelayLaw:
         self._cached_num_els = self.probe.total_elements
         self._cached_active_indices = self.probe.get_active_element_indices()
 
+    @property
+    def transformed_elements(self) -> np.ndarray:
+        """Global (x, y, z) element coordinates, cached at construction."""
+        return self._cached_elements
+
     def solve_fermat_point(self, p_start, p_end, v1, v2, C2=None):
         """
         Finds the point P(x, 0) on the interface that minimizes travel time 
@@ -279,7 +284,7 @@ class DelayLaw:
         Exports the global (x, y, z) coordinates of the probe elements to a CSV or MAT file.
         """
         import os
-        elements = self.wedge.get_transformed_elements(self.probe)
+        elements = self.transformed_elements
         print(f"Exporting element positions to {filename}...")
         
         coords_mm = elements * 1000.0

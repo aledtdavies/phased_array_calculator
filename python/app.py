@@ -7,7 +7,7 @@ import json
 import numpy as np
 
 from material import Material
-from probe import Probe, create_probe_assembly
+from probe import create_probe_assembly
 from wedge import Wedge
 from delay_law import DelayLaw
 
@@ -443,10 +443,7 @@ class App(tk.Tk):
                 v_mat = solver.material.velocity_longitudinal
 
             # 1. Find Probe Center (Geometric Center of Array)
-            elements = solver.wedge.get_transformed_elements(solver.probe)
-            center_x = np.mean(elements[:, 0])
-            center_y = np.mean(elements[:, 1])
-            center_z = np.mean(elements[:, 2])
+            center_x, center_y, center_z = solver.wedge.get_probe_center(solver.probe)
 
             # Dist to Interface (Vertical)
             h_wedge = abs(center_z)

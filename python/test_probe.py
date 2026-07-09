@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from probe import DualProbe
+from probe import DualProbe, Probe
 
 class TestDualProbe(unittest.TestCase):
     def test_dual_probe_array_separation_center_origin(self):
@@ -82,6 +82,31 @@ class TestDualProbe(unittest.TestCase):
         y_diff = coords2[:, 1] - coords1[:, 1]
 
         np.testing.assert_allclose(y_diff, array_separation, err_msg="Y offset does not match array_separation for dual matrix probe")
+
+
+class TestProbeValidation(unittest.TestCase):
+    def test_invalid_pitch_y_zero_raises(self):
+        """num_elements_y > 1 with pitch_y == 0 should raise ValueError."""
+        with self.assertRaisesRegex(ValueError, "pitch_y must be > 0 when num_elements_y > 1"):
+            Probe(num_elements=10, pitch=0.1, num_elements_y=2, pitch_y=0.0)
+
+    def test_invalid_pitch_y_negative_raises(self):
+        """num_elements_y > 1 with pitch_y < 0 should raise ValueError."""
+        with self.assertRaisesRegex(ValueError, "pitch_y must be > 0 when num_elements_y > 1"):
+            Probe(num_elements=10, pitch=0.1, num_elements_y=2, pitch_y=-0.5)
+
+    def test_valid_pitch_y_succeeds(self):
+        """num_elements_y > 1 with pitch_y > 0 should succeed."""
+        probe = Probe(num_elements=10, pitch=0.1, num_elements_y=2, pitch_y=0.1)
+        self.assertEqual(probe.num_elements_y, 2)
+        self.assertEqual(probe.pitch_y, 0.1)
+
+    def test_num_elements_y_one_allows_zero_pitch_y(self):
+        """num_elements_y == 1 should not require a positive pitch_y."""
+        probe = Probe(num_elements=10, pitch=0.1, num_elements_y=1, pitch_y=0.0)
+        self.assertEqual(probe.num_elements_y, 1)
+        self.assertEqual(probe.pitch_y, 0.0)
+
 
 if __name__ == '__main__':
     unittest.main()
