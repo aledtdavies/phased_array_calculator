@@ -4,7 +4,6 @@ import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.colors as mcolors
-from matplotlib.patches import Polygon
 import numpy as np
 
 class PlottingPanel(ttk.Frame):
@@ -217,7 +216,7 @@ class PlottingPanel(ttk.Frame):
             axes_list = [(self.ax, 0)]
             
         # 1. Plot Geometry
-        elements = self.solver.wedge.get_transformed_elements(self.solver.probe)
+        elements = self.solver.transformed_elements
         
         show_all = self.show_all_var.get()
         num_points = len(self.focal_points)
