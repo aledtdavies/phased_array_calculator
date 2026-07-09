@@ -215,7 +215,12 @@ class DelayLaw:
 
         C2_precalc = (v_mat / v_wedge) ** 2
         
-        is_2d = (self.probe.num_elements_y == 1 and abs(focal_point_y) < 1e-9)
+        # A pure 2D (X-Z plane) solve is only valid if every element AND the
+        # focal point actually lie at y=0. num_elements_y==1 is not sufficient:
+        # DualProbe sub-arrays are offset to y=+/-array_separation/2 even when
+        # num_elements_y==1, so their elements are off the X-Z plane.
+        has_y = np.any(np.abs(elements[:, 1]) > 1e-9) or abs(focal_point_y) > 1e-9
+        is_2d = not has_y
         
         # 2. Iterate active elements only and solve path
         for i in active_indices:
