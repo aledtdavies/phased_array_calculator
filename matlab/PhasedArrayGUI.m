@@ -81,6 +81,7 @@ function PhasedArrayGUI()
     addSec(y, 'Material Settings'); y = y - R;
     h_mVelL = addParam(y, 'L-Wave Vel (m/s):', 5920.0, 'mVelL'); y = y - R;
     h_mVelS = addParam(y, 'S-Wave Vel (m/s):', 3240.0, 'mVelS'); y = y - R;
+    h_thickness = addParam(y, 'Thickness (mm):', 0.0, 'thickness'); y = y - R;
 
     % --- Scan Settings ---
     addSec(y, 'Scan Settings'); y = y - R;
@@ -152,6 +153,12 @@ function PhasedArrayGUI()
     grid(ax_yz, 'on'); axis(ax_yz, 'equal'); set(ax_yz, 'YDir', 'reverse');
     xlabel(ax_yz, 'Y (mm)'); ylabel(ax_yz, 'Z Depth (mm)');
     title(ax_yz, 'Ray Tracing Y-Z');
+
+    % Delay profile bar chart (bottom strip, below the sliders)
+    ax_delay = axes(f, 'Position', [sideN + 0.01, 0.05, 0.770, 0.14]);
+    grid(ax_delay, 'on');
+    xlabel(ax_delay, 'Element ID'); ylabel(ax_delay, 'Delay (\mus)');
+    title(ax_delay, 'Delay Profile');
 
     % Azimuth Slider
     sliderX = round(sideN * figW) + 10;
@@ -242,98 +249,68 @@ function PhasedArrayGUI()
     
     function refreshPlot(iAz, iSk)
         if isempty(allResults); return; end
-        
+
         key = sprintf('%.4f_%.4f', angleValues(iAz), skewValues(iSk));
         if ~isKey(indexMap, key); return; end
         idx = indexMap(key);
-        
+
         res = allResults(idx);
-        elements = lastSolver.Wedge.getTransformedElements(lastSolver.Probe);
-        
+        probe = lastSolver.Probe;
+        elements = lastSolver.Wedge.getTransformedElements(probe);
+
+        isDualProbe = isa(probe, 'DualProbe');
         isLinear = strcmp(currentProbeType, 'Linear');
-        isDual = ismember(currentProbeType, {'Dual Linear', 'Dual Matrix'});
-        
+        nHalf = size(elements, 1) / 2;
+
+        % Active element indices: prefer the ones stored with this law
+        % (sub-aperture aware) and fall back to the probe's current
+        % setting only if an older result entry lacks them.
+        if isfield(res, 'ActiveIndices') && ~isempty(res.ActiveIndices)
+            activeIndices = res.ActiveIndices;
+        else
+            activeIndices = probe.getActiveElementIndices();
+        end
+
+        thicknessMM = str2double(get(h_thickness, 'String'));
+        if isnan(thicknessMM) || thicknessMM < 0
+            thicknessMM = 0;
+        end
+
+        wedgeAngDeg = lastSolver.Wedge.AngleDegrees;
+
         % --- X-Z Plot ---
-        cla(ax_xz); hold(ax_xz, 'on');
-        yline(ax_xz, 0, 'k-', 'LineWidth', 2);
-        
-        if isDual
-            nHalf = size(elements, 1) / 2;
-            plot(ax_xz, elements(1:nHalf, 1)*1000, elements(1:nHalf, 3)*1000, 'bs', 'MarkerSize', 4);
-            plot(ax_xz, elements(nHalf+1:end, 1)*1000, elements(nHalf+1:end, 3)*1000, 'rs', 'MarkerSize', 4);
-        else
-            plot(ax_xz, elements(:, 1)*1000, elements(:, 3)*1000, 'rs', 'MarkerSize', 4);
+        titleXZ = sprintf('X-Z  Angle: %.1f  Skew: %.1f', res.Angle, res.Skew);
+        [legH, legL] = plotProjection(ax_xz, 1, true, elements, res.InterfacePoints, ...
+            res.FocalPoint, activeIndices, isDualProbe, nHalf, wedgeAngDeg, thicknessMM, ...
+            'X (mm)', titleXZ);
+        if ~isempty(legH)
+            legend(ax_xz, legH, legL, 'Location', 'northeast', 'FontSize', 7);
         end
-        
-        fp = res.FocalPoint;
-        intPts = res.InterfacePoints;
-        
-        if isDual
-            nHalf = size(elements, 1) / 2;
-            
-            % Array 1 (Tx) — Blue
-            plot(ax_xz, [elements(1,1), intPts(1,1)]*1000, [elements(1,3), intPts(1,3)]*1000, 'b-');
-            plot(ax_xz, [intPts(1,1), fp(1)]*1000, [intPts(1,3), fp(3)]*1000, 'b-');
-            plot(ax_xz, [elements(nHalf,1), intPts(nHalf,1)]*1000, [elements(nHalf,3), intPts(nHalf,3)]*1000, 'b-');
-            plot(ax_xz, [intPts(nHalf,1), fp(1)]*1000, [intPts(nHalf,3), fp(3)]*1000, 'b-');
-            
-            % Array 2 (Rx) — Red
-            plot(ax_xz, [elements(nHalf+1,1), intPts(nHalf+1,1)]*1000, [elements(nHalf+1,3), intPts(nHalf+1,3)]*1000, 'r-');
-            plot(ax_xz, [intPts(nHalf+1,1), fp(1)]*1000, [intPts(nHalf+1,3), fp(3)]*1000, 'r-');
-            plot(ax_xz, [elements(end,1), intPts(end,1)]*1000, [elements(end,3), intPts(end,3)]*1000, 'r-');
-            plot(ax_xz, [intPts(end,1), fp(1)]*1000, [intPts(end,3), fp(3)]*1000, 'r-');
-        else
-            % Single array — Blue
-            plot(ax_xz, [elements(1,1), intPts(1,1)]*1000, [elements(1,3), intPts(1,3)]*1000, 'b-');
-            plot(ax_xz, [intPts(1,1), fp(1)]*1000, [intPts(1,3), fp(3)]*1000, 'b-');
-            plot(ax_xz, [elements(end,1), intPts(end,1)]*1000, [elements(end,3), intPts(end,3)]*1000, 'b-');
-            plot(ax_xz, [intPts(end,1), fp(1)]*1000, [intPts(end,3), fp(3)]*1000, 'b-');
-        end
-        
-        plot(ax_xz, fp(1)*1000, fp(3)*1000, 'rx', 'MarkerSize', 8, 'LineWidth', 2);
-        
-        xlabel(ax_xz, 'X (mm)'); ylabel(ax_xz, 'Z Depth (mm)');
-        title(ax_xz, sprintf('X-Z  Angle: %.1f  Skew: %.1f', res.Angle, res.Skew));
-        axis(ax_xz, 'equal'); set(ax_xz, 'YDir', 'reverse'); grid(ax_xz, 'on');
-        hold(ax_xz, 'off');
-        
+
         % --- Y-Z Plot ---
         if ~isLinear
-            cla(ax_yz); hold(ax_yz, 'on');
-            yline(ax_yz, 0, 'k-', 'LineWidth', 2);
-            
-            if isDual
-                plot(ax_yz, elements(1:nHalf, 2)*1000, elements(1:nHalf, 3)*1000, 'bs', 'MarkerSize', 4);
-                plot(ax_yz, elements(nHalf+1:end, 2)*1000, elements(nHalf+1:end, 3)*1000, 'rs', 'MarkerSize', 4);
-            else
-                plot(ax_yz, elements(:, 2)*1000, elements(:, 3)*1000, 'rs', 'MarkerSize', 4);
+            plotProjection(ax_yz, 2, false, elements, res.InterfacePoints, ...
+                res.FocalPoint, activeIndices, isDualProbe, nHalf, wedgeAngDeg, thicknessMM, ...
+                'Y (mm)', 'Y-Z Projection');
+        end
+
+        % --- Delay Profile Bar Chart ---
+        delaysUs = res.Delays * 1e6;
+        cla(ax_delay);
+        bar(ax_delay, 1:numel(delaysUs), delaysUs, 'FaceColor', [0.53 0.81 0.92], 'EdgeColor', 'k');
+        xlabel(ax_delay, 'Element ID'); ylabel(ax_delay, 'Delay (\mus)');
+        title(ax_delay, sprintf('Delay Profile - Angle: %.1f  Skew: %.1f', res.Angle, res.Skew));
+        grid(ax_delay, 'on');
+
+        globalMaxDelay = 0;
+        for k = 1:numel(allResults)
+            dk = max(allResults(k).Delays) * 1e6;
+            if ~isnan(dk) && dk > globalMaxDelay
+                globalMaxDelay = dk;
             end
-            
-            if isDual
-                % Array 1 (Tx) — Blue
-                plot(ax_yz, [elements(1,2), intPts(1,2)]*1000, [elements(1,3), intPts(1,3)]*1000, 'b-');
-                plot(ax_yz, [intPts(1,2), fp(2)]*1000, [intPts(1,3), fp(3)]*1000, 'b-');
-                plot(ax_yz, [elements(nHalf,2), intPts(nHalf,2)]*1000, [elements(nHalf,3), intPts(nHalf,3)]*1000, 'b-');
-                plot(ax_yz, [intPts(nHalf,2), fp(2)]*1000, [intPts(nHalf,3), fp(3)]*1000, 'b-');
-                
-                % Array 2 (Rx) — Red
-                plot(ax_yz, [elements(nHalf+1,2), intPts(nHalf+1,2)]*1000, [elements(nHalf+1,3), intPts(nHalf+1,3)]*1000, 'r-');
-                plot(ax_yz, [intPts(nHalf+1,2), fp(2)]*1000, [intPts(nHalf+1,3), fp(3)]*1000, 'r-');
-                plot(ax_yz, [elements(end,2), intPts(end,2)]*1000, [elements(end,3), intPts(end,3)]*1000, 'r-');
-                plot(ax_yz, [intPts(end,2), fp(2)]*1000, [intPts(end,3), fp(3)]*1000, 'r-');
-            else
-                plot(ax_yz, [elements(1,2), intPts(1,2)]*1000, [elements(1,3), intPts(1,3)]*1000, 'b-');
-                plot(ax_yz, [intPts(1,2), fp(2)]*1000, [intPts(1,3), fp(3)]*1000, 'b-');
-                plot(ax_yz, [elements(end,2), intPts(end,2)]*1000, [elements(end,3), intPts(end,3)]*1000, 'b-');
-                plot(ax_yz, [intPts(end,2), fp(2)]*1000, [intPts(end,3), fp(3)]*1000, 'b-');
-            end
-            
-            plot(ax_yz, fp(2)*1000, fp(3)*1000, 'rx', 'MarkerSize', 8, 'LineWidth', 2);
-            
-            xlabel(ax_yz, 'Y (mm)'); ylabel(ax_yz, 'Z Depth (mm)');
-            title(ax_yz, 'Y-Z Projection');
-            axis(ax_yz, 'equal'); set(ax_yz, 'YDir', 'reverse'); grid(ax_yz, 'on');
-            hold(ax_yz, 'off');
+        end
+        if globalMaxDelay > 0
+            ylim(ax_delay, [0, 1.1 * globalMaxDelay]);
         end
     end
     
@@ -470,6 +447,7 @@ function PhasedArrayGUI()
                     entry.Delays = res.Delays;
                     entry.InterfacePoints = res.InterfacePoints;
                     entry.VelocityUsed = res.VelocityUsed;
+                    entry.ActiveIndices = res.ActiveIndices;
                     
                     if resultIdx == 1
                         allResults = entry;
@@ -580,5 +558,284 @@ function PhasedArrayGUI()
         fullname = fullfile(path, file);
         lastSolver.exportElementPositions(fullname);
         msgbox(sprintf('Exported elements to %s', fullname), 'Success');
+    end
+end
+
+% =====================================================================
+% Local (non-nested) drawing helpers for refreshPlot.
+% Mirrors python/scene.py: draw_wedge_overlay, draw_elements,
+% draw_law_rays, finish_projection.
+% =====================================================================
+
+function pairs = localActiveEnvelopePairs(activeIndices, isDualProbe, nHalf)
+    % Returns an Mx2 array of [firstIdx, lastIdx] envelope pairs
+    % (1-based), one row per Tx/Rx half for dual probes (split at
+    % nHalf), or a single row for a single array. Halves with no
+    % active elements are omitted.
+    act = sort(activeIndices(:));
+    pairs = zeros(0, 2);
+    if isempty(act)
+        return;
+    end
+    if isDualProbe
+        tx = act(act <= nHalf);
+        rx = act(act > nHalf);
+        if ~isempty(tx)
+            pairs(end+1, :) = [tx(1), tx(end)];
+        end
+        if ~isempty(rx)
+            pairs(end+1, :) = [rx(1), rx(end)];
+        end
+    else
+        pairs(end+1, :) = [act(1), act(end)];
+    end
+end
+
+function geom = localWedgeGeometry(ec, ez, isXZ, wedgeAngDeg)
+    % Computes wedge/probe polygon vertices (mm) and annotation anchors
+    % from transformed element coordinates. Mirrors
+    % python/scene.py:draw_wedge_overlay exactly (contact detection,
+    % sloped/flat wedge silhouette, front-face capping, schematic probe
+    % body). dimIsXZ selects the sloped X-Z silhouette vs. the plain
+    % rectangular Y-Z silhouette; no probe body / annotations for Y-Z.
+    geom.isContact = max(abs(ez)) < 1e-3;
+    geom.contactX = min(ec);
+    geom.wedgeVerts = zeros(0, 2);
+    geom.probeVerts = zeros(0, 2);
+    geom.h1El = [ec(1), ez(1)];
+    geom.angleTextPos = [];
+    geom.wedgeAngDeg = wedgeAngDeg;
+
+    if geom.isContact
+        return;
+    end
+
+    span = max(ec) - min(ec);
+    margin = max(2.0, 0.15 * span);
+
+    if ~isXZ
+        zTop = min(ez);
+        geom.wedgeVerts = [min(ec)-margin, 0.0; max(ec)+margin, 0.0; ...
+                           max(ec)+margin, zTop; min(ec)-margin, zTop];
+        return;
+    end
+
+    tanA = tand(wedgeAngDeg);
+    if tanA > 1e-6
+        % Top-face silhouette line z(x) = -tanA*x + c through the
+        % highest elements (covers roof-angled duals too).
+        c = min(ez + tanA * ec);
+        xToe = c / tanA;           % z = 0 crossing of the top-face line
+        xBack = max(ec) + margin;
+        zBack = -tanA * xBack + c;
+
+        % Cap a very long toe with a vertical front face so a shallow
+        % wedge doesn't dominate the frame.
+        xFrontCap = min(ec) - 4.0 * margin;
+        if xToe < xFrontCap
+            zFront = -tanA * xFrontCap + c;
+            verts = [xFrontCap, 0.0; xBack, 0.0; xBack, zBack; xFrontCap, zFront];
+        else
+            verts = [xToe, 0.0; xBack, 0.0; xBack, zBack];
+        end
+        zAt = @(x) -tanA * x + c;
+    else
+        % Flat wedge (delay line): rectangle
+        zTop = min(ez);
+        verts = [min(ec)-margin, 0.0; max(ec)+margin, 0.0; ...
+                 max(ec)+margin, zTop; min(ec)-margin, zTop];
+        zAt = @(x) zTop;
+    end
+    geom.wedgeVerts = verts;
+
+    % Schematic probe body sitting on the top face over the element extent
+    x0 = min(ec); x1 = max(ec);
+    hp = max(3.0, 0.25 * abs(min(ez)));
+    geom.probeVerts = [x0, zAt(x0); x1, zAt(x1); x1, zAt(x1)-hp; x0, zAt(x0)-hp];
+
+    % Dimension annotation anchors: h1 drop line at element 1, and the
+    % wedge angle centred above the wedge top.
+    xMid = 0.5 * (min(verts(:,1)) + max(verts(:,1)));
+    zTopWedge = min(verts(:,2));
+    geom.angleTextPos = [xMid, zTopWedge - 1.0];
+end
+
+function [hWedge, hProbe] = localDrawWedge(ax, geom)
+    % Draws the wedge body, schematic probe body, and dimension
+    % annotations described by geom (see localWedgeGeometry). Returns
+    % the wedge/probe patch handles (empty if not drawn, e.g. contact).
+    COL_WEDGE_FACE = [0.13 0.77 0.37];
+    COL_WEDGE_EDGE = [0.08 0.50 0.24];
+    COL_PROBE_FACE = [0.39 0.45 0.55];
+    COL_PROBE_EDGE = [0.20 0.26 0.33];
+
+    hWedge = [];
+    hProbe = [];
+
+    if geom.isContact
+        text(ax, geom.contactX, -1.2, 'Contact', 'FontSize', 7, 'Color', COL_PROBE_EDGE);
+        return;
+    end
+
+    if ~isempty(geom.wedgeVerts)
+        hWedge = patch(ax, geom.wedgeVerts(:,1), geom.wedgeVerts(:,2), COL_WEDGE_FACE, ...
+                       'FaceAlpha', 0.16, 'EdgeColor', COL_WEDGE_EDGE, 'LineWidth', 1.0);
+    end
+    if ~isempty(geom.probeVerts)
+        hProbe = patch(ax, geom.probeVerts(:,1), geom.probeVerts(:,2), COL_PROBE_FACE, ...
+                       'FaceAlpha', 0.18, 'EdgeColor', COL_PROBE_EDGE, 'LineWidth', 1.0);
+    end
+    if ~isempty(geom.angleTextPos)
+        x1 = geom.h1El(1); z1 = geom.h1El(2);
+        plot(ax, [x1, x1], [0.0, z1], 'Color', COL_WEDGE_EDGE, 'LineWidth', 0.9);
+        text(ax, x1 + 0.8, z1 * 0.5, sprintf('h1=%.1f mm', abs(z1)), ...
+             'FontSize', 7, 'Color', COL_WEDGE_EDGE);
+        text(ax, geom.angleTextPos(1), geom.angleTextPos(2), ...
+             sprintf('angle=%.1f deg', geom.wedgeAngDeg), 'FontSize', 7, ...
+             'Color', COL_WEDGE_EDGE, 'HorizontalAlignment', 'center');
+    end
+end
+
+function [legH, legL] = plotProjection(ax, dimCol, isXZ, elements, intPts, fp, ...
+        activeIndices, isDualProbe, nHalf, wedgeAngDeg, thicknessMM, xLabelStr, titleStr)
+    % Draws one X-Z or Y-Z projection: component fill/backwall, wedge +
+    % probe overlay, interface line, element markers (active coloured /
+    % inactive grey), envelope rays from the first & last ACTIVE element
+    % of each array, and the focal point marker - with explicit padded
+    % framing (mirrors python/scene.py draw_projection + finish_projection).
+    %
+    % elements, intPts, fp are in METRES (elements: Nx3, intPts: Nx3 with
+    % zero-filled rows for inactive elements, fp: 1x3). dimCol selects
+    % X (1) or Y (2) as the horizontal axis; column 3 is always Z depth.
+    %
+    % Returns legend handle/label arrays for the caller to pass to
+    % legend() (only meaningful when this is the X-Z axes).
+    COL_INACTIVE = [0.58 0.64 0.72];
+    COL_MATERIAL = [0.58 0.64 0.72];
+    COL_BACKWALL = [0.20 0.26 0.33];
+
+    cla(ax); hold(ax, 'on');
+
+    nEl = size(elements, 1);
+    ec = elements(:, dimCol) * 1000;
+    ez = elements(:, 3) * 1000;
+
+    activeMask = false(nEl, 1);
+    activeMask(activeIndices) = true;
+
+    pairs = localActiveEnvelopePairs(activeIndices, isDualProbe, nHalf);
+
+    % ---- Numeric bounds pass (nothing drawn yet, so the component
+    % fill/backwall can be sized to the final frame and still rendered
+    % behind everything else) ----
+    boundsX = ec;
+    boundsZ = ez;
+    for r = 1:size(pairs, 1)
+        for i = pairs(r, :)
+            boundsX(end+1) = intPts(i, dimCol) * 1000; %#ok<AGROW>
+            boundsZ(end+1) = intPts(i, 3) * 1000; %#ok<AGROW>
+        end
+    end
+    boundsX(end+1) = fp(dimCol) * 1000;
+    boundsZ(end+1) = fp(3) * 1000;
+
+    wedgeGeom = localWedgeGeometry(ec, ez, isXZ, wedgeAngDeg);
+    wedgeBoundsXZ = [wedgeGeom.wedgeVerts; wedgeGeom.probeVerts];
+    if ~isempty(wedgeBoundsXZ)
+        boundsX = [boundsX; wedgeBoundsXZ(:,1)];
+        boundsZ = [boundsZ; wedgeBoundsXZ(:,2)];
+    end
+
+    if thicknessMM > 0
+        boundsZ(end+1) = thicknessMM;
+    end
+
+    xmin = min(boundsX); xmax = max(boundsX);
+    zmin = min(boundsZ); zmax = max(boundsZ);
+    xpad = max(2.0, (xmax - xmin) * 0.08);
+    zpad = max(2.0, (zmax - zmin) * 0.10);
+    x0 = xmin - xpad; x1 = xmax + xpad;
+    zTop = zmin - zpad; zBot = zmax + zpad;
+
+    % ---- Draw back-to-front: component, wedge/probe, interface,
+    % elements, rays, focal point ----
+    fillBot = zBot;
+    if thicknessMM > 0
+        fillBot = thicknessMM;
+    end
+    hComponent = patch(ax, [x0, x1, x1, x0], [0, 0, fillBot, fillBot], COL_MATERIAL, ...
+                       'FaceAlpha', 0.15, 'EdgeColor', 'none');
+
+    hBackwall = [];
+    if thicknessMM > 0
+        hBackwall = yline(ax, thicknessMM, 'Color', COL_BACKWALL, 'LineWidth', 1.5);
+    end
+
+    [hWedge, hProbe] = localDrawWedge(ax, wedgeGeom);
+
+    hInterface = yline(ax, 0, 'k-', 'LineWidth', 2);
+
+    if isDualProbe
+        halves = {1:nHalf, 'b'; (nHalf+1):nEl, 'r'};
+    else
+        halves = {1:nEl, 'r'};
+    end
+    hActive = [];
+    hInactive = [];
+    for hi = 1:size(halves, 1)
+        sl = halves{hi, 1};
+        colour = halves{hi, 2};
+        m = activeMask(sl);
+        cSl = ec(sl); zSl = ez(sl);
+        if any(m)
+            h = plot(ax, cSl(m), zSl(m), [colour 's'], 'MarkerSize', 4);
+            if isempty(hActive); hActive = h; end
+        end
+        if any(~m)
+            h = plot(ax, cSl(~m), zSl(~m), 's', 'Color', COL_INACTIVE, ...
+                     'MarkerFaceColor', 'none', 'MarkerSize', 4);
+            if isempty(hInactive); hInactive = h; end
+        end
+    end
+
+    for r = 1:size(pairs, 1)
+        i0 = pairs(r, 1);
+        if isDualProbe && i0 > nHalf
+            rc = 'r';
+        else
+            rc = 'b';
+        end
+        for i = pairs(r, :)
+            pEl = [ec(i), ez(i)];
+            pInt = [intPts(i, dimCol) * 1000, intPts(i, 3) * 1000];
+            pFp = [fp(dimCol) * 1000, fp(3) * 1000];
+            plot(ax, [pEl(1), pInt(1)], [pEl(2), pInt(2)], [rc '-']);
+            plot(ax, [pInt(1), pFp(1)], [pInt(2), pFp(2)], [rc '-']);
+        end
+    end
+
+    hFocal = plot(ax, fp(dimCol) * 1000, fp(3) * 1000, 'rx', 'MarkerSize', 8, 'LineWidth', 2);
+
+    xlim(ax, [x0, x1]);
+    ylim(ax, [zTop, zBot]);
+    set(ax, 'YDir', 'reverse');
+    daspect(ax, [1 1 1]);
+    grid(ax, 'on');
+    xlabel(ax, xLabelStr);
+    ylabel(ax, 'Z Depth (mm)');
+    title(ax, titleStr);
+    hold(ax, 'off');
+
+    legH = [];
+    legL = {};
+    if ~isempty(hActive);   legH(end+1) = hActive;   legL{end+1} = 'Elements';    end
+    if ~isempty(hInactive); legH(end+1) = hInactive; legL{end+1} = 'Inactive';    end
+    if ~isempty(hWedge);    legH(end+1) = hWedge;    legL{end+1} = 'Wedge';       end
+    if ~isempty(hProbe);    legH(end+1) = hProbe;    legL{end+1} = 'Probe';       end
+    legH(end+1) = hFocal;      legL{end+1} = 'Focal point';
+    legH(end+1) = hInterface;  legL{end+1} = 'Interface';
+    legH(end+1) = hComponent;  legL{end+1} = 'Component';
+    if ~isempty(hBackwall)
+        legH(end+1) = hBackwall; legL{end+1} = 'Backwall';
     end
 end
