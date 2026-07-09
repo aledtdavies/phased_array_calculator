@@ -47,7 +47,7 @@ def generate_sector_scan(delay_law_solver, depth, start_angle, end_angle, step):
         fz = depth
         fx = x_int + fz * np.tan(beta_rad)
         
-        law = delay_law_solver.calculate_law(fx, fz, wave_type='longitudinal')
+        law = delay_law_solver.calculate_law(fx, 0.0, fz, wave_type='longitudinal')
         
         results.append({
             'angle': ang_deg,
