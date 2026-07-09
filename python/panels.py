@@ -200,6 +200,9 @@ class MaterialPanel(ParameterPanel):
 
         self.vl_var = self.add_entry("vel_long_ms", 5920.0, "L-Wave Vel (m/s):")
         self.vs_var = self.add_entry("vel_shear_ms", 3240.0, "S-Wave Vel (m/s):")
+        # Display-only: frames the component fill/backwall in the ray plot.
+        # 0 = auto (fill to the bottom of the view, no backwall line).
+        self.thick_var = self.add_entry("thickness_mm", 0.0, "Thickness (mm, 0=auto):")
 
     def on_material_select(self, event):
         name = self.mat_var.get()
