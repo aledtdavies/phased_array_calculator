@@ -1,8 +1,8 @@
 import tkinter as tk
 from tkinter import ttk
+import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 from matplotlib.patches import Polygon
 import numpy as np
@@ -227,7 +227,7 @@ class PlottingPanel(ttk.Frame):
         else:
             indices = [self.current_idx]
             
-        cmap = cm.get_cmap('jet')
+        cmap = matplotlib.colormaps['jet']
         norm = mcolors.Normalize(vmin=0, vmax=max(1, num_points-1))
         
         for ax, dim_idx in axes_list:
