@@ -78,11 +78,14 @@ def _compute_base_focal(focus_mode, param_val, beta_rad, x_int):
 
 
 def _compute_skewed_focal_point(focus_mode, skew_rad, x_int, fx, beta_rad, fz, f_primary,
-                                 center_y, fy_overrides, y_mode):
+                                 center_y, fy_overrides, y_mode, entry_offset=0.0):
     """
     Computes (lx, fy_list, fz_current) for one skew angle, given the
     per-angle base focal primitives from _compute_base_focal.
     """
+    # Rotate both wedge and component legs about the aperture centre.
+    x_int += entry_offset * (np.cos(skew_rad) - 1)
+    center_y += entry_offset * np.sin(skew_rad)
     if focus_mode == FOCUS_CONSTANT_DEPTH:
         lx = x_int + f_primary * np.cos(skew_rad)
         fy_list = fy_overrides if fy_overrides is not None else [center_y + f_primary * np.sin(skew_rad)]
@@ -503,7 +506,8 @@ class App(tk.Tk):
 
                      # Determine 3D Focal point coordinates based on Focus Mode and Y mode
                      lx, fy_list, fz_current = _compute_skewed_focal_point(
-                         focus_mode, skew_rad, x_int, fx, beta_rad, fz, f_primary, center_y, fy_overrides, y_mode
+                         focus_mode, skew_rad, x_int, fx, beta_rad, fz, f_primary, center_y, fy_overrides, y_mode,
+                         entry_offset=h_wedge * np.tan(alpha_rad)
                      )
 
                      for ly in fy_list:
@@ -511,11 +515,12 @@ class App(tk.Tk):
                          if sound_path_y_sweep:
                              # For Y sweep in const path, we back-calculate the effective skew for display
                              # sin(skew) = (ly - center_y) / f_primary
-                             val = (ly - center_y) / f_primary if f_primary > 1e-9 else 0.0
+                             total_horizontal = h_wedge * np.tan(alpha_rad) + f_primary
+                             val = (ly - center_y) / total_horizontal if abs(total_horizontal) > 1e-9 else 0.0
                              if abs(val) <= 1.0:
                                  eff_skew_rad = np.arcsin(val)
                                  eff_skew_deg = np.degrees(eff_skew_rad)
-                                 lx = x_int + f_primary * np.cos(eff_skew_rad)
+                                 lx = center_x + total_horizontal * np.cos(eff_skew_rad)
                              else:
                                  # Y target unreachable with this path length
                                  self._insert_error_row(results, ang, "-", "Err", "Y out", "of reach")

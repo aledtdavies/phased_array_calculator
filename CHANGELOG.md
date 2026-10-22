@@ -1,4 +1,11 @@
 # Changelog
+
+## Review corrections — 2026-10-22
+
+- Replace the 3D Newton/fallback solver with a scaled, bracketed planar Snell solve in Python and MATLAB; refuse invalid geometry and wave modes.
+- Invalidate Python geometry caching when the mutable probe, wedge or active aperture changes, and return independent active-index arrays.
+- Preserve X in MATLAB's legacy two-coordinate call. Rotate both legs of GUI central-ray targets with skew; correct the manual's solver and equal-speed descriptions.
+- Add analytic Snell, grazing-ray, 2D/3D, cache mutation, input refusal, GUI angle and MATLAB legacy-call regression checks. The 2D quartic and max-TOF delay definition are retained.
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),

@@ -15,6 +15,7 @@ classdef DelayLaw
         function xInt = solveFermatPoint(obj, pStart, pEnd, v1, v2)
             % 2D Fermat solver (quartic polynomial method).
             % pStart = [x, z], pEnd = [x, z]
+            validateRay(pStart,pEnd,v1,v2);
             x1 = pStart(1);
             z1 = pStart(2);
             x2 = pEnd(1);
@@ -64,88 +65,30 @@ classdef DelayLaw
         end
         
         function [xi, yi] = solveFermatPoint3D(~, pStart, pEnd, v1, v2)
-            % 3D Fermat solver using Newton-Raphson with analytical Hessian.
-            %
-            % Finds the point P(xi, yi, 0) on the interface that minimises
-            % travel time from pStart(x1, y1, z1) to pEnd(x2, y2, z2).
-            %
-            % Falls back to fminsearch if NR fails to converge.
-            
-            x1 = pStart(1); y1 = pStart(2); z1 = pStart(3);
-            x2 = pEnd(1);   y2 = pEnd(2);   z2 = pEnd(3);
-            
-            % Guard for degenerate geometry
-            if norm([x1 - x2, y1 - y2]) < 1e-9
-                xi = x1;
-                yi = y1;
-                return;
+            % Planar isotropic ray in the vertical incidence plane.
+            % Global metres, z<=0 incident side, z>0 component; speeds m/s.
+            validateRay(pStart, pEnd, v1, v2);
+            delta = pEnd(1:2)-pStart(1:2);
+            distance = norm(delta);
+            if distance == 0
+                xi=pStart(1); yi=pStart(2); return;
             end
-            
-            % Initial guess via linear interpolation
-            h1 = abs(z1);
-            h2 = abs(z2);
-            denom = h1 + h2;
-            if denom > 0
-                ratio = h1 / denom;
+            L=max([distance,-pStart(3),pEnd(3)]);
+            d=distance/L; h1=-pStart(3)/L; h2=pEnd(3)/L;
+            ratio=v1/v2;
+            residual=@(f) snellResidual(f,d,h1,h2,ratio);
+            if h1==0 && residual(0)>=0
+                fraction=0;
             else
-                ratio = 0.5;
-            end
-            
-            u = [x1 + (x2 - x1) * ratio; ...
-                 y1 + (y2 - y1) * ratio];
-            
-            maxIter = 20;
-            tol = 1e-12;
-            
-            for iter = 1:maxIter
-                % Gradient
-                dx1 = u(1) - x1;  dy1 = u(2) - y1;
-                dx2 = x2 - u(1);  dy2 = y2 - u(2);
-                d1 = sqrt(dx1^2 + dy1^2 + z1^2);
-                d2 = sqrt(dx2^2 + dy2^2 + z2^2);
-                
-                gx = dx1 / (v1 * d1) - dx2 / (v2 * d2);
-                gy = dy1 / (v1 * d1) - dy2 / (v2 * d2);
-                g = [gx; gy];
-                
-                if norm(g) < tol
-                    xi = u(1);
-                    yi = u(2);
-                    return;
+                fraction=fzero(residual,[0,1],optimset('TolX',eps,'Display','off'));
+                if abs(residual(fraction))>1e-10
+                    error('DelayLaw:convergence','Snell solve did not satisfy its residual');
                 end
-                
-                % Hessian (with epsilon guard)
-                eps_guard = 1e-12;
-                d1_2 = dx1^2 + dy1^2 + z1^2 + eps_guard;
-                d2_2 = dx2^2 + dy2^2 + z2^2 + eps_guard;
-                d1_3 = d1_2 * sqrt(d1_2);
-                d2_3 = d2_2 * sqrt(d2_2);
-                
-                hxx = (d1_2 - dx1^2) / (v1 * d1_3) + (d2_2 - dx2^2) / (v2 * d2_3);
-                hyy = (d1_2 - dy1^2) / (v1 * d1_3) + (d2_2 - dy2^2) / (v2 * d2_3);
-                hxy = -dx1 * dy1 / (v1 * d1_3) - dx2 * dy2 / (v2 * d2_3);
-                
-                H = [hxx, hxy; hxy, hyy];
-                
-                % Newton step
-                if rcond(H) < 1e-15
-                    break; % Singular Hessian — fall through to fminsearch
-                end
-                
-                du = H \ (-g);
-                u = u + du;
             end
-            
-            % Fallback to fminsearch if NR did not converge
-            timeFun = @(uv) sqrt((uv(1) - x1)^2 + (uv(2) - y1)^2 + z1^2) / v1 + ...
-                           sqrt((x2 - uv(1))^2 + (y2 - uv(2))^2 + z2^2) / v2;
-            
-            opts = optimset('Display', 'off', 'TolX', 1e-12, 'TolFun', 1e-12);
-            uOpt = fminsearch(timeFun, u, opts);
-            xi = uOpt(1);
-            yi = uOpt(2);
+            point=pStart(1:2)+fraction*delta;
+            xi=point(1); yi=point(2);
         end
-        
+
         function result = calculateLaw(obj, focalX, focalY, focalZ, waveType)
             % Computes the delay law for a single focal point (3D).
             %
@@ -160,8 +103,7 @@ classdef DelayLaw
                 focalY = 0.0;
             end
             if nargin < 4
-                focalZ = focalX;  % Legacy 2D call: calculateLaw(fx, fz)
-                focalX = focalY;  % Shift arguments
+                focalZ = focalY;  % Legacy 2D call: calculateLaw(fx, fz)
                 focalY = 0.0;
             end
             if nargin < 5
@@ -179,11 +121,18 @@ classdef DelayLaw
             
             vWedge = obj.Wedge.Velocity;
             
-            if strcmpi(waveType, 'shear') && ~isempty(obj.Material.VelocityShear)
-                vMat = obj.Material.VelocityShear;
-            else
-                vMat = obj.Material.VelocityLongitudinal;
+            if ~any(strcmpi(waveType,{'longitudinal','shear'}))
+                error('DelayLaw:mode','waveType must be longitudinal or shear');
             end
+            if strcmpi(waveType,'shear')
+                if isempty(obj.Material.VelocityShear)
+                    error('DelayLaw:mode','shear mode requires a shear wave speed');
+                end
+                vMat=obj.Material.VelocityShear;
+            else
+                vMat=obj.Material.VelocityLongitudinal;
+            end
+            validateRay(elements(1,:),target,vWedge,vMat);
             
             % Determine if 3D solver is needed
             hasY = any(abs(elements(:, 2)) > 1e-9) || abs(focalY) > 1e-9;
@@ -267,4 +216,23 @@ classdef DelayLaw
             end
         end
     end
+end
+
+function validateRay(a,b,c1,c2)
+    if numel(a)~=numel(b) || ~ismember(numel(a),[2,3]) || ...
+            any(~isfinite(a)) || any(~isfinite(b)) || ...
+            ~isscalar(c1) || ~isscalar(c2) || ~isfinite(c1) || ~isfinite(c2) || c1<=0 || c2<=0 || ...
+            a(end)>0 || b(end)<=0
+        error('DelayLaw:domain','Finite ray endpoints require source z<=0, focus z>0 and positive speeds');
+    end
+end
+
+function value=snellResidual(f,d,h1,h2,ratio)
+    u=d*f; remaining=d*(1-f);
+    if h1==0 && f==0
+        incident=1;
+    else
+        incident=u/hypot(u,h1);
+    end
+    value=incident-ratio*remaining/hypot(remaining,h2);
 end
