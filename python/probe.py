@@ -53,20 +53,11 @@ class Probe:
         user_indices = np.arange(start_0, end_0)
         
         if self.element_order == 'row-first' and self.num_elements_y > 1:
-            # User numbering is row-first (Y varies fastest):
-            # user_idx -> (row, col) where row = user_idx % num_elements_y,
-            #                                col = user_idx // num_elements_y
-            # Internal storage is column-first (X varies fastest via meshgrid 'ij'):
-            # internal_idx = col * num_elements_y + row  (same as ix * Ny + iy)
-            # But since internal is already col-first: internal_idx = ix * Ny + iy
-            # From row-first user_idx: iy = user_idx % num_elements_y
-            #                          ix = user_idx // num_elements_y
-            # So internal_idx = ix * Ny + iy  (which equals user_idx) only if ordering matches.
-            # Actually internal (meshgrid 'ij') order: ix varies first.
-            # internal_idx for (ix, iy) = ix * Ny + iy    (X varies fastest)
-            # row-first user_idx for (ix, iy) = iy * Nx + ix  (Y varies fastest)
-            # So: given user_idx, iy = user_idx // Nx, ix = user_idx % Nx
-            #     internal_idx = ix * Ny + iy
+            # Internal storage (from get_element_positions' meshgrid) is
+            # column-first: internal_idx = ix * Ny + iy, i.e. Y varies
+            # fastest within each fixed-X "column".
+            # User numbering is row-first: Y varies slowest, so
+            # user_idx -> ix = user_idx % Nx, iy = user_idx // Nx.
             Nx = self.num_elements
             Ny = self.num_elements_y
             iy = user_indices // Nx
@@ -136,15 +127,15 @@ class DualProbe(Probe):
     def get_element_positions(self, center_at_origin: bool = True) -> np.ndarray:
         """
         Returns the (x, y, z) coordinates of both sub-arrays.
-        Sub-array 1 is offset by -separation/2 in Y.
-        Sub-array 2 is offset by +separation/2 in Y.
+        Sub-array 1 is offset by negative half the separation distance in the Y axis.
+        Sub-array 2 is offset by positive half the separation distance in the Y axis.
         """
-        # Get coordinates for a single sub-array
+        # Retrieve base element coordinates
         base_coords = super().get_element_positions(center_at_origin)
 
         if not center_at_origin:
-            # Keep dual-array separation symmetric about y=0 even when element 1
-            # anchoring is used for X/Z transformations.
+            # Maintain symmetry across the Y axis even when the first element
+            # is anchored for coordinate system transformations.
             base_coords[:, 1] -= np.mean(base_coords[:, 1])
         
         # Sub-array 1

@@ -112,6 +112,7 @@ The GUI is divided into a **scrollable left sidebar** of input panels and a **ri
 | Material | Preset component material | — |
 | L-Wave Velocity | Longitudinal wave speed in the component | m/s |
 | S-Wave Velocity | Shear wave speed *(used when Wave Type = Shear)* | m/s |
+| Thickness | Component thickness, display-only: frames the component fill and backwall line in the ray plot (0 = auto) | mm |
 
 ### 3.4 Scan Settings
 
@@ -183,10 +184,16 @@ Inactive elements produce `NaN` entries in delay and time-of-flight arrays.
 
 ### Ray Tracing Tab
 
-Displays refracted ray paths from each probe element through the interface to the focal point.
+Displays the inspection scene: the wedge body and schematic probe housing, the
+component (grey fill, with a backwall line when a Thickness is set), active
+elements (coloured squares) and inactive sub-aperture elements (grey open
+squares), the envelope rays of the **active aperture** from element to
+interface to focal point, and the focal-point marker. Wedge dimensions
+(element-1 height, wedge angle) are annotated on the plot.
 
 - **Linear probes:** single X-Z projection.
-- **Matrix / Dual probes:** side-by-side X-Z and Y-Z projections; an optional 3D scatter view is available.
+- **Matrix / Dual probes:** side-by-side X-Z and Y-Z projections.
+- **Show All:** overlays every law in the sweep, coloured by law index.
 
 The **angle/skew sliders** at the top of the tab allow interactive navigation through the computed law set without re-running the calculation.
 
@@ -529,7 +536,8 @@ Pitch (Y-axis rotation by θ):          Roll (X-axis rotation by φ):
 | `material.py` | `Material` class storing longitudinal and shear velocities |
 | `app.py` | Tkinter GUI application, scan engine, CSV export |
 | `panels.py` | Input panels (Probe, Wedge, Material, Scan, SubAperture) |
-| `plotting.py` | Ray tracing and delay histogram visualisation panels |
+| `plotting.py` | Ray tracing and delay histogram GUI panels |
+| `scene.py` | Toolkit-independent scene drawing shared by the GUI and scripts |
 | `materials.json` | Built-in material velocity database |
 | `verify_delays.py` | Standalone verification script |
 
