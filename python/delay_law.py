@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.optimize import minimize
+from scipy.optimize import brentq
 from material import Material
 from probe import Probe
 from wedge import Wedge
@@ -12,6 +12,7 @@ class DelayLaw:
         self.probe = probe
         self.wedge = wedge
         self.material = material
+        self._geometry_cache = None
 
     def solve_fermat_point(self, p_start, p_end, v1, v2, C2=None):
         """
@@ -28,6 +29,7 @@ class DelayLaw:
         Returns:
             x_int: The x-coordinate of the interface point.
         """
+        p_start, p_end = self._validate_ray(p_start, p_end, v1, v2)
         x1, z1 = p_start
         x2, z2 = p_end
         
@@ -101,85 +103,63 @@ class DelayLaw:
             
         return best_u + x1
 
+    @staticmethod
+    def _validate_ray(start, end, v1, v2):
+        start, end = np.asarray(start, dtype=float), np.asarray(end, dtype=float)
+        if start.shape != end.shape or start.ndim != 1 or start.size not in (2, 3):
+            raise ValueError("ray endpoints must both have two or three coordinates")
+        if not np.isfinite(start).all() or not np.isfinite(end).all():
+            raise ValueError("ray coordinates must be finite")
+        if not np.isfinite([v1, v2]).all() or v1 <= 0 or v2 <= 0:
+            raise ValueError("wave speeds must be finite and positive")
+        if start[-1] > 0 or end[-1] <= 0:
+            raise ValueError("source must have z <= 0 and transmitted focus z > 0")
+        return start, end
+
+    def _geometry(self):
+        # Only values actually used by Probe/Wedge geometry and aperture selection.
+        # Public configuration remains mutable; a changed state rebuilds the cache.
+        p, w = self.probe, self.wedge
+        key = (type(p), p.num_elements, p.num_elements_y, p.pitch, p.pitch_y,
+               p.start_element, p.num_active_elements, p.element_order,
+               getattr(p, 'array_separation', None), type(w), w.angle_rad,
+               w.roof_angle_rad, w.height_at_element1, w.probe_offset_x)
+        if self._geometry_cache is None or self._geometry_cache[0] != key:
+            elements = w.get_transformed_elements(p)
+            active = p.get_active_element_indices().copy()
+            self._geometry_cache = (key, elements, p.total_elements, active)
+        return self._geometry_cache[1:]
+
     def solve_fermat_point_3d(self, p_start, p_end, v1, v2):
+        """Planar isotropic Snell ray, reduced to its vertical incidence plane.
+
+        Coordinates are global metres: z<=0 incident medium, z>0 component;
+        speeds are m/s. The dimensionless scalar residual is bracketed on [0,1].
+        No unconstrained Newton step or unchecked optimiser result is used.
         """
-        Finds the point P(x_i, y_i, 0) on the interface that minimizes travel time 
-        from p_start(x1, y1, z1) to p_end(x2, y2, z2).
+        start, end = self._validate_ray(p_start, p_end, v1, v2)
+        delta = end[:2] - start[:2]
+        distance = np.linalg.norm(delta)
+        if distance == 0:
+            return float(start[0]), float(start[1])
+        length = max(distance, -start[2], end[2])
+        d, h1, h2 = distance/length, -start[2]/length, end[2]/length
+        ratio = v1/v2
 
-        Args:
-            p_start: (x, y, z) of element (z usually < 0)
-            p_end: (x, y, z) of focus (z usually > 0)
-            v1: velocity in wedge
-            v2: velocity in component
+        def residual(fraction):
+            u, remaining = d*fraction, d*(1-fraction)
+            incident = 1.0 if h1 == 0 and fraction == 0 else u/np.hypot(u, h1)
+            return incident - ratio*remaining/np.hypot(remaining, h2)
 
-        Returns:
-            (x_i, y_i): The interface coordinates.
-        """
-        x1, y1, z1 = p_start
-        x2, y2, z2 = p_end
-        
-        # Guard for degenerate geometry (element directly above/below focus)
-        if np.linalg.norm(p_start[:2] - p_end[:2]) < 1e-9:
-            return x1, y1
-
-        # Initial guess via linear interpolation
-        h1 = abs(z1)
-        h2 = abs(z2)
-        ratio = h1 / (h1 + h2) if (h1 + h2) > 0 else 0.5
-        x0 = x1 + (x2 - x1) * ratio
-        y0 = y1 + (y2 - y1) * ratio
-        u0 = np.array([x0, y0])
-
-        def time_func(u):
-            dx1, dy1 = u[0] - x1, u[1] - y1
-            dx2, dy2 = x2 - u[0], y2 - u[1]
-            d1 = np.sqrt(dx1**2 + dy1**2 + z1**2)
-            d2 = np.sqrt(dx2**2 + dy2**2 + z2**2)
-            return d1 / v1 + d2 / v2
-
-        def grad_func(u):
-            dx1, dy1 = u[0] - x1, u[1] - y1
-            dx2, dy2 = x2 - u[0], y2 - u[1]
-            d1 = np.sqrt(dx1**2 + dy1**2 + z1**2)
-            d2 = np.sqrt(dx2**2 + dy2**2 + z2**2)
-            
-            gx = dx1 / (v1 * d1) - dx2 / (v2 * d2)
-            gy = dy1 / (v1 * d1) - dy2 / (v2 * d2)
-            return np.array([gx, gy])
-            
-        def hessian_func(u):
-            dx1, dy1 = u[0] - x1, u[1] - y1
-            dx2, dy2 = x2 - u[0], y2 - u[1]
-            
-            d1_2 = dx1**2 + dy1**2 + z1**2 + 1e-12
-            d2_2 = dx2**2 + dy2**2 + z2**2 + 1e-12
-            d1_3 = d1_2 * np.sqrt(d1_2)
-            d2_3 = d2_2 * np.sqrt(d2_2)
-            
-            hxx = (d1_2 - dx1**2) / (v1 * d1_3) + (d2_2 - dx2**2) / (v2 * d2_3)
-            hyy = (d1_2 - dy1**2) / (v1 * d1_3) + (d2_2 - dy2**2) / (v2 * d2_3)
-            hxy = -dx1 * dy1 / (v1 * d1_3) - dx2 * dy2 / (v2 * d2_3)
-            
-            return np.array([[hxx, hxy], [hxy, hyy]])
-
-        # Newton-Raphson
-        u = u0
-        max_iter = 20
-        tol = 1e-12
-        for _ in range(max_iter):
-            g = grad_func(u)
-            if np.linalg.norm(g) < tol:
-                return float(u[0]), float(u[1])
-            H = hessian_func(u)
-            try:
-                du = np.linalg.solve(H, -g)
-                u = u + du
-            except np.linalg.LinAlgError:
-                break
-                
-        # Fallback to scipy if NR fails to converge
-        res = minimize(time_func, u0, method='L-BFGS-B', jac=grad_func)
-        return float(res.x[0]), float(res.x[1])
+        if h1 == 0 and residual(0) >= 0:
+            fraction = 0.0
+        else:
+            fraction = brentq(residual, 0.0, 1.0, xtol=np.nextafter(0., 1.),
+                              rtol=8*np.finfo(float).eps)
+            if abs(residual(fraction)) > 1e-10:
+                raise ArithmeticError("Snell solve did not satisfy its residual")
+        point = start[:2] + fraction*delta
+        return float(point[0]), float(point[1])
 
     def calculate_law(self, focal_point_x: float, focal_point_y: float, focal_point_z: float, wave_type: str = 'longitudinal'):
         """
@@ -195,10 +175,12 @@ class DelayLaw:
             'interface_points': np.ndarray (N, 3)
         """
         # 1. Get Element Positions in Global Frame
-        elements = self.wedge.get_transformed_elements(self.probe)
-        
-        num_els = self.probe.total_elements
-        active_indices = self.probe.get_active_element_indices()
+        target = np.array([focal_point_x, focal_point_y, focal_point_z], dtype=float)
+        if not np.isfinite(target).all() or target[2] <= 0:
+            raise ValueError("transmitted focus must be finite with z > 0")
+        if not isinstance(wave_type, str) or wave_type.lower() not in ('longitudinal', 'shear'):
+            raise ValueError("wave_type must be longitudinal or shear")
+        elements, num_els, active_indices = self._geometry()
         
         tofs = np.full(num_els, np.nan)
         interface_points = np.zeros((num_els, 3))
@@ -208,10 +190,13 @@ class DelayLaw:
         # Velocities
         v_wedge = self.wedge.velocity
         
-        if wave_type.lower() == 'shear' and self.material.velocity_shear:
+        if wave_type.lower() == 'shear':
+            if self.material.velocity_shear is None:
+                raise ValueError("shear mode requires a shear wave speed")
             v_mat = self.material.velocity_shear
         else:
             v_mat = self.material.velocity_longitudinal
+        self._validate_ray(elements[0], target, v_wedge, v_mat)
 
         C2_precalc = (v_mat / v_wedge) ** 2
         
@@ -260,7 +245,7 @@ class DelayLaw:
             'interface_points': interface_points,
             'focal_point': target,
             'velocity_used': v_mat,
-            'active_indices': active_indices
+            'active_indices': active_indices.copy()
         }
 
     def export_element_positions(self, filename: str):
