@@ -430,36 +430,23 @@ When `num_elements_y = 1` and the focal Y coordinate is zero, the problem reduce
 
 All real roots are evaluated; the one yielding minimum T is selected. This is a **closed-form, non-iterative** solution.
 
-> **Special case — equal velocities (`v₁ = v₂`):** The leading coefficient vanishes and the polynomial degenerates to a cubic. This is handled naturally by `numpy.roots` / MATLAB `roots` without special-casing.
+> **Special case — equal velocities (`v₁ = v₂`):** Both quartic and cubic coefficients vanish, leaving a quadratic. The selected minimum is the straight segment through the interface.
 
 ### 9.3 3D Solver — Matrix & Dual Probes
 
-For 3D geometry the interface point has **two free coordinates** `(x_i, y_i)` and no closed-form solution exists. The stationarity conditions form a coupled 2×2 nonlinear system `∇T = 0`, solved by **Newton-Raphson** iteration using the analytical Hessian.
+For a planar interface and isotropic speeds, the minimum lies in the vertical incidence plane through the source and focus. Let `D` be their horizontal separation, `u` the distance from the source projection to the interface point, and `h₁`, `h₂` the two positive depths. Solve the dimensionless Snell residual on `0 ≤ u ≤ D`:
 
-**Algorithm:**
+```
+u / sqrt(u² + h₁²) − (v₁/v₂)(D−u) / sqrt((D−u)² + h₂²) = 0
+```
 
-1. **Initial guess** — linear interpolation by depth ratio:
-   ```
-   x_i⁰ = x₁ + (x₂ − x₁) · |z₁| / (|z₁| + |z₂|)
-   y_i⁰ = y₁ + (y₂ − y₁) · |z₁| / (|z₁| + |z₂|)
-   ```
+For positive depths it is strictly increasing and has one root. Python uses bracketed Brent iteration; MATLAB uses bracketed `fzero`. Lengths are scaled before evaluation and the residual must be at most `1e-10`; failure raises an error. The horizontal root is rotated back to global X/Y. A vertical ray returns the shared horizontal position. A source on the interface uses the appropriate one-sided boundary minimum.
 
-2. **Newton-Raphson** — iterate `u ← u − H⁻¹ · ∇T` until `‖∇T‖ < 10⁻¹²` (max 20 iterations).
+The solver requires finite endpoints, source Z ≤ 0, focus Z > 0 and finite positive wave speeds. Unknown wave modes and shear mode without a shear speed are refused. Strict convexity alone does not guarantee convergence of an unguarded Newton iteration; the former Newton/minimisation fallback has been removed.
 
-3. **Fallback** — if the Hessian is singular or convergence fails, fall back to `scipy.optimize.minimize` with L-BFGS-B (Python) or MATLAB `fminsearch`.
+Python caches transformed geometry and active indices using their actual probe/wedge parameters; changing those parameters invalidates the cache. Time of flight and target-dependent results are always recomputed.
 
-The analytical gradient and Hessian components (with distances `d₁`, `d₂` from element and focus to interface point respectively) are:
-
-| Quantity | Expression |
-|---|---|
-| `∂T/∂x_i` | `Δx₁ / (v₁·d₁) − Δx₂ / (v₂·d₂)` |
-| `∂T/∂y_i` | `Δy₁ / (v₁·d₁) − Δy₂ / (v₂·d₂)` |
-| `∂²T/∂x_i²` | `(d₁² − Δx₁²)/(v₁·d₁³) + (d₂² − Δx₂²)/(v₂·d₂³)` |
-| `∂²T/∂x_i∂y_i` | `−Δx₁Δy₁/(v₁·d₁³) − Δx₂Δy₂/(v₂·d₂³)` |
-
-The objective function is strictly convex for all physically valid geometries, so convergence is guaranteed and typically achieved in **2–5 iterations** from the linear initial guess.
-
-> **Degenerate geometry guard:** If the element and focal point share the same XY position (`‖p_start[:2] − p_end[:2]‖ < 10⁻⁹`), the solver returns the element XY position directly and computes a vertical TOF.
+Angle/skew targets use the refracted central ray from the geometric centre of the complete aperture: both the wedge entry displacement and the component displacement rotate with skew. This follows the geometry of Schmerr, *Fundamentals of Ultrasonic Phased Arrays* (2015), §§5.2 and 8.2, especially Eqs. 8.14–8.15. A fixed-Y override is an explicit target constraint and does not promise the displayed nominal skew. A sound-path Y sweep derives its effective skew from the complete central-ray horizontal displacement. This is numerical ray verification, not experimental validation or a model of finite-aperture beam maxima.
 
 ### 9.4 Delay Calculation
 
@@ -506,7 +493,7 @@ Pitch (Y-axis rotation by θ):          Roll (X-axis rotation by φ):
 | **Planar interface only** | The wedge–component interface is a flat plane at Z = 0. Curved surfaces, tapered wedges, and immersion setups are not supported. |
 | **No diffraction or attenuation** | Geometric ray paths only. Beam spread, diffraction, frequency-dependent attenuation, and near-field effects are not modelled. |
 | **Isotropic materials** | Both wedge and component are treated as acoustically isotropic. Anisotropic or textured materials require stiffness-matrix methods. |
-| **Serial 3D solver** | The Newton-Raphson solver iterates over elements sequentially. For arrays larger than approximately 32×32 with long angle sweeps, calculation may take several seconds. Parallelisation is not yet implemented. |
+| **Serial 3D solver** | The bracketed Snell solver evaluates elements sequentially. Large arrays and long angle sweeps may take several seconds. Parallelisation is not yet implemented. |
 | **Critical angle handling** | Beam angles beyond the first critical angle are flagged as errors in the Data Table. Mode-converted or head-wave paths are not computed. |
 
 ---
