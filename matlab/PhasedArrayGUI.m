@@ -434,8 +434,19 @@ function PhasedArrayGUI()
                     skewDeg = skewAngles(j);
                     skewRad = deg2rad(skewDeg);
                     
-                    lx = xInt + fPrimary * cos(skewRad);
-                    ly = centerY + fPrimary * sin(skewRad);
+                    entryOffset = hWedge * tan(alpha);
+                    entryX = centerX + entryOffset * cos(skewRad);
+                    entryY = centerY + entryOffset * sin(skewRad);
+                    if strcmp(fMode, 'Vertical')
+                        if abs(cos(skewRad)*tan(beta)) < 1e-12
+                            continue;
+                        end
+                        fPrimary = (fx_target-entryX)/cos(skewRad);
+                        fz = fPrimary/tan(beta);
+                    end
+                    if fz<=0, continue; end
+                    lx = entryX + fPrimary * cos(skewRad);
+                    ly = entryY + fPrimary * sin(skewRad);
                     
                     res = solver.calculateLaw(lx, ly, fz, wType);
                     
