@@ -55,7 +55,7 @@ The left sidebar contains scrollable input panels:
 |---|---|
 | **Probe Settings** | Probe type, element count, pitch, frequency |
 | **Wedge Settings** | Angle, height, velocity, offset; roof angle and array separation for dual probes |
-| **Component Settings** | L-wave and S-wave velocities |
+| **Component Settings** | L-wave and S-wave velocities; display-only thickness for the plot backwall |
 | **Scan Settings** | Focus type, wave type, angle/skew sweep, Y focus mode |
 | **Sub-Aperture Settings** | Start element, active element count, element order (matrix only) |
 
@@ -130,6 +130,7 @@ phased_array_calculator/
 │   ├── wedge.py        — Wedge geometry and coordinate transform
 │   ├── material.py     — Material velocities
 │   ├── panels.py       — Input panels (incl. SubAperturePanel)
+│   ├── scene.py        — Toolkit-independent ray-scene drawing
 │   └── plotting.py     — Ray tracing and histogram panels
 ├── matlab/
 │   ├── PhasedArrayGUI.m — GUI
