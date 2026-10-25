@@ -54,6 +54,14 @@ class TestDelayLaw(unittest.TestCase):
         actual['active_indices'][0]=0
         np.testing.assert_array_equal(s.calculate_law(.03,0,.04)['active_indices'],[3,4])
 
+    def test_central_ray_starts_at_active_aperture_centre(self):
+        p=Probe(16,.001,start_element=9,num_active_elements=8)
+        s=DelayLaw(p,Wedge(20,.01,2330),Material(5900,3240))
+        elements=s.wedge.get_transformed_elements(p)
+        np.testing.assert_allclose(s.aperture_centre(),elements[8:16].mean(axis=0),atol=1e-15,rtol=0)
+        p.start_element=1; p.num_active_elements=0
+        np.testing.assert_allclose(s.aperture_centre(),elements.mean(axis=0),atol=1e-15,rtol=0)
+
     def test_repeated_laws_reuse_geometry(self):
         s=self.solver(); original=s.wedge.get_transformed_elements; calls=[]
         def counted(p):

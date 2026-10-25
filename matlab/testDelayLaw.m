@@ -19,6 +19,15 @@ residual=(q(1:2)-a(1:2))/(1480*norm(q-a))+(q(1:2)-b(1:2))/(5900*norm(q-b));
 verifyLessThan(test,norm(residual),1e-12);
 end
 
+function testCentralRayStartsAtActiveApertureCentre(test)
+p=Probe(16,.001,5e6,1,0,9,8);
+s=DelayLaw(p,Wedge(20,.01,2330),Material(5900,3240));
+elements=s.Wedge.getTransformedElements(p);
+verifyEqual(test,s.apertureCentre(),mean(elements(9:16,:),1),'AbsTol',1e-15);
+s=DelayLaw(Probe(16,.001),Wedge(20,.01,2330),Material(5900,3240));
+verifyEqual(test,s.apertureCentre(),mean(elements,1),'AbsTol',1e-15);
+end
+
 function testLegacyTwoCoordinateCall(test)
 s=DelayLaw(Probe(8,.0006),Wedge(20,.01,1480),Material(5900,3240));
 a=s.calculateLaw(.03,.04); b=s.calculateLaw(.03,0,.04);
