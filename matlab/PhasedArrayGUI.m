@@ -393,10 +393,11 @@ function PhasedArrayGUI()
             end
             
             % 4. Compute
-            elements = wedge.getTransformedElements(probe);
-            centerX = mean(elements(:, 1));
-            centerY = mean(elements(:, 2));
-            centerZ = mean(elements(:, 3));
+            % Central ray starts at the centre of the active sub-aperture
+            centre = solver.apertureCentre();
+            centerX = centre(1);
+            centerY = centre(2);
+            centerZ = centre(3);
             hWedge = abs(centerZ);
             
             resultIdx = 0;

@@ -445,11 +445,8 @@ class App(tk.Tk):
             else:
                 v_mat = solver.material.velocity_longitudinal
 
-            # 1. Find Probe Center (Geometric Center of Array)
-            elements = solver.wedge.get_transformed_elements(solver.probe)
-            center_x = np.mean(elements[:, 0])
-            center_y = np.mean(elements[:, 1])
-            center_z = np.mean(elements[:, 2])
+            # 1. Central ray starts at the centre of the active sub-aperture
+            center_x, center_y, center_z = solver.aperture_centre()
 
             # Dist to Interface (Vertical)
             h_wedge = abs(center_z)
