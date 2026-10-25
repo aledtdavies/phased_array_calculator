@@ -446,7 +446,7 @@ The solver requires finite endpoints, source Z ≤ 0, focus Z > 0 and finite pos
 
 Python caches transformed geometry and active indices using their actual probe/wedge parameters; changing those parameters invalidates the cache. Time of flight and target-dependent results are always recomputed.
 
-Angle/skew targets use the refracted central ray from the geometric centre of the complete aperture: both the wedge entry displacement and the component displacement rotate with skew. This follows the geometry of Schmerr, *Fundamentals of Ultrasonic Phased Arrays* (2015), §§5.2 and 8.2, especially Eqs. 8.14–8.15. A fixed-Y override is an explicit target constraint and does not promise the displayed nominal skew. A sound-path Y sweep derives its effective skew from the complete central-ray horizontal displacement. This is numerical ray verification, not experimental validation or a model of finite-aperture beam maxima.
+Angle/skew targets use the refracted central ray from the geometric centre of the active sub-aperture (the whole array when no sub-aperture is set), so each sub-aperture of a sequence steers and focuses about its own centre: both the wedge entry displacement and the component displacement rotate with skew. This follows the geometry of Schmerr, *Fundamentals of Ultrasonic Phased Arrays* (2015), §§5.2 and 8.2, especially Eqs. 8.14–8.15. A fixed-Y override is an explicit target constraint and does not promise the displayed nominal skew. A sound-path Y sweep derives its effective skew from the complete central-ray horizontal displacement. This is numerical ray verification, not experimental validation or a model of finite-aperture beam maxima.
 
 ### 9.4 Delay Calculation
 
