@@ -130,6 +130,11 @@ class DelayLaw:
             self._geometry_cache = (key, elements, p.total_elements, active)
         return self._geometry_cache[1:]
 
+    def aperture_centre(self):
+        """Centre of the active sub-aperture, global frame. Focal rules start the central ray here."""
+        elements, _, active = self._geometry()
+        return elements[active].mean(axis=0)
+
     def solve_fermat_point_3d(self, p_start, p_end, v1, v2):
         """Planar isotropic Snell ray, reduced to its vertical incidence plane.
 

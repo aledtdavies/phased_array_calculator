@@ -1,5 +1,9 @@
 # Changelog
 
+## Sub-aperture central ray — 2026-10-25
+
+- Angle/skew focal targets (constant depth, vertical line, constant sound path) start the refracted central ray at the centre of the active sub-aperture, not the whole array, in both GUIs (`DelayLaw.aperture_centre` / `apertureCentre`). Full-aperture laws are unchanged; 16-element sub-aperture laws on a 32-element array move by up to about 10 mm. Matches buildFE and imageFE.
+
 ## Review corrections — 2026-10-22
 
 - Replace the 3D Newton/fallback solver with a scaled, bracketed planar Snell solve in Python and MATLAB; refuse invalid geometry and wave modes.

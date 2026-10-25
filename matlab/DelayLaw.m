@@ -175,6 +175,12 @@ classdef DelayLaw
             result.ActiveIndices = activeIndices;
         end
         
+        function centre = apertureCentre(obj)
+            % Centre of the active sub-aperture, global frame. Focal rules start the central ray here.
+            elements = obj.Wedge.getTransformedElements(obj.Probe);
+            centre = mean(elements(obj.Probe.getActiveElementIndices(), :), 1);
+        end
+
         function exportElementPositions(obj, filename)
             elements = obj.Wedge.getTransformedElements(obj.Probe);
             fprintf('Exporting elements to %s...\n', filename);
