@@ -5,7 +5,9 @@ laptop for a 64-element linear probe and a 16 x 4 dual matrix).
     python tests/benchmarks/redraw_timing.py
 
 Steps through every law of a sweep, as Play does, and times each tab's redraw (the window
-shown, so the time includes painting), then times a dragged focus (solve + every tab).
+shown, so the time includes painting). Then times a dragged focus: the solve plus the visible
+Ray Tracing tab (hidden tabs defer their redraw), and the solve plus every tab, each shown in
+turn so its deferred redraw is counted.
 Prints medians and maxima in milliseconds. A measurement, not a test.
 """
 import os
@@ -58,23 +60,30 @@ def main():
             times = []
             for k in range(1, n):
                 t0 = time.perf_counter()
-                tab.show_law(k)
-                if hasattr(tab, "plotter"):
-                    tab.plotter.render()
+                tab.show_law(k)          # refresh_plot renders (the 3D tab once, as in use)
                 app.processEvents()
                 times.append((time.perf_counter() - t0) * 1e3)
             rows.append((name, type(tab).__name__, n, np.median(times), np.max(times)))
-        # dragged focus: solve and redraw every tab
+        # dragged focus: the solve plus the visible Ray Tracing tab (hidden tabs redraw when shown)
         w.tabs.setCurrentIndex(0)
         app.processEvents()
-        y = float(w.plot_tab.current_focal()[1])
         times = []
         for k in range(20):
             t0 = time.perf_counter()
             w.on_focus_dragged(0.03 + 0.0005 * k, 0.018)
             app.processEvents()
             times.append((time.perf_counter() - t0) * 1e3)
-        rows.append((name, "dragged focus (all tabs)", 20, np.median(times), np.max(times)))
+        rows.append((name, "drag: solve + Ray Tracing", 20, np.median(times), np.max(times)))
+        # and every tab: each shown in turn after the drag, so its deferred redraw is included
+        times = []
+        for k in range(10):
+            t0 = time.perf_counter()
+            w.on_focus_dragged(0.03 + 0.0005 * k, 0.019)
+            for i in (2, 3, 0):
+                w.tabs.setCurrentIndex(i)
+                app.processEvents()
+            times.append((time.perf_counter() - t0) * 1e3)
+        rows.append((name, "drag: solve + all 3 tabs", 10, np.median(times), np.max(times)))
     w.close()
     print(f"{'setup':22s} {'view':26s} {'laws':>5s} {'median ms':>10s} {'max ms':>8s}")
     for name, view, n, med, mx in rows:
