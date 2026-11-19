@@ -11,15 +11,15 @@ Plan step 4 (`docs/plans/PLAN-2026-11-qt-vtk-migration.md`).
 - **Drag the focus in X-Z.** The law for the dragged focus is solved live and shown in every tab, marked "dragged focus (not in the sweep)". The table and CSV are unchanged; any slider, step or table selection returns to the sweep. A focus dragged above the surface is refused.
 - **One current law for every tab.** A slider, step, Play or table selection in any tab moves them all; hidden tabs draw it when shown.
 - **Linked element selection.** Clicking an element marker, a delay bar, a map cell or an element in the 3D view selects it in every tab.
-- **Hidden tabs redraw only when shown,** and the 3D tab updates the law's meshes in place: a 3D redraw per law went from about 125–156 ms to 42–48 ms.
+- **Hidden tabs redraw only when shown,** and the 3D tab updates the law's meshes in place: a 3D redraw per law went from about 125–156 ms to 28–30 ms.
 - **Redraw per law** (dev laptop, `tests/benchmarks/redraw_timing.py`, medians):
 
-  | | Ray Tracing | Delays | 3D View | Dragged focus |
+  | | Ray Tracing | Delays | 3D View | Dragged focus (solve + visible tab) |
   |---|---|---|---|---|
-  | 64-element linear | 18 ms | 17 ms | 42 ms | 37 ms |
-  | 16 × 4 dual matrix | 33 ms | 24 ms | 48 ms | 66 ms |
+  | 64-element linear | 19 ms | 17 ms | 28 ms | 36 ms |
+  | 16 × 4 dual matrix | 33 ms | 29 ms | 30 ms | 66 ms |
 
-  The dual-matrix drag includes solving 128 elements with the 3D solver.
+  The dual-matrix drag includes solving 128 elements with the 3D solver. Hidden tabs redraw when shown: a drag followed by showing every tab in turn takes 120 and 160 ms, tab switching included.
 - `scene_model.wedge_yz_rect` (the Y-Z wedge silhouette) is shared by both renderers; the Tk images are unchanged. `session.law_result` holds one law's fields.
 - `requirements.txt` adds pyqtgraph. The Qt window no longer uses matplotlib; the Tk window and static exports still do.
 
