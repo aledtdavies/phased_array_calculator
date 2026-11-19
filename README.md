@@ -128,6 +128,8 @@ phased_array_calculator/
 │   ├── app.py          — GUI application
 │   ├── probe.py        — Probe, DualProbe, sub-aperture logic
 │   ├── delay_law.py    — Fermat solver, focal law calculation
+│   ├── focal_rules.py  — Focal targets: constant depth, vertical line, sound path, skew, Y modes
+│   ├── scene_model.py  — Renderer-independent scene primitives (what every view shows)
 │   ├── wedge.py        — Wedge geometry and coordinate transform
 │   ├── material.py     — Material velocities
 │   ├── panels.py       — Input panels (incl. SubAperturePanel)
@@ -140,6 +142,7 @@ phased_array_calculator/
 │   ├── Probe.m          — Probe class with sub-aperture support
 │   ├── DualProbe.m      — DualProbe subclass
 │   ├── DelayLaw.m       — Focal law solver
+│   ├── FocalRules.m     — Focal targets (twin of focal_rules.py, checked on shared cases)
 │   ├── Wedge.m          — Wedge class
 │   └── Material.m       — Material class
 ├── UserManual.md        — Full user manual
