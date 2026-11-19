@@ -185,7 +185,10 @@ def focal_targets(solver, mode: str, value: float, angles_deg: Sequence[float],
         entry = h * np.tan(alpha)
         x_int = cx + entry
         fz, f_primary, fx = base_focal(mode, value, beta, x_int)
-        if fz is not None and fz < 0:
+        # Depth and path foci do not depend on skew, so a negative depth refuses every skew
+        # here. A vertical-line focus does (the entry point rotates with skew): it is
+        # checked per skew below.
+        if mode != "vertical-line" and fz < 0:
             out += [Refused(float(ang), float(s), "focus not below surface") for s in skews_deg]
             continue
 
@@ -193,6 +196,9 @@ def focal_targets(solver, mode: str, value: float, angles_deg: Sequence[float],
             if path_y_sweep:
                 # Skew solved per Y: the focus lies on the central ray at that Y.
                 reach = entry + f_primary
+                if not fz > 0:
+                    out += [Refused(float(ang), None, "focus not below surface") for _ in y_list]
+                    break
                 for y in y_list:
                     if abs(reach) <= _ZERO_REACH:
                         # No horizontal reach (a 0 degree beam from the centre): only the

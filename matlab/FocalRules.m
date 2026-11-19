@@ -70,7 +70,9 @@ classdef FocalRules
                 entry = h * tan(asin(sinAlpha));
                 xInt = cx + entry;
                 [fz, fPrimary, fx] = FocalRules.baseFocal(mode, value, beta, xInt);
-                if ~isnan(fz) && fz < 0
+                % Depth and path foci do not depend on skew; a vertical-line focus does
+                % (the entry point rotates with skew), so it is checked per skew below.
+                if ~strcmp(mode, 'vertical-line') && fz < 0
                     for s = skewsDeg(:)'
                         T(end+1) = FocalRules.refused(ang, s, 'focus not below surface'); %#ok<AGROW>
                     end
@@ -79,6 +81,12 @@ classdef FocalRules
                 for s = skewsDeg(:)'
                     if pathSweep
                         reach = entry + fPrimary;
+                        if ~(fz > 0)
+                            for y = yValues(:)'
+                                T(end+1) = FocalRules.refused(ang, NaN, 'focus not below surface'); %#ok<AGROW>
+                            end
+                            break
+                        end
                         for y = yValues(:)'
                             if abs(reach) <= FocalRules.ZeroReach
                                 % No horizontal reach: only the aperture centre's Y is on the ray.
