@@ -85,6 +85,16 @@ class TestEmptyRecalculation(GuiCase):
         a.scene3d_tab.animate()
         self.assertEqual(a.scene3d_tab.focal_points, [])
 
+    def test_play_before_any_laws_stays_idle(self):
+        a = self.app
+        tab = a.scene3d_tab
+        tab.toggle_play()
+        self.assertFalse(tab.is_playing)
+        self.assertEqual(str(tab.play_btn.cget("text")), "Play")
+        a.run_calculation()
+        self.assertGreater(len(a.last_results), 0)
+        self.assertTrue(any(ax.has_data() for ax in tab.figure.axes))
+
 
 class TestCatalogueRoundTrip(GuiCase):
     def config_with_reference(self, match=True):

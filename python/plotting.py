@@ -235,7 +235,7 @@ class PlayMixin:
             if self.anim_job:
                 self.after_cancel(self.anim_job)
                 self.anim_job = None
-        else:
+        elif self.focal_points:     # nothing to play before laws are calculated
             self.is_playing = True
             self.play_btn.config(text="Pause")
             self.animate()
