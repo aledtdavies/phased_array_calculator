@@ -33,10 +33,34 @@ def prism_mesh(p):
     return pv.PolyData(pts, face).extrude((0, y1 - y0, 0), capping=True)
 
 
+LAW_ROLES = ("ray", "focus", "central-ray")   # primitives that change with the selected law
+
+
+def add_law(pl, prims):
+    """
+    Add (or replace) the law-dependent actors. Each is named by its role, so adding the
+    next law's primitives replaces the previous law's actors instead of piling up.
+    """
+    for p in prims:
+        c = COLOURS.get(p.role)
+        if p.role == "ray":
+            pl.add_mesh(pv.line_segments_from_points(p.coords), color=c, opacity=0.5,
+                        line_width=1, label=p.label, name="law:ray")
+        elif p.role == "central-ray":
+            pl.add_mesh(pv.lines_from_points(p.coords), color=c, line_width=3, label=p.label,
+                        name="law:central-ray")
+        elif p.role == "focus":
+            pl.add_points(p.coords, color=c, point_size=16, render_points_as_spheres=True,
+                          label=p.label, name="law:focus")
+
+
 def add_scene(pl, prims, element_size=None):
     """Add every primitive to a pv.Plotter (or pyvistaqt QtInteractor). Returns the element actor."""
     picked = None
+    add_law(pl, prims)
     for p in prims:
+        if p.role in LAW_ROLES:
+            continue
         c = COLOURS.get(p.role)
         if p.kind == "prism":
             pl.add_mesh(prism_mesh(p), color=c, opacity=0.18 if p.role == "wedge" else 0.35,
