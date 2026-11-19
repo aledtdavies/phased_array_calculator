@@ -8,6 +8,7 @@ Evidence for `docs/plans/PLAN-2026-11-qt-vtk-migration.md`. This is not producti
 | `render_static.py` | matplotlib renderer: coverage, skips and weld, plus the field (`images/proto_coverage_field.png`) |
 | `render_pyvista.py` | PyVista 3D renderer, off-screen screenshots, `--show` for an interactive window |
 | `qt_mock.py` | PySide6 shell with pyvistaqt and pyqtgraph, linked law slider, `--screenshot` |
+| `check_mock.py` | Checks the linking: law actors replaced (none pile up), 3D central ray and focus match the scene model, table row follows the slider in any sort order |
 
 ```
 python -m venv .venv-proto

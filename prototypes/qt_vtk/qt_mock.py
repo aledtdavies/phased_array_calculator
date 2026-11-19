@@ -19,7 +19,7 @@ from qtpy import QtCore, QtGui, QtWidgets
 from pyvistaqt import QtInteractor
 
 from scene_model import build_scene, constant_depth_sweep, demo_setup, single_v_weld
-from render_pyvista import add_scene, z_down_camera
+from render_pyvista import add_law, add_scene, z_down_camera
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.normpath(os.path.join(HERE, "..", "..", "docs", "plans", "images"))
@@ -156,6 +156,17 @@ class Mock(QtWidgets.QMainWindow):
         self.show_law(len(self.sweep) // 2)
         z_down_camera(self.vtk, (60, 0, 0), 230, -35, 30)
 
+    def _select_table_row(self, law):
+        """Select the row holding `law` (UserRole), whatever the table's sort order."""
+        for r in range(self.table.rowCount()):
+            item = self.table.item(r, 0)
+            if item is not None and int(item.data(QtCore.Qt.UserRole)) == law:
+                if self.table.currentRow() != r:
+                    self.table.blockSignals(True)
+                    self.table.selectRow(r)
+                    self.table.blockSignals(False)
+                return
+
     def _table_selected(self):
         item = self.table.currentItem()
         if item is not None:
@@ -203,18 +214,14 @@ class Mock(QtWidgets.QMainWindow):
         ok = np.isfinite(d)
         self.bar_item.setOpts(x=np.arange(1, len(d) + 1)[ok], height=d[ok])
         self.bars.setTitle(f"Delays (µs), law {i + 1}")
-        # 3D: the static scene once, then only the law's rays and focus
+        # 3D: the static scene once; afterwards only the law's named actors are replaced
         if self.ray_actor is None:
             add_scene(self.vtk, prims)
             self.ray_actor = True
         else:
-            import pyvista as pv
-            for name in ("rays", "focus"):
-                self.vtk.remove_actor(name)
-            self.vtk.add_mesh(pv.line_segments_from_points(by["ray"].coords), color="#1d4ed8",
-                              opacity=0.5, name="rays")
-            self.vtk.add_points(by["focus"].coords, color="black", point_size=16,
-                                render_points_as_spheres=True, name="focus")
+            add_law(self.vtk, prims)
+        self.current_prims = by
+        self._select_table_row(i)
         a, _, f, _ = self.sweep[i]
         ms = (time.perf_counter() - t0) * 1e3
         self.readout.setText(f"{i + 1}/{len(self.sweep)}  {a:.1f}° SW  F = ({f[0]*1e3:.1f}, "
