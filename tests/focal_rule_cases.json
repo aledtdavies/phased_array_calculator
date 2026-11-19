@@ -1,0 +1,874 @@
+{
+ "about": "Focal-rule cases and their Python targets (python/make_focal_rule_cases.py). SI units, angles in degrees, global frame (X along the wedge, Y across, Z down).",
+ "cases": [
+  {
+   "name": "depth linear",
+   "inputs": {
+    "probe": {
+     "type": "Linear",
+     "n": 16,
+     "pitch": 0.0006,
+     "start": 1,
+     "active": 0
+    },
+    "wedge": {
+     "angle": 30.0,
+     "height": 0.012,
+     "velocity": 2330.0,
+     "offset": 0.003,
+     "roof": 0.0
+    },
+    "material": {
+     "vl": 5920.0,
+     "vs": 3240.0
+    },
+    "mode": "constant-depth",
+    "value": 0.03,
+    "angles": [
+     -20,
+     0,
+     40,
+     70
+    ],
+    "skews": [
+     0
+    ],
+    "wave": "longitudinal",
+    "y_mode": "from-skew",
+    "y_values": null
+   },
+   "targets": [
+    {
+     "angle": -20.0,
+     "skew": 0.0,
+     "x": -0.0059578426175276545,
+     "y": 0.0,
+     "z": 0.03
+    },
+    {
+     "angle": 0.0,
+     "skew": 0.0,
+     "x": 0.006897114317029974,
+     "y": 0.0,
+     "z": 0.03
+    },
+    {
+     "angle": 40.0,
+     "skew": 0.0,
+     "x": 0.0357964172911488,
+     "y": 0.0,
+     "z": 0.03
+    },
+    {
+     "angle": 70.0,
+     "skew": 0.0,
+     "x": 0.09499395031520518,
+     "y": 0.0,
+     "z": 0.03
+    }
+   ]
+  },
+  {
+   "name": "depth linear sub-aperture shear",
+   "inputs": {
+    "probe": {
+     "type": "Linear",
+     "n": 16,
+     "pitch": 0.0006,
+     "start": 5,
+     "active": 8
+    },
+    "wedge": {
+     "angle": 30.0,
+     "height": 0.012,
+     "velocity": 2330.0,
+     "offset": 0.003,
+     "roof": 0.0
+    },
+    "material": {
+     "vl": 5920.0,
+     "vs": 3240.0
+    },
+    "mode": "constant-depth",
+    "value": 0.02,
+    "angles": [
+     40,
+     55,
+     70
+    ],
+    "skews": [
+     0
+    ],
+    "wave": "shear",
+    "y_mode": "from-skew",
+    "y_values": null
+   },
+   "targets": [
+    {
+     "angle": 40.0,
+     "skew": 0.0,
+     "x": 0.031107461961343057,
+     "y": 0.0,
+     "z": 0.02
+    },
+    {
+     "angle": 55.0,
+     "skew": 0.0,
+     "x": 0.04584825253988264,
+     "y": 0.0,
+     "z": 0.02
+    },
+    {
+     "angle": 70.0,
+     "skew": 0.0,
+     "x": 0.07491065618776038,
+     "y": 0.0,
+     "z": 0.02
+    }
+   ]
+  },
+  {
+   "name": "vertical line linear",
+   "inputs": {
+    "probe": {
+     "type": "Linear",
+     "n": 16,
+     "pitch": 0.0006,
+     "start": 1,
+     "active": 0
+    },
+    "wedge": {
+     "angle": 30.0,
+     "height": 0.012,
+     "velocity": 2330.0,
+     "offset": 0.003,
+     "roof": 0.0
+    },
+    "material": {
+     "vl": 5920.0,
+     "vs": 3240.0
+    },
+    "mode": "vertical-line",
+    "value": 0.04,
+    "angles": [
+     -10,
+     0,
+     10,
+     45
+    ],
+    "skews": [
+     0
+    ],
+    "wave": "longitudinal",
+    "y_mode": "from-skew",
+    "y_values": null
+   },
+   "targets": [
+    {
+     "angle": -10.0,
+     "skew": 0.0,
+     "reason": "focus not below surface"
+    },
+    {
+     "angle": 0.0,
+     "skew": 0.0,
+     "reason": "beam parallel to line"
+    },
+    {
+     "angle": 10.0,
+     "skew": 0.0,
+     "x": 0.04,
+     "y": 0.0,
+     "z": 0.1821995244624216
+    },
+    {
+     "angle": 45.0,
+     "skew": 0.0,
+     "x": 0.04,
+     "y": 0.0,
+     "z": 0.028973933643500153
+    }
+   ]
+  },
+  {
+   "name": "sound path linear",
+   "inputs": {
+    "probe": {
+     "type": "Linear",
+     "n": 16,
+     "pitch": 0.0006,
+     "start": 1,
+     "active": 0
+    },
+    "wedge": {
+     "angle": 30.0,
+     "height": 0.012,
+     "velocity": 2330.0,
+     "offset": 0.003,
+     "roof": 0.0
+    },
+    "material": {
+     "vl": 5920.0,
+     "vs": 3240.0
+    },
+    "mode": "sound-path",
+    "value": 0.035,
+    "angles": [
+     0,
+     30,
+     60
+    ],
+    "skews": [
+     0
+    ],
+    "wave": "shear",
+    "y_mode": "from-skew",
+    "y_values": null
+   },
+   "targets": [
+    {
+     "angle": 0.0,
+     "skew": 0.0,
+     "x": 0.006897114317029974,
+     "y": 0.0,
+     "z": 0.035
+    },
+    {
+     "angle": 30.0,
+     "skew": 0.0,
+     "x": 0.029888207109674936,
+     "y": 0.0,
+     "z": 0.030310889132455356
+    },
+    {
+     "angle": 60.0,
+     "skew": 0.0,
+     "x": 0.04855115124797206,
+     "y": 0.0,
+     "z": 0.017500000000000005
+    }
+   ]
+  },
+  {
+   "name": "critical angle",
+   "inputs": {
+    "probe": {
+     "type": "Linear",
+     "n": 16,
+     "pitch": 0.0006,
+     "start": 1,
+     "active": 0
+    },
+    "wedge": {
+     "angle": 30.0,
+     "height": 0.012,
+     "velocity": 2330.0,
+     "offset": 0.003,
+     "roof": 0.0
+    },
+    "material": {
+     "vl": 2000.0,
+     "vs": 1000.0
+    },
+    "mode": "constant-depth",
+    "value": 0.03,
+    "angles": [
+     20,
+     80
+    ],
+    "skews": [
+     0
+    ],
+    "wave": "longitudinal",
+    "y_mode": "from-skew",
+    "y_values": null
+   },
+   "targets": [
+    {
+     "angle": 20.0,
+     "skew": 0.0,
+     "x": 0.02400683712381977,
+     "y": 0.0,
+     "z": 0.03
+    },
+    {
+     "angle": 80.0,
+     "skew": 0.0,
+     "reason": "critical angle"
+    }
+   ]
+  },
+  {
+   "name": "depth matrix skew",
+   "inputs": {
+    "probe": {
+     "type": "Matrix",
+     "n": 8,
+     "pitch": 0.001,
+     "ny": 4,
+     "pitch_y": 0.0012,
+     "start": 3,
+     "active": 20,
+     "order": "row-first"
+    },
+    "wedge": {
+     "angle": 30.0,
+     "height": 0.012,
+     "velocity": 2330.0,
+     "offset": 0.003,
+     "roof": 0.0
+    },
+    "material": {
+     "vl": 5920.0,
+     "vs": 3240.0
+    },
+    "mode": "constant-depth",
+    "value": 0.025,
+    "angles": [
+     40,
+     60
+    ],
+    "skews": [
+     -20,
+     0,
+     15
+    ],
+    "wave": "longitudinal",
+    "y_mode": "from-skew",
+    "y_values": null
+   },
+   "targets": [
+    {
+     "angle": 40.0,
+     "skew": -20.0,
+     "x": 0.029122209206098766,
+     "y": -0.00720448046245885,
+     "z": 0.025
+    },
+    {
+     "angle": 40.0,
+     "skew": 0.0,
+     "x": 0.03060414587046742,
+     "y": 0.0012,
+     "z": 0.025
+    },
+    {
+     "angle": 40.0,
+     "skew": 15.0,
+     "x": 0.029766839259098423,
+     "y": 0.007559975136918021,
+     "z": 0.025
+    },
+    {
+     "angle": 60.0,
+     "skew": -20.0,
+     "x": 0.05140556029134734,
+     "y": -0.015314956977192805,
+     "z": 0.025
+    },
+    {
+     "angle": 60.0,
+     "skew": 0.0,
+     "x": 0.05431759279166594,
+     "y": 0.0012,
+     "z": 0.025
+    },
+    {
+     "angle": 60.0,
+     "skew": 15.0,
+     "x": 0.05267227007061906,
+     "y": 0.013697466825151933,
+     "z": 0.025
+    }
+   ]
+  },
+  {
+   "name": "vertical matrix skew",
+   "inputs": {
+    "probe": {
+     "type": "Matrix",
+     "n": 8,
+     "pitch": 0.001,
+     "ny": 4,
+     "pitch_y": 0.0012,
+     "start": 3,
+     "active": 20,
+     "order": "row-first"
+    },
+    "wedge": {
+     "angle": 30.0,
+     "height": 0.012,
+     "velocity": 2330.0,
+     "offset": 0.003,
+     "roof": 0.0
+    },
+    "material": {
+     "vl": 5920.0,
+     "vs": 3240.0
+    },
+    "mode": "vertical-line",
+    "value": 0.03,
+    "angles": [
+     30,
+     50
+    ],
+    "skews": [
+     -30,
+     0,
+     90
+    ],
+    "wave": "longitudinal",
+    "y_mode": "from-skew",
+    "y_values": null
+   },
+   "targets": [
+    {
+     "angle": 30.0,
+     "skew": -30.0,
+     "x": 0.03,
+     "y": -0.012638457268119893,
+     "z": 0.0431576442376085
+    },
+    {
+     "angle": 30.0,
+     "skew": 0.0,
+     "x": 0.03,
+     "y": 0.0012,
+     "z": 0.036735193868459255
+    },
+    {
+     "angle": 30.0,
+     "skew": 90.0,
+     "reason": "beam parallel to line"
+    },
+    {
+     "angle": 50.0,
+     "skew": -30.0,
+     "x": 0.03,
+     "y": -0.012638457268119891,
+     "z": 0.019575316021755995
+    },
+    {
+     "angle": 50.0,
+     "skew": 0.0,
+     "x": 0.03,
+     "y": 0.0012,
+     "z": 0.016463931694888776
+    },
+    {
+     "angle": 50.0,
+     "skew": 90.0,
+     "reason": "beam parallel to line"
+    }
+   ]
+  },
+  {
+   "name": "path matrix skew",
+   "inputs": {
+    "probe": {
+     "type": "Matrix",
+     "n": 8,
+     "pitch": 0.001,
+     "ny": 4,
+     "pitch_y": 0.0012,
+     "start": 3,
+     "active": 20,
+     "order": "row-first"
+    },
+    "wedge": {
+     "angle": 30.0,
+     "height": 0.012,
+     "velocity": 2330.0,
+     "offset": 0.003,
+     "roof": 0.0
+    },
+    "material": {
+     "vl": 5920.0,
+     "vs": 3240.0
+    },
+    "mode": "sound-path",
+    "value": 0.04,
+    "angles": [
+     35,
+     55
+    ],
+    "skews": [
+     -10,
+     10
+    ],
+    "wave": "shear",
+    "y_mode": "from-skew",
+    "y_values": null
+   },
+   "targets": [
+    {
+     "angle": 35.0,
+     "skew": -10.0,
+     "x": 0.03475690645423365,
+     "y": -0.003865136675384695,
+     "z": 0.03276608177155967
+    },
+    {
+     "angle": 35.0,
+     "skew": 10.0,
+     "x": 0.03475690645423365,
+     "y": 0.006265136675384695,
+     "z": 0.03276608177155967
+    },
+    {
+     "angle": 55.0,
+     "skew": -10.0,
+     "x": 0.0481707786573749,
+     "y": -0.006230364260573797,
+     "z": 0.02294305745404184
+    },
+    {
+     "angle": 55.0,
+     "skew": 10.0,
+     "x": 0.0481707786573749,
+     "y": 0.008630364260573797,
+     "z": 0.02294305745404184
+    }
+   ]
+  },
+  {
+   "name": "depth matrix fixed y",
+   "inputs": {
+    "probe": {
+     "type": "Matrix",
+     "n": 8,
+     "pitch": 0.001,
+     "ny": 4,
+     "pitch_y": 0.0012,
+     "start": 3,
+     "active": 20,
+     "order": "row-first"
+    },
+    "wedge": {
+     "angle": 30.0,
+     "height": 0.012,
+     "velocity": 2330.0,
+     "offset": 0.003,
+     "roof": 0.0
+    },
+    "material": {
+     "vl": 5920.0,
+     "vs": 3240.0
+    },
+    "mode": "constant-depth",
+    "value": 0.025,
+    "angles": [
+     45
+    ],
+    "skews": [
+     -10,
+     10
+    ],
+    "wave": "longitudinal",
+    "y_mode": "fixed",
+    "y_values": [
+     0.003
+    ]
+   },
+   "targets": [
+    {
+     "angle": 45.0,
+     "skew": -10.0,
+     "x": 0.03457483219321219,
+     "y": 0.003,
+     "z": 0.025
+    },
+    {
+     "angle": 45.0,
+     "skew": 10.0,
+     "x": 0.03457483219321219,
+     "y": 0.003,
+     "z": 0.025
+    }
+   ]
+  },
+  {
+   "name": "vertical matrix y sweep",
+   "inputs": {
+    "probe": {
+     "type": "Matrix",
+     "n": 8,
+     "pitch": 0.001,
+     "ny": 4,
+     "pitch_y": 0.0012,
+     "start": 3,
+     "active": 20,
+     "order": "row-first"
+    },
+    "wedge": {
+     "angle": 30.0,
+     "height": 0.012,
+     "velocity": 2330.0,
+     "offset": 0.003,
+     "roof": 0.0
+    },
+    "material": {
+     "vl": 5920.0,
+     "vs": 3240.0
+    },
+    "mode": "vertical-line",
+    "value": 0.035,
+    "angles": [
+     40,
+     60
+    ],
+    "skews": [
+     0,
+     10
+    ],
+    "wave": "longitudinal",
+    "y_mode": "sweep",
+    "y_values": [
+     -0.004,
+     0.0,
+     0.004
+    ]
+   },
+   "targets": [
+    {
+     "angle": 40.0,
+     "skew": 0.0,
+     "x": 0.035,
+     "y": -0.004,
+     "z": 0.030238774951390553
+    },
+    {
+     "angle": 40.0,
+     "skew": 0.0,
+     "x": 0.035,
+     "y": 0.0,
+     "z": 0.030238774951390553
+    },
+    {
+     "angle": 40.0,
+     "skew": 0.0,
+     "x": 0.035,
+     "y": 0.004,
+     "z": 0.030238774951390553
+    },
+    {
+     "angle": 40.0,
+     "skew": 10.0,
+     "x": 0.035,
+     "y": -0.004,
+     "z": 0.03077136027437659
+    },
+    {
+     "angle": 40.0,
+     "skew": 10.0,
+     "x": 0.035,
+     "y": 0.0,
+     "z": 0.03077136027437659
+    },
+    {
+     "angle": 40.0,
+     "skew": 10.0,
+     "x": 0.035,
+     "y": 0.004,
+     "z": 0.03077136027437659
+    },
+    {
+     "angle": 60.0,
+     "skew": 0.0,
+     "x": 0.035,
+     "y": -0.004,
+     "z": 0.013846982601636094
+    },
+    {
+     "angle": 60.0,
+     "skew": 0.0,
+     "x": 0.035,
+     "y": 0.0,
+     "z": 0.013846982601636094
+    },
+    {
+     "angle": 60.0,
+     "skew": 0.0,
+     "x": 0.035,
+     "y": 0.004,
+     "z": 0.013846982601636094
+    },
+    {
+     "angle": 60.0,
+     "skew": 10.0,
+     "x": 0.035,
+     "y": -0.004,
+     "z": 0.014104995903633441
+    },
+    {
+     "angle": 60.0,
+     "skew": 10.0,
+     "x": 0.035,
+     "y": 0.0,
+     "z": 0.014104995903633441
+    },
+    {
+     "angle": 60.0,
+     "skew": 10.0,
+     "x": 0.035,
+     "y": 0.004,
+     "z": 0.014104995903633441
+    }
+   ]
+  },
+  {
+   "name": "path matrix y sweep",
+   "inputs": {
+    "probe": {
+     "type": "Matrix",
+     "n": 8,
+     "pitch": 0.001,
+     "ny": 4,
+     "pitch_y": 0.0012,
+     "start": 3,
+     "active": 20,
+     "order": "row-first"
+    },
+    "wedge": {
+     "angle": 30.0,
+     "height": 0.012,
+     "velocity": 2330.0,
+     "offset": 0.003,
+     "roof": 0.0
+    },
+    "material": {
+     "vl": 5920.0,
+     "vs": 3240.0
+    },
+    "mode": "sound-path",
+    "value": 0.04,
+    "angles": [
+     30,
+     60
+    ],
+    "skews": [
+     -20,
+     0,
+     20
+    ],
+    "wave": "longitudinal",
+    "y_mode": "sweep",
+    "y_values": [
+     0.0,
+     0.01,
+     0.2
+    ]
+   },
+   "targets": [
+    {
+     "angle": 30.0,
+     "skew": -3.0222901077119926,
+     "x": 0.028759269242716407,
+     "y": 0.0,
+     "z": 0.034641016151377546
+    },
+    {
+     "angle": 30.0,
+     "skew": 22.74596418675616,
+     "x": 0.0270208526348539,
+     "y": 0.01,
+     "z": 0.034641016151377546
+    },
+    {
+     "angle": 30.0,
+     "skew": null,
+     "reason": "Y out of reach"
+    },
+    {
+     "angle": 60.0,
+     "skew": -1.7353509033973902,
+     "x": 0.045639164812331476,
+     "y": 0.0,
+     "z": 0.020000000000000004
+    },
+    {
+     "angle": 60.0,
+     "skew": 12.830937861468474,
+     "x": 0.044667854777222196,
+     "y": 0.01,
+     "z": 0.020000000000000004
+    },
+    {
+     "angle": 60.0,
+     "skew": null,
+     "reason": "Y out of reach"
+    }
+   ]
+  },
+  {
+   "name": "depth dual matrix roof",
+   "inputs": {
+    "probe": {
+     "type": "Dual Matrix",
+     "n": 8,
+     "pitch": 0.001,
+     "ny": 2,
+     "pitch_y": 0.0015,
+     "sep": 0.01,
+     "start": 1,
+     "active": 0,
+     "order": "column-first"
+    },
+    "wedge": {
+     "angle": 30.0,
+     "height": 0.012,
+     "velocity": 2330.0,
+     "offset": 0.003,
+     "roof": 4.0
+    },
+    "material": {
+     "vl": 5920.0,
+     "vs": 3240.0
+    },
+    "mode": "constant-depth",
+    "value": 0.02,
+    "angles": [
+     45,
+     60
+    ],
+    "skews": [
+     -10,
+     10
+    ],
+    "wave": "longitudinal",
+    "y_mode": "from-skew",
+    "y_values": null
+   },
+   "targets": [
+    {
+     "angle": 45.0,
+     "skew": -10.0,
+     "x": 0.02955005229223696,
+     "y": -0.0041470278020105155,
+     "z": 0.02
+    },
+    {
+     "angle": 45.0,
+     "skew": 10.0,
+     "x": 0.02955005229223696,
+     "y": 0.0041470278020105155,
+     "z": 0.02
+    },
+    {
+     "angle": 60.0,
+     "skew": -10.0,
+     "x": 0.04492927063927389,
+     "y": -0.006858798938799766,
+     "z": 0.02
+    },
+    {
+     "angle": 60.0,
+     "skew": 10.0,
+     "x": 0.04492927063927389,
+     "y": 0.006858798938799766,
+     "z": 0.02
+    }
+   ]
+  }
+ ]
+}

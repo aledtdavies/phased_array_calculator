@@ -373,9 +373,6 @@ function PhasedArrayGUI()
             mat = Material(mVL, mVS);
             solver = DelayLaw(probe, wedge, mat);
             
-            vMat = mVL;
-            if strcmp(wType, 'shear'); vMat = mVS; end
-            
             % 3. Angles and Skew
             angles = startA:stepA:endA;
             
@@ -392,84 +389,46 @@ function PhasedArrayGUI()
                 skewAngles = 0;
             end
             
-            % 4. Compute
-            % Central ray starts at the centre of the active sub-aperture
-            centre = solver.apertureCentre();
-            centerX = centre(1);
-            centerY = centre(2);
-            centerZ = centre(3);
-            hWedge = abs(centerZ);
+            % 4. Compute: focal targets from the shared rules (FocalRules, twin of
+            % python/focal_rules.py), then one delay law per target. Refused targets
+            % (critical angle, focus not below the surface, beam parallel to the
+            % vertical line) are counted and reported, not drawn.
+            ruleModes = containers.Map({'Depth', 'Vertical', 'SoundPath'}, ...
+                {'constant-depth', 'vertical-line', 'sound-path'});
+            T = FocalRules.targets(solver, ruleModes(fMode), tgtVal, angles, skewAngles, wType);
             
             resultIdx = 0;
+            nRefused = 0;
             allResults = [];
             angleValues = unique(angles);
             skewValues = unique(skewAngles);
             indexMap = containers.Map('KeyType', 'char', 'ValueType', 'int32');
             
-            for i = 1:length(angles)
-                angDeg = angles(i);
-                beta = deg2rad(angDeg);
-                sinAlpha = (wV / vMat) * sin(beta);
+            for k = 1:numel(T)
+                t = T(k);
+                if ~isempty(t.Reason)
+                    nRefused = nRefused + 1;
+                    continue
+                end
+                res = solver.calculateLaw(t.X, t.Y, t.Z, wType);
+                resultIdx = resultIdx + 1;
                 
-                if abs(sinAlpha) > 1.0; continue; end
+                entry.Angle = t.Angle;
+                entry.Skew = t.Skew;
+                entry.FocalPoint = [t.X, t.Y, t.Z];
+                entry.Delays = res.Delays;
+                entry.InterfacePoints = res.InterfacePoints;
+                entry.VelocityUsed = res.VelocityUsed;
+                entry.ActiveIndices = res.ActiveIndices;
                 
-                alpha = asin(sinAlpha);
-                xInt = centerX + hWedge * tan(alpha);
-                
-                if strcmp(fMode, 'Depth')
-                    fz = tgtVal;
-                    fPrimary = fz * tan(beta);
-                elseif strcmp(fMode, 'Vertical')
-                    fx_target = tgtVal;
-                    fPrimary = fx_target - xInt;
-                    fz = fPrimary / tan(beta);
-                else % SoundPath
-                    R = tgtVal;
-                    fz = R * cos(beta);
-                    fPrimary = R * sin(beta);
+                if resultIdx == 1
+                    allResults = entry;
+                else
+                    allResults(resultIdx) = entry;
                 end
                 
-                if fz < 0; continue; end
-                
-                for j = 1:length(skewAngles)
-                    skewDeg = skewAngles(j);
-                    skewRad = deg2rad(skewDeg);
-                    
-                    entryOffset = hWedge * tan(alpha);
-                    entryX = centerX + entryOffset * cos(skewRad);
-                    entryY = centerY + entryOffset * sin(skewRad);
-                    if strcmp(fMode, 'Vertical')
-                        if abs(cos(skewRad)*tan(beta)) < 1e-12
-                            continue;
-                        end
-                        fPrimary = (fx_target-entryX)/cos(skewRad);
-                        fz = fPrimary/tan(beta);
-                    end
-                    if fz<=0, continue; end
-                    lx = entryX + fPrimary * cos(skewRad);
-                    ly = entryY + fPrimary * sin(skewRad);
-                    
-                    res = solver.calculateLaw(lx, ly, fz, wType);
-                    
-                    resultIdx = resultIdx + 1;
-                    
-                    entry.Angle = angDeg;
-                    entry.Skew = skewDeg;
-                    entry.FocalPoint = [lx, ly, fz];
-                    entry.Delays = res.Delays;
-                    entry.InterfacePoints = res.InterfacePoints;
-                    entry.VelocityUsed = res.VelocityUsed;
-                    entry.ActiveIndices = res.ActiveIndices;
-                    
-                    if resultIdx == 1
-                        allResults = entry;
-                    else
-                        allResults(resultIdx) = entry;
-                    end
-                    
-                    key = sprintf('%.4f_%.4f', angDeg, skewDeg);
-                    indexMap(key) = resultIdx;
-                end
+                key = sprintf('%.4f_%.4f', t.Angle, t.Skew);
+                indexMap(key) = resultIdx;
             end
             
             % 5. Update State
@@ -501,7 +460,11 @@ function PhasedArrayGUI()
             
             refreshPlot(1, 1);
             
-            set(lbl_status, 'String', sprintf('Success: %d focal laws calculated.', resultIdx));
+            if nRefused > 0
+                set(lbl_status, 'String', sprintf('Success: %d focal laws calculated, %d refused (critical angle, focus not below the surface or beam parallel to the line).', resultIdx, nRefused));
+            else
+                set(lbl_status, 'String', sprintf('Success: %d focal laws calculated.', resultIdx));
+            end
             
         catch err
             errordlg(err.message, 'Calculation Error');

@@ -216,7 +216,7 @@ A rotatable 3D scene of the selected law (mm, global frame, depth drawn downward
 | Min Delay (µs) | Smallest element delay in the law |
 | Max Delay (µs) | Largest element delay in the law |
 
-Error conditions (critical angle exceeded, Z < 0, Y out of reach) are shown inline as text rows. Min/Max Delay are taken over the active elements.
+Refused laws are shown inline as rows numbered "-": critical angle exceeded (**Crit**), focus not below the surface (**Z<0**), beam parallel to the vertical line (**Parallel**: a 0° refracted angle or 90° skew in Vertical Line mode), and Y out of reach. Min/Max Delay are taken over the active elements.
 
 ### Delays Tab
 
@@ -344,6 +344,22 @@ result = solver.calculate_law(
 | `focal_point` | `ndarray (3,)` | Target focal point (metres) |
 | `velocity_used` | `float` | Wave velocity used (m/s) |
 | `active_indices` | `ndarray` | 0-based indices of active elements |
+
+### `focal_targets` — `focal_rules.py`
+
+```python
+from focal_rules import focal_targets, Target
+targets = focal_targets(solver, "constant-depth", 0.03,     # mode, value (m)
+                        angles_deg=[40, 50, 60], skews_deg=[0, 10],
+                        wave="shear", y_mode="from-skew")    # or "fixed" / "sweep" with y_values=[...]
+for t in targets:
+    if isinstance(t, Target):
+        law = solver.calculate_law(t.x, t.y, t.z, wave_type="shear")
+    else:
+        print(t.angle_deg, t.skew_deg, t.reason)          # a Refused law and why
+```
+
+Modes: `constant-depth` (Z = value), `vertical-line` (X = value), `sound-path` (distance along the central ray). The central ray starts at the active sub-aperture's centre. Refusal reasons: `critical angle`, `focus not below surface`, `beam parallel to line`, `Y out of reach`. MATLAB: `FocalRules.targets(solver, mode, value, anglesDeg, skewsDeg, wave, yMode, yValues)` returns a struct array (`Angle, Skew, X, Y, Z, Reason`). The two are checked against shared cases (`tests/focal_rule_cases.json`).
 
 ### Export
 
@@ -552,6 +568,8 @@ Pitch (Y-axis rotation by θ):          Roll (X-axis rotation by φ):
 | `probe.py` | `Probe` and `DualProbe` classes; `create_probe_assembly` factory; element grid generation; `get_active_element_indices()` |
 | `wedge.py` | `Wedge` class; coordinate transform from probe-local to global frame |
 | `material.py` | `Material` class storing longitudinal and shear velocities |
+| `focal_rules.py` | `focal_targets`: focal points for angle/skew/Y sweeps in every focus mode, with refusal reasons |
+| `scene_model.py` | `build_scene`: the geometry every view draws, as primitives in the global frame |
 | `app.py` | Tkinter GUI application, scan engine, CSV export |
 | `panels.py` | Input panels (Probe, Wedge, Material, Scan, SubAperture) |
 | `plotting.py` | Ray tracing, 3D view and delay GUI panels |
@@ -566,6 +584,7 @@ Pitch (Y-axis rotation by θ):          Roll (X-axis rotation by φ):
 | File | Purpose |
 |---|---|
 | `DelayLaw.m` | Core solver class (mirrors Python `DelayLaw`) |
+| `FocalRules.m` | Focal targets (mirrors Python `focal_rules.py`; shared case table) |
 | `Probe.m` | `Probe` class |
 | `DualProbe.m` | `DualProbe` subclass (extends `Probe`) |
 | `Wedge.m` | `Wedge` class |

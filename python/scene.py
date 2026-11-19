@@ -1,14 +1,16 @@
 """
-Toolkit-independent 2D scene drawing for the ray-tracing view.
-
-Everything here draws onto a plain matplotlib Axes, so it is shared by the
-Tkinter GUI panels (plotting.py) and the standalone visualisation script,
-and stays portable to other front ends (e.g. pogopy's Qt canvas).
+matplotlib renderer of the scene model (scene_model.py): the 2D X-Z / Y-Z projections and the
+3D view used by the Tk GUI panels and the standalone visualisation script, plus the aperture
+delay maps. Geometry is decided in scene_model; this module only styles and draws it.
+Everything draws onto a plain matplotlib Axes or Figure, so it is toolkit-independent.
 """
 import matplotlib
 import matplotlib.colors as mcolors
 from matplotlib.patches import Polygon
 import numpy as np
+
+from scene_model import (build_scene, decimate_rays, user_element_numbers,  # noqa: F401 (re-exported)
+                         wedge_silhouette_xz)
 
 # ---------------------------------------------------------------------------
 # Shared scene styling
@@ -27,132 +29,49 @@ COLOR_MATERIAL = "#94a3b8"
 COLOR_BACKWALL = "#334155"
 LAW_CMAP = "viridis"
 
-_CONTACT_TOL_MM = 1e-3   # elements closer than this to z=0 count as contact
+ELEMENT_COLOUR = {"single": COLOR_ELEMENT_ACTIVE, "tx": COLOR_ELEMENT_TX, "rx": COLOR_ELEMENT_ACTIVE}
+ELEMENT_LABEL = {"single": "Elements", "tx": "Tx elements", "rx": "Rx elements"}
+RAY_COLOUR = {"single": COLOR_RAY, "tx": COLOR_RAY_TX, "rx": COLOR_RAY_RX}
+WEDGE_LABEL = {"catalogue": "Wedge (catalogue)", "schematic": "Wedge (schematic)"}
 
 
-def _active_envelope_indices(probe):
-    """
-    Returns the element indices whose rays bound the active aperture:
-    [(first, last)] for a single array, [(tx_first, tx_last), (rx_first,
-    rx_last)] for dual probes (either entry omitted if that array has no
-    active elements). Fixes the previous behaviour of always using
-    element 0 / element -1, whose interface points are zero-filled when
-    those elements are inactive.
-    """
-    act = np.asarray(probe.get_active_element_indices())
-    if act.size == 0:
-        return []
-    if hasattr(probe, "array_separation"):
-        n_half = probe.total_elements // 2
-        pairs = []
-        tx = act[act < n_half]
-        rx = act[act >= n_half]
-        if tx.size:
-            pairs.append((int(tx[0]), int(tx[-1])))
-        if rx.size:
-            pairs.append((int(rx[0]), int(rx[-1])))
-        return pairs
-    return [(int(act[0]), int(act[-1]))]
-
-
-def draw_elements(ax, elements_mm, probe, dim_idx):
+# ---------------------------------------------------------------------------
+# 2D projections
+# ---------------------------------------------------------------------------
+def _draw_elements_2d(ax, scene, dim_idx):
     """Element markers: active coloured, inactive grey; Tx/Rx split for duals."""
-    act = np.asarray(probe.get_active_element_indices())
-    n_el = len(elements_mm)
-    active_mask = np.zeros(n_el, dtype=bool)
-    active_mask[act] = True
-
-    ec = elements_mm[:, dim_idx]
-    ez = elements_mm[:, 2]
-    is_dual = hasattr(probe, "array_separation")
-
-    if is_dual:
-        n_half = n_el // 2
-        halves = [
-            (slice(0, n_half), COLOR_ELEMENT_TX, "Tx elements"),
-            (slice(n_half, n_el), COLOR_ELEMENT_ACTIVE, "Rx elements"),
-        ]
-    else:
-        halves = [(slice(0, n_el), COLOR_ELEMENT_ACTIVE, "Elements")]
-
-    for sl, colour, label in halves:
-        m = active_mask[sl]
-        c = ec[sl]
-        z = ez[sl]
-        if m.any():
-            ax.plot(c[m], z[m], "s", color=colour, markersize=4,
-                    linestyle="none", zorder=5, label=label)
-        if (~m).any():
-            ax.plot(c[~m], z[~m], "s", markerfacecolor="none",
+    for p in scene.find("element"):
+        c, z = p.coords[:, dim_idx], p.coords[:, 2]
+        if p.meta["active"]:
+            ax.plot(c, z, "s", color=ELEMENT_COLOUR[p.meta["array"]], markersize=4,
+                    linestyle="none", zorder=5, label=ELEMENT_LABEL[p.meta["array"]])
+        else:
+            ax.plot(c, z, "s", markerfacecolor="none",
                     markeredgecolor=COLOR_ELEMENT_INACTIVE, markersize=4,
                     linestyle="none", zorder=5,
-                    label="Inactive elements" if sl.start == 0 else None)
+                    label="Inactive elements" if p.meta["array"] in ("single", "tx") else None)
 
 
-def wedge_silhouette_xz(elements_mm, wedge):
+def _draw_wedge_2d(ax, scene, dim_idx):
     """
-    Schematic X-Z wedge silhouette (mm, Z down) under the element footprint,
-    derived from the wedge angle and the transformed element positions, or
-    None for a contact setup. Used when no catalogue outline is known.
+    Wedge body, schematic probe body and dimensions. Returns (coord, z) bound points.
+    X-Z: the wedge polygon (catalogue outline or schematic). Y-Z: a rectangle over the
+    element footprint up to the tallest of the elements and the catalogue outline.
     """
-    ec = elements_mm[:, 0]
-    ez = elements_mm[:, 2]
-    if float(np.max(np.abs(ez))) < _CONTACT_TOL_MM:
-        return None
-    span = float(np.max(ec) - np.min(ec))
-    margin = max(2.0, 0.15 * span)
-    tan_a = float(np.tan(wedge.angle_rad))
-    if tan_a > 1e-6:
-        # Top-face silhouette line z(x) = -tan_a * x + c through the
-        # highest elements (covers roof-angled duals too).
-        c = float(np.min(ez + tan_a * ec))
-        x_toe = c / tan_a       # z = 0 crossing of the top-face line
-        x_back = float(np.max(ec)) + margin
-        z_back = -tan_a * x_back + c
-        # Cap a very long toe with a vertical end face so a shallow
-        # wedge doesn't dominate the frame.
-        x_front_cap = float(np.min(ec)) - 4.0 * margin
-        if x_toe < x_front_cap:
-            z_front = -tan_a * x_front_cap + c
-            return [(x_front_cap, 0.0), (x_back, 0.0),
-                    (x_back, z_back), (x_front_cap, z_front)]
-        return [(x_toe, 0.0), (x_back, 0.0), (x_back, z_back)]
-    # Flat wedge (delay line): rectangle
-    z_top = float(np.min(ez))
-    return [(np.min(ec) - margin, 0.0), (np.max(ec) + margin, 0.0),
-            (np.max(ec) + margin, z_top), (np.min(ec) - margin, z_top)]
-
-
-def draw_wedge_overlay(ax, elements_mm, wedge, dim_idx, outline_mm=None):
-    """
-    Draw the wedge body plus a schematic probe body and dimension
-    annotations. Returns a list of (coord, z) points to include in the
-    axis bounds.
-
-    dim_idx 0 = X-Z view, 1 = Y-Z view (rectangular silhouette).
-    outline_mm: the catalogue wedge outline in the global X-Z plane (mm,
-    Z down), drawn as the true wedge body in the X-Z view; None draws the
-    schematic silhouette.
-    """
-    ec = elements_mm[:, dim_idx]
-    ez = elements_mm[:, 2]
-
-    # Contact setup: no wedge body to draw
-    if float(np.max(np.abs(ez))) < _CONTACT_TOL_MM:
-        ax.text(float(np.min(ec)), -1.2, "Contact", fontsize=7,
+    el = np.vstack([p.coords for p in scene.find("element")])
+    ec, ez = el[:, dim_idx], el[:, 2]
+    if scene.contact:
+        p = scene.one("contact")
+        ax.text(float(p.coords[0, dim_idx]), float(p.coords[0, 2]), p.meta["text"], fontsize=7,
                 color=COLOR_PROBE_EDGE, zorder=6)
         return []
-
-    span = float(np.max(ec) - np.min(ec))
-    margin = max(2.0, 0.15 * span)
-    bounds = []
-
+    wedge = scene.one("wedge")
     if dim_idx == 1:
-        # Y-Z silhouette of the wedge block is a rectangle up to its
-        # tallest edge (the catalogue outline's height when known).
+        span = float(np.max(ec) - np.min(ec))
+        margin = max(2.0, 0.15 * span)
         z_top = float(np.min(ez))
-        if outline_mm is not None:
-            z_top = min(z_top, min(v[1] for v in outline_mm))
+        if wedge.meta["source"] == "catalogue":
+            z_top = min(z_top, float(np.min(wedge.coords[:, 2])))
         verts = [(np.min(ec) - margin, 0.0), (np.max(ec) + margin, 0.0),
                  (np.max(ec) + margin, z_top), (np.min(ec) - margin, z_top)]
         ax.add_patch(Polygon(verts, closed=True, facecolor=COLOR_WEDGE_FACE,
@@ -160,83 +79,41 @@ def draw_wedge_overlay(ax, elements_mm, wedge, dim_idx, outline_mm=None):
                              linewidth=1.0, zorder=1.5))
         return verts
 
-    if outline_mm is not None:
-        verts = [tuple(v) for v in outline_mm]
-        label = "Wedge (catalogue)"
-    else:
-        verts = wedge_silhouette_xz(elements_mm, wedge)
-        label = "Wedge (schematic)"
+    verts = [(float(x), float(z)) for x, _, z in wedge.coords]
     ax.add_patch(Polygon(verts, closed=True, facecolor=COLOR_WEDGE_FACE,
                          edgecolor=COLOR_WEDGE_EDGE, alpha=0.16,
-                         linewidth=1.0, zorder=1.5, label=label))
-    bounds.extend(verts)
-
-    # Schematic probe body sitting on the element plane over the element extent
-    tan_a = float(np.tan(wedge.angle_rad))
-    if tan_a > 1e-6:
-        c_line = float(np.min(ez + tan_a * ec))
-        z_at = lambda x: -tan_a * x + c_line
-    else:
-        z_top = float(np.min(ez))
-        z_at = lambda x: z_top
-    hp = max(3.0, 0.25 * abs(float(np.min(ez))))
-    x0, x1 = float(np.min(ec)), float(np.max(ec))
-    probe_verts = [(x0, z_at(x0)), (x1, z_at(x1)),
-                   (x1, z_at(x1) - hp), (x0, z_at(x0) - hp)]
-    ax.add_patch(Polygon(probe_verts, closed=True, facecolor=COLOR_PROBE_FACE,
+                         linewidth=1.0, zorder=1.5, label=WEDGE_LABEL[wedge.meta["source"]]))
+    body = [(float(x), float(z)) for x, _, z in scene.one("probe-body").coords]
+    ax.add_patch(Polygon(body, closed=True, facecolor=COLOR_PROBE_FACE,
                          edgecolor=COLOR_PROBE_EDGE, alpha=0.18,
                          linewidth=1.0, zorder=1.5, label="Probe (schematic)"))
-    bounds.extend(probe_verts)
-
-    # Dimension annotations: h1 drop line at element 1 and the wedge angle
-    x_el1, z_el1 = float(ec[0]), float(ez[0])
-    h1 = abs(z_el1)
-    ax.plot([x_el1, x_el1], [0.0, z_el1], color=COLOR_WEDGE_EDGE,
-            linewidth=0.9, zorder=4)
-    ax.text(x_el1 + 0.8, z_el1 * 0.5, f"h1={h1:.1f} mm", fontsize=7,
-            color=COLOR_WEDGE_EDGE, zorder=6)
-    x_mid = 0.5 * (min(v[0] for v in verts) + max(v[0] for v in verts))
-    z_top_wedge = min(v[1] for v in verts)
-    ax.text(x_mid, z_top_wedge - 1.0,
-            f"angle={wedge.angle_degrees:.1f}°", fontsize=7,
+    dim = scene.one("dimension")
+    ax.plot(dim.coords[:, 0], dim.coords[:, 2], color=COLOR_WEDGE_EDGE, linewidth=0.9, zorder=4)
+    ax.text(*dim.meta["text_at"], dim.meta["text"], fontsize=7, color=COLOR_WEDGE_EDGE, zorder=6)
+    ang = scene.one("wedge-angle")
+    ax.text(float(ang.coords[0, 0]), float(ang.coords[0, 2]), ang.meta["text"], fontsize=7,
             color=COLOR_WEDGE_EDGE, ha="center", zorder=6)
-    return bounds
+    return verts + body
 
 
-def draw_law_rays(ax, elements_mm, int_pts_mm, target_mm, probe, dim_idx,
-                  colour=None, alpha=1.0, show_all=False, label_focal=False):
-    """
-    Draw the envelope rays (first/last ACTIVE element of each array) for
-    one focal law, plus the focal-point marker. Returns (coord, z) bound
-    points.
-    """
-    is_dual = hasattr(probe, "array_separation")
-    n_half = probe.total_elements // 2 if is_dual else None
+def _draw_law_2d(ax, scene, law, dim_idx, colour=None, alpha=1.0, show_all=False,
+                 label_focal=False):
+    """Envelope rays and focus of one law. Returns (coord, z) bound points."""
     bounds = []
-
-    for i0, i1 in _active_envelope_indices(probe):
-        if colour is not None:
-            c = colour
-        elif is_dual:
-            c = COLOR_RAY_TX if (n_half and i0 < n_half) else COLOR_RAY_RX
-        else:
-            c = COLOR_RAY
-        for i in (i0, i1):
-            p_el = elements_mm[i]
-            p_int = int_pts_mm[i]
-            ax.plot([p_el[dim_idx], p_int[dim_idx]], [p_el[2], p_int[2]],
-                    color=c, alpha=alpha, linewidth=1, zorder=4)
-            ax.plot([p_int[dim_idx], target_mm[dim_idx]],
-                    [p_int[2], target_mm[2]],
-                    color=c, alpha=alpha, linewidth=1, zorder=4)
-            bounds.append((float(p_int[dim_idx]), float(p_int[2])))
-
+    for p in scene.find("envelope-ray", law=law):
+        c = colour if colour is not None else RAY_COLOUR[p.meta["array"]]
+        el, ip, _, tg = p.coords
+        ax.plot([el[dim_idx], ip[dim_idx]], [el[2], ip[2]], color=c, alpha=alpha,
+                linewidth=1, zorder=4)
+        ax.plot([ip[dim_idx], tg[dim_idx]], [ip[2], tg[2]], color=c, alpha=alpha,
+                linewidth=1, zorder=4)
+        bounds.append((float(ip[dim_idx]), float(ip[2])))
+    tg = scene.one("focus", law=law).coords[0]
     marker_c = colour if colour is not None else COLOR_ELEMENT_ACTIVE
-    ax.plot(target_mm[dim_idx], target_mm[2],
-            marker="o" if show_all else "x", color=marker_c,
+    ax.plot(tg[dim_idx], tg[2], marker="o" if show_all else "x", color=marker_c,
             markersize=3 if show_all else 8, zorder=6,
             label="Focal point" if label_focal else None)
-    bounds.append((float(target_mm[dim_idx]), float(target_mm[2])))
+    bounds.append((float(tg[dim_idx]), float(tg[2])))
     return bounds
 
 
@@ -285,35 +162,35 @@ def finish_projection(ax, bounds, dim_idx, wave_type,
         ax.legend(loc="upper right", fontsize=7, framealpha=0.7)
 
 
+def draw_scene_projection(ax, scene, indices, dim_idx, wave_type, show_all,
+                          component_thickness_mm=0.0):
+    """Draw one projection (dim_idx 0 = X-Z, 1 = Y-Z) of a Scene holding the laws in `indices`."""
+    bounds = [(float(c), float(z)) for p in scene.find("element")
+              for c, z in zip(p.coords[:, dim_idx], p.coords[:, 2])]
+    bounds.extend(_draw_wedge_2d(ax, scene, dim_idx))
+    _draw_elements_2d(ax, scene, dim_idx)
+
+    cmap = matplotlib.colormaps[LAW_CMAP]
+    norm = mcolors.Normalize(vmin=0, vmax=max(1, len(indices) - 1))
+    for j, idx in enumerate(indices):
+        bounds.extend(_draw_law_2d(ax, scene, idx, dim_idx,
+                                   colour=cmap(norm(idx)) if show_all else None,
+                                   alpha=0.5 if show_all else 1.0, show_all=show_all,
+                                   label_focal=(j == 0)))
+    finish_projection(ax, bounds, dim_idx, wave_type,
+                      component_thickness_mm=component_thickness_mm,
+                      show_legend=(dim_idx == 0))
+
+
 def draw_projection(ax, solver, get_law, indices, dim_idx, wave_type,
                     show_all, component_thickness_mm=0.0, outline_mm=None):
     """
     Draw one full projection (geometry + rays for `indices`).
     `get_law(idx)` must return (interface_points_mm, target_mm).
     """
-    elements_mm = solver.wedge.get_transformed_elements(solver.probe) * 1000
-    probe = solver.probe
-
-    bounds = [(float(c), float(z))
-              for c, z in zip(elements_mm[:, dim_idx], elements_mm[:, 2])]
-    bounds.extend(draw_wedge_overlay(ax, elements_mm, solver.wedge, dim_idx,
-                                     outline_mm=outline_mm))
-    draw_elements(ax, elements_mm, probe, dim_idx)
-
-    cmap = matplotlib.colormaps[LAW_CMAP]
-    norm = mcolors.Normalize(vmin=0, vmax=max(1, len(indices) - 1))
-    for j, idx in enumerate(indices):
-        int_pts_mm, target_mm = get_law(idx)
-        colour = cmap(norm(idx)) if show_all else None
-        alpha = 0.5 if show_all else 1.0
-        bounds.extend(draw_law_rays(
-            ax, elements_mm, int_pts_mm, target_mm, probe, dim_idx,
-            colour=colour, alpha=alpha, show_all=show_all,
-            label_focal=(j == 0)))
-
-    finish_projection(ax, bounds, dim_idx, wave_type,
-                      component_thickness_mm=component_thickness_mm,
-                      show_legend=(dim_idx == 0))
+    scene = build_scene(solver, get_law, indices, outline_mm=outline_mm)
+    draw_scene_projection(ax, scene, indices, dim_idx, wave_type, show_all,
+                          component_thickness_mm=component_thickness_mm)
 
 
 # ---------------------------------------------------------------------------
@@ -328,15 +205,6 @@ VIEW_PRESETS = {
 }
 
 
-def decimate_rays(active, max_rays):
-    """Active element indices to draw rays from: all, or an even subset that keeps both ends."""
-    active = np.asarray(active)
-    if max_rays <= 0 or active.size <= max_rays:
-        return active
-    pick = np.unique(np.round(np.linspace(0, active.size - 1, max_rays)).astype(int))
-    return active[pick]
-
-
 def _wedge_faces_3d(xz_verts, y0, y1):
     """Faces of a prism: the X-Z polygon extruded across Y from y0 to y1 (mm)."""
     front = [(x, y0, z) for x, z in xz_verts]
@@ -349,46 +217,33 @@ def _wedge_faces_3d(xz_verts, y0, y1):
     return faces
 
 
-def draw_scene_3d(ax, solver, law, focal_points_mm, current_idx, wave_type,
-                  component_thickness_mm=0.0, outline_mm=None, max_rays=48,
-                  show_locus=True):
+def draw_scene_3d_from(ax, scene, wave_type, component_thickness_mm=0.0, show_locus=True):
     """
-    3D view of one focal law on a mplot3d Axes (all mm, global frame: Z > 0
-    in the component, drawn increasing downward).
-
-    law: (interface_points_mm, target_mm) for the selected law.
-    focal_points_mm: (N, 3) focal points of every law, drawn as the sweep
-    locus coloured by law index; current_idx is the selected law.
-    Rays run element -> interface point -> focus for every active element
-    (an even subset of at most max_rays, ends kept, for large apertures).
-    The wedge body is the catalogue outline or the schematic silhouette,
-    extruded across the element footprint in Y; roof angles tilt the
-    elements but are not shown in the body.
+    Draw a Scene built with a current law on a mplot3d Axes (mm, global frame, Z drawn
+    increasing downward): wedge prism, interface and backwall planes, elements, the current
+    law's rays and interface points, the sweep's foci and the current focus.
     """
     from mpl_toolkits.mplot3d.art3d import Poly3DCollection, Line3DCollection
 
-    probe = solver.probe
-    elements = solver.wedge.get_transformed_elements(probe) * 1000
-    int_pts, target = law
-    target = np.asarray(target, dtype=float)
-    act = np.asarray(probe.get_active_element_indices())
-    is_dual = hasattr(probe, "array_separation")
-    n_half = probe.total_elements // 2 if is_dual else probe.total_elements
+    elements = [p for p in scene.find("element")]
+    rays = scene.find("ray")
+    law = rays[0].meta["law"] if rays else scene.find("focus")[0].meta["law"]
+    target = scene.one("focus", law=law).coords[0]
+    sweep = scene.find("focus-sweep")
+    fp = sweep[0].coords if sweep else None
 
-    pts = [elements, target[None, :], int_pts[act]]
-    if focal_points_mm is not None and len(focal_points_mm):
-        pts.append(np.asarray(focal_points_mm, dtype=float))
-
-    xz = outline_mm if outline_mm is not None else wedge_silhouette_xz(elements, solver.wedge)
-    # Wedge width is not modelled: draw it a little wider than the element
-    # footprint (at least 15 % of the aperture length) so it reads as a body.
-    y_margin = max(3.0, 0.2 * float(np.ptp(elements[:, 1])),
-                   0.15 * float(np.ptp(elements[:, 0])))
-    y0 = float(np.min(elements[:, 1])) - y_margin
-    y1 = float(np.max(elements[:, 1])) + y_margin
+    pts = [np.vstack([p.coords for p in elements]), target[None, :]]
+    all_ip = scene.find("interface-point-all")
+    if all_ip:
+        pts.append(all_ip[0].coords)
+    if fp is not None:
+        pts.append(fp)
     faces = None
-    if xz is not None:
-        faces = _wedge_faces_3d([tuple(v) for v in xz], y0, y1)
+    wedges = scene.find("wedge")
+    if wedges:
+        w = wedges[0]
+        faces = _wedge_faces_3d([(float(x), float(z)) for x, _, z in w.coords],
+                                w.meta["y0"], w.meta["y1"])
         pts.append(np.array([p for f in faces for p in f]))
 
     allp = np.vstack(pts)
@@ -408,43 +263,32 @@ def draw_scene_3d(ax, solver, law, focal_points_mm, current_idx, wave_type,
     if faces is not None:
         ax.add_collection3d(Poly3DCollection(
             faces, facecolor=COLOR_WEDGE_FACE, alpha=0.10, edgecolor=COLOR_WEDGE_EDGE,
-            linewidth=0.5,
-            label="Wedge (catalogue)" if outline_mm is not None else "Wedge (schematic)"))
+            linewidth=0.5, label=WEDGE_LABEL[wedges[0].meta["source"]]))
 
     # Elements: active coloured (Tx/Rx split for duals), inactive hollow grey
-    mask = np.zeros(len(elements), dtype=bool)
-    mask[act] = True
-    idx = np.arange(len(elements))
-    groups = ([(idx < n_half, COLOR_ELEMENT_TX, "Tx elements"),
-               (idx >= n_half, COLOR_ELEMENT_ACTIVE, "Rx elements")]
-              if is_dual else [(idx >= 0, COLOR_ELEMENT_ACTIVE, "Elements")])
     inactive_labelled = False
-    for sel, colour, label in groups:
-        on, off = sel & mask, sel & ~mask
-        if on.any():
-            ax.scatter(*elements[on].T, marker="s", s=10, color=colour,
-                       depthshade=False, label=label)
-        if off.any():
-            ax.scatter(*elements[off].T, marker="s", s=10, facecolors="none",
+    for p in elements:
+        if p.meta["active"]:
+            ax.scatter(*p.coords.T, marker="s", s=10, color=ELEMENT_COLOUR[p.meta["array"]],
+                       depthshade=False, label=ELEMENT_LABEL[p.meta["array"]])
+        else:
+            ax.scatter(*p.coords.T, marker="s", s=10, facecolors="none",
                        edgecolors=COLOR_ELEMENT_INACTIVE, depthshade=False,
                        label=None if inactive_labelled else "Inactive elements")
             inactive_labelled = True
 
-    # Rays for the selected law
-    ray_idx = decimate_rays(act, max_rays)
-    segs, cols = [], []
-    for i in ray_idx:
-        c = (COLOR_RAY_TX if i < n_half else COLOR_RAY_RX) if is_dual else COLOR_RAY
-        segs += [[elements[i], int_pts[i]], [int_pts[i], target]]
-        cols += [c, c]
-    if segs:
+    # Rays of the current law, in element order (Tx before Rx)
+    n_rays, n_active = 0, 0
+    if rays:
+        segs = np.concatenate([p.coords for p in rays]).reshape(-1, 2, 3)
+        cols = [RAY_COLOUR[p.meta["array"]] for p in rays for _ in range(len(p.coords) // 2)]
         ax.add_collection3d(Line3DCollection(segs, colors=cols, linewidths=0.6, alpha=0.7))
-        ax.scatter(*int_pts[ray_idx].T, s=4, color="k", depthshade=False,
-                   label="Interface points")
+        ip = scene.one("interface-point", law=law)
+        ax.scatter(*ip.coords.T, s=4, color="k", depthshade=False, label="Interface points")
+        n_rays = sum(len(p.meta["elements"]) for p in rays)
+        n_active = rays[0].meta["n_active"]
 
-    # Sweep locus and the selected focus
-    if show_locus and focal_points_mm is not None and len(focal_points_mm) > 1:
-        fp = np.asarray(focal_points_mm, dtype=float)
+    if show_locus and fp is not None and len(fp) > 1:
         ax.scatter(*fp.T, c=np.arange(len(fp)), cmap=LAW_CMAP, s=8,
                    depthshade=False, label="Focal points (sweep)")
     ax.scatter(*target.T, marker="x", s=60, color="k", depthshade=False,
@@ -457,35 +301,36 @@ def draw_scene_3d(ax, solver, law, focal_points_mm, current_idx, wave_type,
     ax.set_xlabel("X (mm)")
     ax.set_ylabel("Y (mm)")
     ax.set_zlabel("Z depth (mm)")
-    n_rays = len(ray_idx)
-    note = f", rays from {n_rays} of {act.size} active elements" if n_rays < act.size else ""
+    note = f", rays from {n_rays} of {n_active} active elements" if n_rays < n_active else ""
     ax.set_title(f"3D ray scene ({wave_type}{note})", fontsize=10)
     ax.legend(loc="upper left", fontsize=7, framealpha=0.7)
+
+
+def draw_scene_3d(ax, solver, law, focal_points_mm, current_idx, wave_type,
+                  component_thickness_mm=0.0, outline_mm=None, max_rays=48,
+                  show_locus=True):
+    """
+    3D view of one focal law on a mplot3d Axes (all mm, global frame: Z > 0
+    in the component, drawn increasing downward).
+
+    law: (interface_points_mm, target_mm) for the selected law.
+    focal_points_mm: (N, 3) focal points of every law, drawn as the sweep
+    locus coloured by law index; current_idx is the selected law.
+    Rays run element -> interface point -> focus for every active element
+    (an even subset of at most max_rays, ends kept, for large apertures).
+    The wedge body is the catalogue outline or the schematic silhouette,
+    extruded across the element footprint in Y; roof angles tilt the
+    elements but are not shown in the body.
+    """
+    scene = build_scene(solver, lambda i: law, [], outline_mm=outline_mm, current=current_idx,
+                        max_rays=max_rays, sweep_focal_mm=focal_points_mm)
+    draw_scene_3d_from(ax, scene, wave_type, component_thickness_mm=component_thickness_mm,
+                       show_locus=show_locus)
 
 
 # ---------------------------------------------------------------------------
 # Aperture delay map (matrix probes)
 # ---------------------------------------------------------------------------
-def user_element_numbers(probe):
-    """
-    1-based element numbers in the user's numbering convention, indexed by
-    internal storage position (internal index = block*Nx*Ny + ix*Ny + iy).
-    column-first: Y varies fastest (number = ix*Ny + iy + 1); row-first:
-    X varies fastest (number = iy*Nx + ix + 1); dual probes number the
-    second array after the first.
-    """
-    nx, ny = probe.num_elements, probe.num_elements_y
-    per = nx * ny
-    internal = np.arange(probe.total_elements)
-    block, local = internal // per, internal % per
-    ix, iy = local // ny, local % ny
-    if probe.element_order == "row-first" and ny > 1:
-        local_user = iy * nx + ix
-    else:
-        local_user = local
-    return block * per + local_user + 1
-
-
 def draw_aperture_maps(fig, probe, delays_us, vmax=None, title=""):
     """
     One heat map per array of the delay (µs) over the element grid, X across
