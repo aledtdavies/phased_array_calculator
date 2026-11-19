@@ -688,10 +688,9 @@ class App(tk.Tk):
                                              outline_mm=outline_mm)
                 self.hist_tab.update_plot(solver, focal_points, wave_type, global_max_delay=global_max_delay, results=results, is_matrix=is_matrix)
             else:
-                self.plot_tab.ax.clear()
-                self.plot_tab.canvas.draw()
-                self.hist_tab.ax.clear()
-                self.hist_tab.canvas.draw()
+                # No laws: no tab may keep showing (or stepping through) the previous set.
+                for tab in (self.plot_tab, self.hist_tab, self.scene3d_tab):
+                    tab.clear_laws()
             
             if not results:
                  messagebox.showwarning("No Results", "No valid focal laws could be calculated.\nPlease check your geometry, angles, and target coordinates.")

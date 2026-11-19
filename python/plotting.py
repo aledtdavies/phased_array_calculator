@@ -106,6 +106,24 @@ class LawNavigatorPanel(ttk.Frame):
 
         self.on_slider_change()
 
+    def clear_laws(self):
+        """Forget the law set (a calculation gave no laws) and blank the plot."""
+        if getattr(self, "is_playing", False):
+            self.toggle_play()
+        self.solver = None
+        self.focal_points = []
+        self.results = []
+        self.angle_values = []
+        self.skew_values = []
+        self.index_map = {}
+        self.current_idx = 0
+        self._pinned_idx = None
+        self.lbl_law.config(text="")
+        projection = "3d" if self.ax.name == "3d" else None
+        self.figure.clear()
+        self.ax = self.figure.add_subplot(111, projection=projection)
+        self.canvas.draw_idle()
+
     def set_sliders(self, angle_val, skew_val):
         if angle_val in self.angle_values:
             self.slider.set(self.angle_values.index(angle_val))
