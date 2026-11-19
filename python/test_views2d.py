@@ -14,7 +14,7 @@ try:
     if HEADLESS:
         raise ImportError("no display")
     from qtpy import QtWidgets
-    import pyqtgraph  # noqa: F401
+    import pyqtgraph
     import pyvistaqt  # noqa: F401
     HAVE_QT = True
 except Exception:
@@ -24,8 +24,8 @@ DUAL = {"probe_type": "Dual Matrix", "num_elements": 4, "num_elements_y": 3, "pi
 LINEAR = {"probe_type": "Linear", "num_elements": 16, "pitch_mm": 0.6}
 
 
-@unittest.skipUnless(HAVE_QT, "PySide6/pyqtgraph/pyvistaqt not installed, or no display")
-class Views2D(unittest.TestCase):
+class _WindowCase(unittest.TestCase):
+    """A Qt main window per test (hidden), and a helper to run a calculation."""
     @classmethod
     def setUpClass(cls):
         cls.qapp = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
@@ -55,6 +55,9 @@ class Views2D(unittest.TestCase):
         self.assertEqual(self.errors, [])
         return w
 
+
+@unittest.skipUnless(HAVE_QT, "PySide6/pyqtgraph/pyvistaqt not installed, or no display")
+class Views2D(_WindowCase):
     def test_items_reused_per_law_and_match_the_scene(self):
         from scene_model import build_scene
         w = self.calc(DUAL, {"array_sep_mm": 10, "roof_angle_deg": 3},
@@ -159,6 +162,107 @@ class Views2D(unittest.TestCase):
         tab.step_law(1)                           # back to the sweep
         self.assertIsNone(tab.custom)
         self.assertEqual(tab.current_idx, 3)
+
+
+class _Click:
+    """A scene click event as pyqtgraph's scene delivers it (only scenePos is read)."""
+
+    def __init__(self, pos):
+        self._pos = pos
+
+    def scenePos(self):
+        return self._pos
+
+
+@unittest.skipUnless(HAVE_QT, "PySide6/pyqtgraph/pyvistaqt not installed, or no display")
+class ReviewFixes(_WindowCase):
+    """Review of PR #27."""
+
+    def test_leaving_a_dragged_focus_returns_every_tab_to_the_sweep(self):
+        for how in ("slider", "step", "play"):
+            with self.subTest(how):
+                w = self.calc(LINEAR)
+                tab = w.plot_tab
+                tab.show_law(2)
+                tab.xz.focus.setPos(30.0, 15.0)
+                self.assertTrue(all(t.custom is not None for t in w.law_tabs()))
+                if how == "slider":
+                    tab.slider.setValue(tab.slider.value() + 1)
+                elif how == "step":
+                    tab.step_law(1)
+                else:
+                    tab.toggle_play()
+                    tab.animate()
+                    tab.toggle_play()
+                idx = tab.current_idx
+                for t in w.law_tabs():
+                    self.assertIsNone(t.custom, (how, type(t).__name__))
+                    self.assertEqual(t.current_idx, idx, (how, type(t).__name__))
+                    np.testing.assert_allclose(t.current_focal(), t.focal_points[idx])
+
+    def test_one_delay_click_handler_through_rebuilds(self):
+        w = self.calc(LINEAR)
+        selected = []
+        w.hist_tab.element_selected.connect(selected.append)
+        for probe in (dict(LINEAR, num_elements=16), DUAL, dict(LINEAR, num_elements=4), DUAL,
+                      dict(DUAL, num_elements=2, num_elements_y=2)):
+            self.calc(probe, {"array_sep_mm": 10})
+            tab = w.hist_tab
+            tab.refresh_plot()
+            n = tab.solver.probe.total_elements
+            if "bars" in tab.items:
+                plot = tab.items["plot"]
+                target = plot.vb.mapViewToScene(pyqtgraph.QtCore.QPointF(n, 0.01))
+                want = n - 1
+            else:
+                nx, ny, per = tab.items["shape"]
+                plot = tab.items["plots"][-1]
+                target = plot.vb.mapViewToScene(pyqtgraph.QtCore.QPointF(nx, ny))
+                want = (len(tab.items["plots"]) - 1) * per + (nx - 1) * ny + (ny - 1)
+            before = len(selected)
+            tab.view.scene().sigMouseClicked.emit(_Click(target))
+            self.assertEqual(selected[before:], [want], probe)        # exactly one, valid, current
+            self.assertLess(want, n)
+
+    def test_selection_while_the_delay_layout_is_stale(self):
+        """Delays shown for a small dual matrix, then hidden while a larger one is calculated."""
+        w = self.win
+        w.resize(1000, 700)
+        w.show()
+        self.calc(DUAL, {"array_sep_mm": 10})
+        w.tabs.setCurrentIndex(2)                               # Delays built for 4 x 3 x 2
+        self.qapp.processEvents()
+        w.tabs.setCurrentIndex(0)                               # Ray Tracing in front
+        self.qapp.processEvents()
+        self.calc(dict(DUAL, num_elements=16, num_elements_y=4), {"array_sep_mm": 10})
+        self.assertEqual(w.hist_tab.items["shape"], (4, 3, 12))  # still the old layout (deferred)
+        w.select_element(100)                                   # a new element: no IndexError
+        self.assertEqual(w.hist_tab.selected_element, 100)
+        w.tabs.setCurrentIndex(2)                               # shown: rebuilt, selection applied
+        self.qapp.processEvents()
+        nx, ny, per = w.hist_tab.items["shape"]
+        self.assertEqual((nx, ny), (16, 4))
+        block, local = divmod(100, per)
+        ix, iy = divmod(local, ny)
+        r = w.hist_tab.items["picks"][block]
+        self.assertTrue(r.isVisible())
+        self.assertEqual((r.rect().x(), r.rect().y()), (ix + 0.5, iy + 0.5))
+        w.tabs.setCurrentIndex(3)
+        self.qapp.processEvents()
+        self.assertEqual(w.scene3d_tab.picked, 100)
+        self.assertIn("Element", w.scene3d_tab.lbl_pick.text())
+
+    def test_refused_drag_puts_the_marker_back(self):
+        w = self.calc(LINEAR)
+        tab = w.plot_tab
+        tab.xz.focus.setPos(30.0, 15.0)
+        tab.xz.focus.setPos(32.0, -3.0)                         # above the surface: refused
+        f = tab.current_focal() * 1e3
+        self.assertAlmostEqual(tab.xz.focus.pos().x(), f[0], places=9)
+        self.assertAlmostEqual(tab.xz.focus.pos().y(), f[2], places=9)
+        self.assertEqual((round(f[0], 9), round(f[2], 9)), (30.0, 15.0))
+        for t in w.law_tabs():
+            np.testing.assert_allclose(t.current_focal() * 1e3, f)
 
 
 @unittest.skipUnless(HAVE_QT, "PySide6/pyqtgraph/pyvistaqt not installed, or no display")

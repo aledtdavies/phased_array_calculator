@@ -87,6 +87,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.probe_panel.probe_type_changed.connect(self.on_probe_type_changed)
         for tab in self.law_tabs():
             tab.element_selected.connect(self.select_element)
+            tab.left_custom.connect(self.on_left_custom)
         self.plot_tab.focus_dragged.connect(self.on_focus_dragged)
         self.on_probe_type_changed(self.probe_panel.type_combo.currentText())
 
@@ -287,6 +288,12 @@ class MainWindow(QtWidgets.QMainWindow):
         for tab in self.law_tabs():
             tab.highlight_element(idx)
 
+    def on_left_custom(self, idx):
+        """One tab navigated away from a dragged focus: every tab returns to that sweep law."""
+        for t in self.law_tabs():
+            if t.custom is not None:
+                t.show_law(idx, notify=False)
+
     def on_focus_dragged(self, x, z):
         """The X-Z focus dragged to (x, z) m: solve that law live and show it in every tab."""
         tab = self.plot_tab
@@ -295,11 +302,13 @@ class MainWindow(QtWidgets.QMainWindow):
         y = float(tab.current_focal()[1])
         if not z > 0:
             self.statusBar().showMessage("The focus must be below the surface (Z > 0).")
+            tab.reset_focus_marker()
             return
         try:
             result = law_result(tab.solver, (x, y, z), tab.wave_type)
         except (ValueError, ArithmeticError) as e:
             self.statusBar().showMessage(f"No law for that focus: {e}")
+            tab.reset_focus_marker()
             return
         for t in self.law_tabs():
             t.set_custom(result, (x, y, z))
