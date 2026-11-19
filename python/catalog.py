@@ -414,7 +414,7 @@ class Catalog:
         angle = e.get("wedgeAngleDeg")
         if angle is None:
             missing.append("wedge angle")
-        missing += ["height at element 1", "wedge velocity"]
+        missing += ["height at element 1", "probe offset X (element 1)", "wedge velocity"]
         if e.get("material"):
             notes.append(f"material named '{e['material']}' without a wave speed")
         if e.get("curvature") and str(e["curvature"]).lower() != "flat":

@@ -239,6 +239,8 @@ class TestNdeKnowledgeFormat(CatalogFiles):
         w = self.catalog().wedge("w1")
         self.assertEqual(w.panel_values(), {"angle_deg": 22.0})
         self.assertIn("height at element 1", w.missing)
+        self.assertIn("probe offset X (element 1)", w.missing)
+        self.assertNotIn("offset_mm", w.panel_values())
         self.assertTrue(any("curved" in n for n in w.notes))
 
 
