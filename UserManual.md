@@ -216,7 +216,7 @@ Drag to rotate, scroll to zoom. **Iso**, **X-Z**, **Y-Z** and **Top** set the ca
 ### Qt window: live 2D views
 
 In the Qt window the Ray Tracing and Delays tabs are pyqtgraph views:
-- **Navigation:** scroll to zoom, drag to pan; right-click for the view menu.
+- **Navigation:** scroll to zoom, drag to pan; right-click for the view menu. The law shown is shared: moving the slider, stepping or playing in any tab (or selecting a table row) moves every tab to that law.
 - **Drag the focus:** drag the focal-point marker in the X-Z view to move the focus. The law for that point is solved as you drag and shown in every tab (rays, delays, 3D), with the readout "Dragged focus (not in the sweep)". The focus keeps the current law's Y. It isn't added to the sweep, the table or the CSV, and a slider, step or table selection returns to the sweep. A focus above the surface is refused.
 - **Select an element:** click an element marker (X-Z or Y-Z), a delay bar, a delay-map cell or an element in the 3D view. It is selected in every tab: orange in the projections and the 3D view, outlined in the delay map, and reported in the 3D readout.
 

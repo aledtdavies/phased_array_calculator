@@ -22,7 +22,7 @@ class LawTab(QtWidgets.QWidget):
     """
 
     element_selected = QtCore.Signal(int)     # an element clicked in this view (internal index)
-    left_custom = QtCore.Signal(int)          # navigation left a dragged focus for sweep law (index)
+    law_changed = QtCore.Signal(int)          # this tab's navigation chose sweep law (index)
 
     def __init__(self):
         super().__init__()
@@ -164,22 +164,22 @@ class LawTab(QtWidgets.QWidget):
     def _sliders_moved(self, *_):
         if not self.focal_points:
             return
-        was_custom, self.custom = self.custom is not None, None
+        self.custom = None
         self.nav.from_sliders(self.slider.value(), self.slider_skew.value() if self.is_matrix else 0)
         self._labels()
         if not self.is_playing:
             self.request_redraw()
-        if was_custom:
-            self.left_custom.emit(self.nav.current)
+        self.law_changed.emit(self.nav.current)
 
     def show_law(self, idx, redraw=True, notify=True):
         """
-        Select law idx directly (table row, step buttons, animation). Leaving a dragged focus
-        is announced (left_custom) unless notify is False (the window relaying it to this tab).
+        Select law idx directly (step buttons, animation, table row). The choice is announced
+        (law_changed) so every tab shows the same law, unless notify is False (the window
+        relaying another tab's choice to this one).
         """
         if not self.focal_points:
             return
-        was_custom, self.custom = self.custom is not None, None
+        self.custom = None
         i_az, i_sk = self.nav.select(idx)
         for s, v in ((self.slider, i_az), (self.slider_skew, i_sk)):
             s.blockSignals(True)
@@ -188,8 +188,8 @@ class LawTab(QtWidgets.QWidget):
         self._labels()
         if redraw:
             self.request_redraw()
-        if was_custom and notify:
-            self.left_custom.emit(self.nav.current)
+        if notify:
+            self.law_changed.emit(self.nav.current)
 
     def step_law(self, delta):
         if self.focal_points:
