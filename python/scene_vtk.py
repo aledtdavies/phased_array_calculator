@@ -60,6 +60,7 @@ def add_setup(pl, scene, component_thickness_mm=0.0, section=False):
     """Wedge, component, element faces (or markers) and the sweep's foci. Returns (lo, hi) bounds."""
     lo, hi = scene_bounds(scene, component_thickness_mm)
     origin, normal = section_plane(scene)
+    pl._pac_law_meshes = None     # a fresh setup: law actors are added anew
 
     def clip(mesh):
         return mesh.clip(normal=normal, origin=origin, invert=False) if section else mesh
@@ -108,21 +109,48 @@ def add_setup(pl, scene, component_thickness_mm=0.0, section=False):
     return lo, hi
 
 
-def add_law(pl, scene):
-    """The current law's rays, interface points and focus; replaces the previous law's."""
-    for name in list(pl.renderer.actors):
-        if name.startswith("law:"):
-            pl.remove_actor(name, render=False)
+def _law_geometry(scene):
+    """{actor name: (points (N, 3), kind, style)} for the current law."""
+    out = {}
     for p in scene.find("ray"):
-        pl.add_mesh(pv.line_segments_from_points(p.coords), color=RAY_COLOUR[p.meta["array"]],
-                    opacity=0.6, line_width=1, name=f"law:ray-{p.meta['array']}", label="Rays")
+        out[f"law:ray-{p.meta['array']}"] = (p.coords, "segments", dict(color=RAY_COLOUR[p.meta["array"]],
+                                                                         opacity=0.6, line_width=1, label="Rays"))
     for p in scene.find("interface-point"):
-        pl.add_points(p.coords, color="black", point_size=4, name="law:interface",
-                      label="Interface points")
+        out["law:interface"] = (p.coords, "points", dict(color="black", point_size=4, label="Interface points"))
     focus = [p for p in scene.find("focus") if p.meta["law"] == current_law(scene)]
     if focus:
-        pl.add_points(focus[0].coords, color="black", point_size=16, render_points_as_spheres=True,
-                      name="law:focus", label="Focal point")
+        out["law:focus"] = (focus[0].coords, "points", dict(color="black", point_size=16,
+                                                            render_points_as_spheres=True, label="Focal point"))
+    return out
+
+
+def add_law(pl, scene):
+    """
+    The current law's rays, interface points and focus. When the previous law's actors have
+    the same number of points (the active aperture is fixed for a calculation), their meshes
+    are updated in place; otherwise they are replaced. Never adds a second set.
+    """
+    cache = getattr(pl, "_pac_law_meshes", None)
+    if cache is None or any(name not in pl.renderer.actors for name in cache):
+        cache = {}
+    new = _law_geometry(scene)
+    for name in list(cache):
+        if name not in new:
+            pl.remove_actor(name, render=False)
+            del cache[name]
+    for name, (pts, kind, style) in new.items():
+        mesh = cache.get(name)
+        if mesh is not None and mesh.n_points == len(pts):
+            mesh.points = np.asarray(pts, dtype=float)
+            mesh.Modified()
+            continue
+        mesh = pv.line_segments_from_points(pts) if kind == "segments" else pv.PolyData(np.asarray(pts, dtype=float))
+        if kind == "segments":
+            pl.add_mesh(mesh, name=name, **style)
+        else:
+            pl.add_points(mesh, name=name, **style)
+        cache[name] = mesh
+    pl._pac_law_meshes = cache
 
 
 def current_law(scene):

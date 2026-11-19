@@ -233,8 +233,12 @@ class TestQtWindow(QtCase):
             tab.step_law(1)
             if hasattr(tab, "plotter"):
                 self.assertEqual(list(tab.plotter.renderer.actors), [])
+            elif hasattr(tab, "xz"):
+                for plot in (tab.xz, tab.yz):
+                    self.assertEqual(plot.setup_items, [])
+                    self.assertTrue(all(len(it.getData()[0] or []) == 0 for it in plot.env_items.values()))
             else:
-                self.assertFalse(any(ax.has_data() for ax in tab.figure.axes))
+                self.assertEqual(tab.items, {})
 
     def test_exports(self):
         w = self.win

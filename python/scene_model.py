@@ -191,6 +191,26 @@ def wedge_silhouette_xz(elements_mm, wedge):
             (np.max(ec) + margin, z_top), (np.min(ec) - margin, z_top)]
 
 
+def wedge_yz_rect(scene):
+    """
+    The wedge's Y-Z silhouette (mm, [(y, z), ...]): a rectangle over the element footprint in
+    Y (margin max(2 mm, 15 % of the footprint)) up to the tallest of the elements and, for a
+    catalogue outline, the outline's top. None for a contact setup.
+    """
+    if scene.contact:
+        return None
+    el = np.vstack([p.coords for p in scene.find("element")])
+    ec, ez = el[:, 1], el[:, 2]
+    span = float(np.max(ec) - np.min(ec))
+    margin = max(2.0, 0.15 * span)
+    z_top = float(np.min(ez))
+    wedge = scene.one("wedge")
+    if wedge.meta["source"] == "catalogue":
+        z_top = min(z_top, float(np.min(wedge.coords[:, 2])))
+    return [(np.min(ec) - margin, 0.0), (np.max(ec) + margin, 0.0),
+            (np.max(ec) + margin, z_top), (np.min(ec) - margin, z_top)]
+
+
 def _xz(verts):
     """[(x, z), ...] -> (N, 3) with Y = 0."""
     v = np.asarray(verts, dtype=float)

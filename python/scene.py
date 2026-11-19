@@ -10,7 +10,7 @@ from matplotlib.patches import Polygon
 import numpy as np
 
 from scene_model import (build_scene, decimate_rays, user_element_numbers,  # noqa: F401 (re-exported)
-                         wedge_silhouette_xz)
+                         wedge_silhouette_xz, wedge_yz_rect)
 
 # ---------------------------------------------------------------------------
 # Shared scene styling
@@ -67,13 +67,7 @@ def _draw_wedge_2d(ax, scene, dim_idx):
         return []
     wedge = scene.one("wedge")
     if dim_idx == 1:
-        span = float(np.max(ec) - np.min(ec))
-        margin = max(2.0, 0.15 * span)
-        z_top = float(np.min(ez))
-        if wedge.meta["source"] == "catalogue":
-            z_top = min(z_top, float(np.min(wedge.coords[:, 2])))
-        verts = [(np.min(ec) - margin, 0.0), (np.max(ec) + margin, 0.0),
-                 (np.max(ec) + margin, z_top), (np.min(ec) - margin, z_top)]
+        verts = wedge_yz_rect(scene)
         ax.add_patch(Polygon(verts, closed=True, facecolor=COLOR_WEDGE_FACE,
                              edgecolor=COLOR_WEDGE_EDGE, alpha=0.16,
                              linewidth=1.0, zorder=1.5))

@@ -58,7 +58,7 @@ class Scene3DTab(PlayMixin, LawTab):
         self._setup_drawn = False
 
     # -- view ------------------------------------------------------------------------
-    def _make_view(self, lay, projection, toolbar):
+    def _make_view(self, lay):
         self.plotter = QtInteractor(self)
         self.plotter.set_background("white")
         lay.addWidget(self.plotter.interactor, 1)
@@ -110,8 +110,7 @@ class Scene3DTab(PlayMixin, LawTab):
 
     def _build_scene(self):
         cur = self.nav.current
-        get = lambda i: (self.results[i]["interface_points"] * 1e3, np.asarray(self.focal_points[i]) * 1e3)
-        return build_scene(self.solver, get, [cur], outline_mm=self.outline_mm, current=cur,
+        return build_scene(self.solver, self._get_law_data, [cur], outline_mm=self.outline_mm, current=cur,
                            max_rays=self.MAX_RAYS,
                            sweep_focal_mm=np.asarray(self.focal_points) * 1e3 if self.chk_locus.isChecked() else None,
                            element_size_m=self.element_size_m)
@@ -158,6 +157,7 @@ class Scene3DTab(PlayMixin, LawTab):
         idx = element_at_display(self.scene, self.plotter.renderer, xy)
         if idx is not None:
             self.pick_element(idx)
+            self.element_selected.emit(idx)
         return idx
 
     def element_info(self, idx):
@@ -167,14 +167,21 @@ class Scene3DTab(PlayMixin, LawTab):
         block, local = divmod(int(idx), per)
         ix, iy = divmod(local, probe.num_elements_y)
         array = ("Tx" if block == 0 else "Rx") if hasattr(probe, "array_separation") else ""
-        r = self.results[self.nav.current]
+        r = self.current_result()
         delay, tof = float(r["delays_us"][idx]), float(r["tof_us"][idx])
         return {"index": int(idx), "number": int(user_element_numbers(probe)[idx]), "array": array,
                 "x_index": ix + 1, "y_index": iy + 1, "active": bool(np.isfinite(delay)),
                 "delay_us": delay, "tof_us": tof}
 
+    def highlight_element(self, idx):
+        """Selected in another tab: show it here too."""
+        super().highlight_element(idx)
+        if self.scene is not None:
+            self.pick_element(idx)
+
     def pick_element(self, idx):
         self.picked = int(idx)
+        self.selected_element = self.picked
         self._show_pick(self.picked)
         self.plotter.render()
         return self.element_info(idx)
@@ -196,8 +203,7 @@ class Scene3DTab(PlayMixin, LawTab):
         self.plotter.add_points(el[None, :], color="#f59e0b", point_size=14,
                                 render_points_as_spheres=True, name="pick:element")
         if info["active"]:
-            r = self.results[self.nav.current]
-            ip = r["interface_points"][idx] * 1e3
-            fp = np.asarray(self.focal_points[self.nav.current]) * 1e3
+            ip = self.current_result()["interface_points"][idx] * 1e3
+            fp = self.current_focal() * 1e3
             self.plotter.add_mesh(pv.lines_from_points(np.array([el, ip, fp])), color="#f59e0b",
                                   line_width=4, name="pick:ray")
