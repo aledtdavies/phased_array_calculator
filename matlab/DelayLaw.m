@@ -102,14 +102,19 @@ classdef DelayLaw
             if nargin < 3
                 focalY = 0.0;
             end
-            if nargin < 4
+            if nargin == 4 && (ischar(focalZ) || isstring(focalZ))
+                % Legacy 2D call with a mode: calculateLaw(fx, fz, waveType)
+                waveType = focalZ;
+                focalZ = focalY;
+                focalY = 0.0;
+            elseif nargin < 4
                 focalZ = focalY;  % Legacy 2D call: calculateLaw(fx, fz)
                 focalY = 0.0;
             end
-            if nargin < 5
+            if ~exist('waveType', 'var')
                 waveType = 'longitudinal';
             end
-            
+
             elements = obj.Wedge.getTransformedElements(obj.Probe);
             numEls = size(elements, 1);
             activeIndices = obj.Probe.getActiveElementIndices();

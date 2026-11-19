@@ -11,3 +11,9 @@ build/
 
 # Output
 phased_array_calculator_executable/
+
+# Generated outputs of the example scripts and GUI exports
+element_positions.csv
+focal_laws*.csv
+visual_check.png
+curvature_check.png

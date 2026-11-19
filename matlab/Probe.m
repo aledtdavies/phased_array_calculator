@@ -73,10 +73,15 @@ classdef Probe
                 Ny = obj.NumElementsY;
                 % User numbering (1-based, row-first): iy = ceil(idx/Nx), ix = mod(idx-1, Nx)+1
                 % Internal (column-first): internal = (ix-1)*Ny + iy
+                % Dual probes number the second array after the first, so
+                % the mapping is applied within each array (block 0 or 1).
+                perArray = Nx * Ny;
                 userIdx0 = userIndices - 1;  % 0-based
-                iy = floor(userIdx0 / Nx);   % 0-based row
-                ix = mod(userIdx0, Nx);      % 0-based col
-                internalIdx0 = ix * Ny + iy; % 0-based internal
+                block = floor(userIdx0 / perArray);
+                localIdx0 = mod(userIdx0, perArray);
+                iy = floor(localIdx0 / Nx);  % 0-based row
+                ix = mod(localIdx0, Nx);     % 0-based col
+                internalIdx0 = block * perArray + ix * Ny + iy; % 0-based internal
                 indices = sort(internalIdx0 + 1); % back to 1-based
             else
                 indices = userIndices;
@@ -104,10 +109,11 @@ classdef Probe
                 yPos = indicesY * obj.PitchY;
             end
             
-            % Create meshgrid (X varies fastest)
+            % meshgrid gives Ny x Nx grids; flattening column-major makes Y
+            % vary fastest (index = (ix-1)*Ny + iy), the same storage order as
+            % the Python edition ('column-first').
             [X, Y] = meshgrid(xPos, yPos);
-            
-            % Flatten (column-major, but transpose to match Python row-major ordering)
+
             xFlat = X(:);
             yFlat = Y(:);
             zFlat = zeros(size(xFlat));
