@@ -156,6 +156,26 @@ def set_camera(pl, view, lo, hi):
     pl.reset_camera(bounds=(lo[0], hi[0], lo[1], hi[1], lo[2], hi[2]))
 
 
+def add_axes(pl, lo, hi):
+    """Labelled millimetre axes on the scene's bounds, and the orientation marker."""
+    pl.show_bounds(bounds=(lo[0], hi[0], lo[1], hi[1], lo[2], hi[2]), xtitle="X (mm)",
+                   ytitle="Y (mm)", ztitle="Z depth (mm)", location="outer", grid=False,
+                   ticks="outside", font_size=9, color="#334155", fmt="%.0f")
+    pl.show_axes()
+
+
+def refit_camera(pl, lo, hi):
+    """Keep the camera's viewing direction, up and projection; frame new bounds (lo, hi)."""
+    cam = pl.camera
+    direction = np.subtract(cam.position, cam.focal_point)
+    direction /= np.linalg.norm(direction)
+    centre = 0.5 * (np.asarray(lo) + np.asarray(hi))
+    cam.focal_point = tuple(centre)
+    cam.position = tuple(centre + 2.2 * float(np.linalg.norm(np.subtract(hi, lo))) * direction)
+    pl.reset_camera(bounds=(lo[0], hi[0], lo[1], hi[1], lo[2], hi[2]))
+    pl.reset_camera_clipping_range()
+
+
 def display_positions(renderer, pts_mm):
     """(N, 3) world points (mm) -> (N, 3) display coordinates: pixel x, y and depth (0 near, 1 far)."""
     out = np.empty((len(pts_mm), 3))
@@ -200,7 +220,7 @@ def render_scene(scene, component_thickness_mm=0.0, view="Iso", window_size=(120
     lo, hi = add_setup(pl, scene, component_thickness_mm, section=section)
     add_law(pl, scene)
     pl.add_legend(bcolor="white", face="rectangle", size=(0.18, 0.24), loc="lower right")
-    pl.show_axes()
+    add_axes(pl, lo, hi)
     set_camera(pl, view, lo, hi)
     img = pl.screenshot(path, return_img=True)
     pl.close()

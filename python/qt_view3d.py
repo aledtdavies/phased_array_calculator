@@ -18,7 +18,8 @@ from qtpy import QtWidgets
 
 from qt_plotting import LawTab, PlayMixin
 from scene_model import build_scene, user_element_numbers
-from scene_vtk import VIEWS, add_law, add_setup, element_at_display, set_camera
+from scene_vtk import (VIEWS, add_axes, add_law, add_setup, element_at_display, refit_camera,
+                       set_camera)
 
 
 class Scene3DTab(PlayMixin, LawTab):
@@ -125,17 +126,17 @@ class Scene3DTab(PlayMixin, LawTab):
         self.scene = self._build_scene()
         pl = self.plotter
         if not self._setup_drawn:
-            camera = pl.camera_position if self.bounds is not None else None
+            keep_camera = self.bounds is not None
             pl.clear()
             self.bounds = add_setup(pl, self.scene, self.component_thickness_mm,
                                     section=self.chk_section.isChecked())
             add_law(pl, self.scene)
             pl.add_legend(bcolor="white", face="rectangle", size=(0.2, 0.26), loc="lower right")
-            pl.show_axes()
-            if camera is None:
-                set_camera(pl, self.view, *self.bounds)
+            add_axes(pl, *self.bounds)
+            if keep_camera:
+                refit_camera(pl, *self.bounds)   # keep the user's viewing angle, frame the new setup
             else:
-                pl.camera_position = camera      # keep the user's camera across recalculations
+                set_camera(pl, self.view, *self.bounds)
             self._setup_drawn = True
         else:
             add_law(pl, self.scene)
