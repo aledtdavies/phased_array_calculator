@@ -60,7 +60,12 @@ def panel_matches(want, have):
 
 
 def build_solver(pv, wv, mv, sav) -> DelayLaw:
-    """DelayLaw from the probe, wedge, component and sub-aperture panel values."""
+    """
+    DelayLaw from the probe, wedge, component and sub-aperture panel values. Array separation
+    and roof angle apply to dual probes only: the panels hide them for single arrays, so a
+    value left there from a dual setup is not applied unseen (as the MATLAB GUI reads them).
+    """
+    dual = pv.get("probe_type", "Linear") in DUAL_PROBE_TYPES
     probe = create_probe_assembly(
         probe_type=pv.get("probe_type", "Linear"),
         num_elements=int(pv["num_elements"]),
@@ -68,14 +73,14 @@ def build_solver(pv, wv, mv, sav) -> DelayLaw:
         freq=pv["freq_mhz"] * 1e6,
         num_elements_y=int(pv.get("num_elements_y", 1)),
         pitch_y=pv.get("pitch_y_mm", 0.0) * 1e-3,
-        array_separation=wv.get("array_sep_mm", 0.0) * 1e-3,
+        array_separation=wv.get("array_sep_mm", 0.0) * 1e-3 if dual else 0.0,
         start_element=sav.get("start_element", 1),
         num_active_elements=sav.get("num_active_elements", 0),
         element_order=sav.get("element_order", "column-first"))
     mat = Material(velocity_longitudinal=mv["vel_long_ms"], velocity_shear=mv["vel_shear_ms"])
     wedge = Wedge(angle_degrees=wv["angle_deg"], height_at_element1=wv["height_mm"] * 1e-3,
                   velocity=wv["velocity_ms"], probe_offset_x=wv["offset_mm"] * 1e-3,
-                  roof_angle_degrees=wv.get("roof_angle_deg", 0.0))
+                  roof_angle_degrees=wv.get("roof_angle_deg", 0.0) if dual else 0.0)
     return DelayLaw(probe, wedge, mat)
 
 
@@ -83,7 +88,7 @@ def build_solver(pv, wv, mv, sav) -> DelayLaw:
 class Calculation:
     """One sweep's laws (results), table rows and what the views need."""
     solver: DelayLaw
-    results: list            # dicts: angle, skew, fx, fy, fz (m), delays_us, velocity_used, interface_points
+    results: list            # dicts: angle, skew, fx, fy, fz (m), delays_us, tof_us, velocity_used, interface_points
     rows: list               # (values tuple for the table, law index or None for a refused law)
     focal_points: list       # (x, y, z) m per law
     is_matrix: bool
@@ -132,7 +137,8 @@ def calculate(solver, sv, probe_type) -> Calculation:
         law = solver.calculate_law(t.x, t.y, t.z, wave_type=wave_type)
         delays_us = law['delays'] * 1e6
         results.append({'angle': t.angle_deg, 'skew': t.skew_deg, 'fx': t.x, 'fy': t.y, 'fz': t.z,
-                        'delays_us': delays_us, 'velocity_used': law['velocity_used'],
+                        'delays_us': delays_us, 'tof_us': law['tof'] * 1e6,
+                        'velocity_used': law['velocity_used'],
                         'interface_points': law['interface_points']})
         idx = len(results) - 1
         focal_points.append(t.point)
@@ -198,12 +204,24 @@ class CatalogLinks:
             refs[kind] = ref
         return refs
 
-    def wedge_outline_mm(self, wedge_values):
-        """The catalogue wedge outline (global X-Z, mm) while the wedge panel still matches it."""
+    def element_size_m(self, probe_values):
+        """(element width, elevation) in metres from the catalogue probe while the probe panel
+        still matches it; (None, None) otherwise (the 3D view then draws a schematic size)."""
+        asset = self.assets.get("probe")
+        if asset is None or not panel_matches(asset.panel_values(), probe_values):
+            return None, None
+        return asset.element_width, asset.elevation
+
+    def wedge_outline_mm(self, wedge_values, probe_type="Linear"):
+        """
+        The catalogue wedge outline (global X-Z, mm) while the wedge panel still matches it and
+        no roof tilts the arrays (a roof applies to dual probes only, see build_solver).
+        """
         asset = self.assets.get("wedge")
         if asset is None or asset.outline is None:
             return None
-        if not panel_matches(asset.panel_values(), wedge_values) or wedge_values.get("roof_angle_deg", 0.0):
+        roof = wedge_values.get("roof_angle_deg", 0.0) if probe_type in DUAL_PROBE_TYPES else 0.0
+        if not panel_matches(asset.panel_values(), wedge_values) or roof:
             return None
         return asset.outline_global_mm()
 
