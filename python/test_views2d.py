@@ -252,6 +252,41 @@ class ReviewFixes(_WindowCase):
         self.assertEqual(w.scene3d_tab.picked, 100)
         self.assertIn("Element", w.scene3d_tab.lbl_pick.text())
 
+    def test_delay_scale_covers_a_dragged_focus_and_returns(self):
+        w = self.calc(dict(LINEAR, num_elements=64, pitch_mm=0.75))
+        bars = w.hist_tab.items
+        sweep_top = bars["plot"].vb.viewRange()[1][1]
+        w.plot_tab.xz.focus.setPos(0.0, 1.0)                      # the reviewer's focus
+        d = np.asarray(w.hist_tab.current_result()["delays_us"])
+        self.assertGreater(np.nanmax(d), sweep_top)               # would clip on the sweep scale
+        self.assertGreaterEqual(bars["plot"].vb.viewRange()[1][1], np.nanmax(d))
+        w.plot_tab.step_law(1)                                    # back to the sweep: its scale
+        self.assertAlmostEqual(bars["plot"].vb.viewRange()[1][1], sweep_top, places=9)
+        # matrix: image levels and colour bar
+        w = self.calc(DUAL, {"array_sep_mm": 10})
+        items = w.hist_tab.items
+        sweep_vmax = items["vmax"]
+        w.plot_tab.xz.focus.setPos(-5.0, 0.5)
+        d = np.asarray(w.hist_tab.current_result()["delays_us"])
+        top = float(np.nanmax(d))
+        self.assertGreater(top, sweep_vmax)
+        for img in items["images"]:
+            self.assertGreaterEqual(img.getLevels()[1], top)
+        self.assertGreaterEqual(items["bar"].levels()[1], top)
+        w.plot_tab.step_law(1)
+        self.assertAlmostEqual(items["images"][0].getLevels()[1], sweep_vmax, places=12)
+
+    def test_selected_bar_follows_the_law(self):
+        w = self.calc(LINEAR)
+        w.select_element(10)
+        for step in ("law", "custom"):
+            if step == "law":
+                w.hist_tab.show_law(3)
+            else:
+                w.plot_tab.xz.focus.setPos(25.0, 12.0)
+            y = w.hist_tab.items["pick"].getData()[1][0]
+            self.assertAlmostEqual(y, w.hist_tab.current_result()["delays_us"][10], places=12, msg=step)
+
     def test_refused_drag_puts_the_marker_back(self):
         w = self.calc(LINEAR)
         tab = w.plot_tab
