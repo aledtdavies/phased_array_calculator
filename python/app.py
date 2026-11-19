@@ -2,57 +2,14 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import sys
 import os
-import csv
 import json
-import numpy as np
-
-from material import Material
-from probe import Probe, create_probe_assembly
-from wedge import Wedge
-from delay_law import DelayLaw
 
 from panels import ProbePanel, WedgePanel, MaterialPanel, ScanPanel, SubAperturePanel
 from plotting import PlottingPanel, DelayHistogramPanel, Scene3DPanel
 from catalog import Catalog, CatalogError, default_catalog_dir
-from focal_rules import Target, angle_sweep, focal_targets, swept_values
-
-# Scan Panel focus modes (must match ScanPanel's combobox values)
-FOCUS_CONSTANT_DEPTH = "Constant Depth"
-FOCUS_VERTICAL_LINE = "Vertical Line"
-FOCUS_CONSTANT_SOUND_PATH = "Constant Sound Path"
-
-# Scan Panel Y-focus modes (must match ScanPanel's combobox values)
-Y_MODE_DERIVED_FROM_SKEW = "Derived from Skew"
-Y_MODE_FIXED_Y = "Fixed Y"
-Y_MODE_Y_SWEEP = "Y Sweep"
-
-MATRIX_PROBE_TYPES = ["Matrix", "Dual Matrix"]
-
-
-# GUI labels -> focal_rules names
-FOCUS_MODE_NAMES = {FOCUS_CONSTANT_DEPTH: "constant-depth",
-                    FOCUS_VERTICAL_LINE: "vertical-line",
-                    FOCUS_CONSTANT_SOUND_PATH: "sound-path"}
-Y_MODE_NAMES = {Y_MODE_DERIVED_FROM_SKEW: "from-skew", Y_MODE_FIXED_Y: "fixed",
-                Y_MODE_Y_SWEEP: "sweep"}
-# Table text for a refused law: (Fx, Fy, Fz) columns
-REFUSED_TEXT = {"critical angle": ("Err", "Crit", "-"),
-                "focus not below surface": ("Err", "-", "Z<0"),
-                "beam parallel to line": ("Err", "Parallel", "-"),
-                "Y out of reach": ("Err", "Y out", "of reach")}
-
-
-def panel_matches(want, have):
-    """True when every catalogue-given panel value is still in the panel (numbers to 1e-9 relative)."""
-    for k, v in want.items():
-        if k not in have:
-            return False
-        if isinstance(v, str):
-            if have[k] != v:
-                return False
-        elif abs(float(have[k]) - float(v)) > 1e-9 * max(1.0, abs(float(v))):
-            return False
-    return True
+from session import (CatalogLinks, MATRIX_PROBE_TYPES, TABLE_COLUMNS, TABLE_HEADINGS,
+                     asset_message, build_solver, calculate, panel_matches,  # noqa: F401
+                     write_laws_csv)
 
 
 class ScrollableFrame(ttk.Frame):
@@ -215,10 +172,8 @@ class App(tk.Tk):
         self.tree.bind("<<TreeviewSelect>>", self.on_table_select)
 
         self.last_results = None
-        # Catalogue assets applied to the panels: {'probe': ProbeAsset, 'wedge': WedgeAsset}
-        self.catalog_assets = {}
-        self.loaded_catalog_refs = None
-        self.loaded_panel_values = {}
+        # Catalogue references of the setup (session.CatalogLinks)
+        self.catalog = CatalogLinks()
 
     def on_probe_type_changed(self, event=None):
         vals = self.probe_panel.get_values()
@@ -272,10 +227,8 @@ class App(tk.Tk):
         # values stand on their own, and the references travel on with the
         # configuration when it is saved again. The panel values as loaded are
         # kept so that a later edit makes a restored reference's values_match false.
-        self.catalog_assets = {}
-        self.loaded_catalog_refs = config.get("catalog")
-        self.loaded_panel_values = {"probe": self.probe_panel.get_values(),
-                                    "wedge": self.wedge_panel.get_values()}
+        self.catalog.loaded(config, {"probe": self.probe_panel.get_values(),
+                                     "wedge": self.wedge_panel.get_values()})
 
     def save_config(self):
         config = self.config_dict()
@@ -358,204 +311,68 @@ class App(tk.Tk):
         else:
             self.wedge_panel.set_values(asset.panel_values())
             self.wedge_panel.mat_var.set("Custom")
-        self.catalog_assets[kind] = asset
-        if self.loaded_catalog_refs:
-            self.loaded_catalog_refs.pop(kind, None)
-
-        lines = [f"{kind.capitalize()}: {asset.ref.label()}"]
-        if asset.ref.stamp == "changed":
-            lines.append("WARNING: the entry's values no longer give its stamped hash; "
-                         "buildFE treats it as a different asset.")
-        if asset.missing:
-            lines.append("Not in the catalogue, enter by hand: " + ", ".join(asset.missing))
-        lines += asset.notes
+        self.catalog.apply(kind, asset)
         self.status_var.set(f"{kind.capitalize()} from catalogue: {asset.ref.id}")
-        messagebox.showinfo("Catalogue entry applied", "\n".join(lines))
+        messagebox.showinfo("Catalogue entry applied", asset_message(kind, asset))
 
     def catalog_status(self):
-        """
-        Catalogue references for the current setup: each asset's reference and
-        whether the panels still hold its values ('values_match'). References
-        loaded with a saved configuration are passed through unchanged.
-        """
-        refs = {}
-        current = {"probe": self.probe_panel.get_values(), "wedge": self.wedge_panel.get_values()}
-        for kind, asset in self.catalog_assets.items():
-            refs[kind] = dict(asset.ref.as_dict(),
-                              values_match=panel_matches(asset.panel_values(), current[kind]),
-                              missing=list(asset.missing), notes=list(asset.notes))
-        for kind, ref in (self.loaded_catalog_refs or {}).items():
-            if kind in refs or kind not in current:
-                continue
-            ref = dict(ref)
-            snapshot = self.loaded_panel_values.get(kind)
-            ref["values_match"] = bool(ref.get("values_match")) and snapshot is not None                 and panel_matches(snapshot, current[kind])
-            refs[kind] = ref
-        return refs
+        """Catalogue references for the current setup (session.CatalogLinks.status)."""
+        return self.catalog.status({"probe": self.probe_panel.get_values(),
+                                    "wedge": self.wedge_panel.get_values()})
 
     def wedge_outline_mm(self):
         """The catalogue wedge outline (global X-Z, mm) while the wedge panel still matches it."""
-        asset = self.catalog_assets.get("wedge")
-        if asset is None or asset.outline is None:
-            return None
-        wv = self.wedge_panel.get_values()
-        if not panel_matches(asset.panel_values(), wv) or wv.get("roof_angle_deg", 0.0):
-            return None
-        return asset.outline_global_mm()
+        return self.catalog.wedge_outline_mm(self.wedge_panel.get_values())
 
     def get_solver(self):
-        # 1. Probe
-        pv = self.probe_panel.get_values()
-        wv = self.wedge_panel.get_values()
-        sav = self.sub_aperture_panel.get_values()
-        
-        ptype = pv.get("probe_type", "Linear")
-        probe = create_probe_assembly(
-            probe_type=ptype,
-            num_elements=int(pv["num_elements"]),
-            pitch=pv["pitch_mm"] * 1e-3,
-            freq=pv["freq_mhz"] * 1e6,
-            num_elements_y=int(pv.get("num_elements_y", 1)),
-            pitch_y=pv.get("pitch_y_mm", 0.0) * 1e-3,
-            array_separation=wv.get("array_sep_mm", 0.0) * 1e-3,
-            start_element=sav.get("start_element", 1),
-            num_active_elements=sav.get("num_active_elements", 0),
-            element_order=sav.get("element_order", "column-first")
-        )
-        
-        # 2. Material
-        mv = self.mat_panel.get_values()
-        mat = Material(
-            velocity_longitudinal=mv["vel_long_ms"],
-            velocity_shear=mv["vel_shear_ms"]
-        )
-        
-        # 3. Wedge
-        wedge = Wedge(
-            angle_degrees=wv["angle_deg"],
-            height_at_element1=wv["height_mm"] * 1e-3,
-            velocity=wv["velocity_ms"],
-            probe_offset_x=wv["offset_mm"] * 1e-3,
-            roof_angle_degrees=wv.get("roof_angle_deg", 0.0)
-        )
-        
-        return DelayLaw(probe, wedge, mat)
-
-    def _insert_refused_row(self, refused):
-        """A law the focal rule refused: no law number, its reason in the Fx/Fy/Fz columns."""
-        skew = "-" if refused.skew_deg is None else f"{refused.skew_deg:.1f}"
-        fx_t, fy_t, fz_t = REFUSED_TEXT[refused.reason]
-        self.tree.insert("", "end", values=("-", f"{refused.angle_deg:.1f}", skew, fx_t, fy_t, fz_t, "-", "-"))
+        return build_solver(self.probe_panel.get_values(), self.wedge_panel.get_values(),
+                            self.mat_panel.get_values(), self.sub_aperture_panel.get_values())
 
     def run_calculation(self):
         try:
             solver = self.get_solver()
-            sv = self.scan_panel.get_values()
-
-            start = sv["start_angle"]
-            end = sv["end_angle"]
-            step = sv["step_angle"]
-
-            # Determine skew angles based on probe type
-            ptype = self.probe_panel.get_values().get("probe_type", "Linear")
-            is_matrix = ptype in MATRIX_PROBE_TYPES
-
-            if is_matrix:
-                s_start = sv.get("start_skew", 0.0)
-                s_end = sv.get("end_skew", 0.0)
-                s_step = sv.get("step_skew", 1.0)
-            else:
-                s_start, s_end, s_step = 0.0, 0.0, 1.0
-            skew_angles = swept_values(s_start, s_end, s_step, s_start)
-
-            # Y focus (matrix probes only)
-            y_mode = Y_MODE_NAMES[sv.get("y_focus_mode", Y_MODE_DERIVED_FROM_SKEW)] if is_matrix else "from-skew"
-            y_values = None
-            if y_mode == "fixed":
-                y_values = [sv.get("target_y_mm", 0.0) * 1e-3]
-            elif y_mode == "sweep":
-                y_s = sv.get("y_start_mm", 0.0) * 1e-3
-                y_e = sv.get("y_end_mm", 0.0) * 1e-3
-                y_st = sv.get("y_step_mm", 1.0) * 1e-3
-                y_values = swept_values(y_s, y_e, y_st, y_s).tolist()
-
-            wave_type = sv["wave_type"]
-            targets = focal_targets(solver, FOCUS_MODE_NAMES[sv["focus_mode"]],
-                                    sv["param_val"] * 1e-3, angle_sweep(start, end, step),
-                                    skew_angles, wave=wave_type.lower(), y_mode=y_mode,
-                                    y_values=y_values)
-
-            results = []
-            focal_points = []
-
             self.status_var.set("Calculating...")
             self.update_idletasks()
+            calc = calculate(solver, self.scan_panel.get_values(),
+                             self.probe_panel.get_values().get("probe_type", "Linear"))
 
-            # Clear Tree
             for item in self.tree.get_children():
                 self.tree.delete(item)
+            for values, idx in calc.rows:
+                self.tree.insert("", "end", values=values, tags=() if idx is None else (idx,))
 
-            for t in targets:
-                if not isinstance(t, Target):
-                    self._insert_refused_row(t)
-                    continue
-                law = solver.calculate_law(t.x, t.y, t.z, wave_type=wave_type)
-                delays_us = law['delays'] * 1e6
-                results.append({
-                    'angle': t.angle_deg,
-                    'skew': t.skew_deg,
-                    'fx': t.x,
-                    'fy': t.y,
-                    'fz': t.z,
-                    'delays_us': delays_us,
-                    'velocity_used': law['velocity_used'],
-                    'interface_points': law['interface_points']
-                })
-                idx = len(results) - 1
-                focal_points.append(t.point)
-
-                # Inactive elements are NaN
-                min_d = np.nanmin(delays_us)
-                max_d = np.nanmax(delays_us)
-                self.tree.insert("", "end", values=(idx+1, f"{t.angle_deg:.1f}", f"{t.skew_deg:.1f}",
-                                                    f"{t.x*1000:.2f}", f"{t.y*1000:.2f}", f"{t.z*1000:.2f}",
-                                                    f"{min_d:.2f}", f"{max_d:.2f}"), tags=(idx,))
-
+            results = calc.results
             self.last_results = results
-            
-            # Update Plots
-            if focal_points:
-                global_max_delay = 0.0
-                if results:
-                    # results stores 'delays_us'
-                    global_max_delay = max(np.nanmax(r['delays_us']) for r in results)
-                
+            if calc.focal_points:
                 thickness_mm = self.mat_panel.get_values().get("thickness_mm", 0.0)
                 outline_mm = self.wedge_outline_mm()
-                self.plot_tab.update_plot(solver, focal_points, wave_type, results=results, is_matrix=is_matrix,
-                                          component_thickness_mm=thickness_mm, outline_mm=outline_mm)
-                self.scene3d_tab.update_plot(solver, focal_points, wave_type, results=results,
-                                             is_matrix=is_matrix, component_thickness_mm=thickness_mm,
+                self.plot_tab.update_plot(solver, calc.focal_points, calc.wave_type, results=results,
+                                          is_matrix=calc.is_matrix, component_thickness_mm=thickness_mm,
+                                          outline_mm=outline_mm)
+                self.scene3d_tab.update_plot(solver, calc.focal_points, calc.wave_type, results=results,
+                                             is_matrix=calc.is_matrix, component_thickness_mm=thickness_mm,
                                              outline_mm=outline_mm)
-                self.hist_tab.update_plot(solver, focal_points, wave_type, global_max_delay=global_max_delay, results=results, is_matrix=is_matrix)
+                self.hist_tab.update_plot(solver, calc.focal_points, calc.wave_type,
+                                          global_max_delay=calc.global_max_delay, results=results,
+                                          is_matrix=calc.is_matrix)
             else:
                 # No laws: no tab may keep showing (or stepping through) the previous set.
                 for tab in (self.plot_tab, self.hist_tab, self.scene3d_tab):
                     tab.clear_laws()
-            
+
             if not results:
-                 messagebox.showwarning("No Results", "No valid focal laws could be calculated.\nPlease check your geometry, angles, and target coordinates.")
-                 self.status_var.set("Calculation complete. 0 laws generated.")
-                 self.export_btn.config(state="disabled")
+                messagebox.showwarning("No Results", "No valid focal laws could be calculated.\nPlease check your geometry, angles, and target coordinates.")
+                self.status_var.set("Calculation complete. 0 laws generated.")
+                self.export_btn.config(state="disabled")
             else:
-                 self.status_var.set(f"Calculation complete. {len(results)} laws generated.")
-                 self.export_btn.config(state="normal")
-            
+                self.status_var.set(f"Calculation complete. {len(results)} laws generated.")
+                self.export_btn.config(state="normal")
+
         except Exception as e:
             messagebox.showerror("Error", str(e))
             self.status_var.set("Error during calculation.")
             print(e)
-            
+
     def on_table_select(self, event):
         selected = self.tree.selection()
         if not selected:
@@ -584,20 +401,7 @@ class App(tk.Tk):
             return
 
         try:
-            with open(fpath, 'w', newline='') as f:
-                writer = csv.writer(f)
-
-                # Header
-                num_els = len(self.last_results[0]['delays_us'])
-
-                header = ['LawID', 'Angle_Deg', 'Skew_Deg', 'Fx_mm', 'Fy_mm', 'Fz_mm', 'Velocity_m_s'] + [f'El_{i+1}_us' for i in range(num_els)]
-                writer.writerow(header)
-
-                for i, res in enumerate(self.last_results):
-                    row = [i+1, res['angle'], res.get('skew', 0.0), res['fx']*1000, res.get('fy', 0.0)*1000, res['fz']*1000, res['velocity_used']]
-                    row.extend(res['delays_us'])
-                    writer.writerow(row)
-
+            write_laws_csv(fpath, self.last_results)
             self.status_var.set(f"Exported to {os.path.basename(fpath)}")
             messagebox.showinfo("Success", f"Exported to {os.path.basename(fpath)}")
 

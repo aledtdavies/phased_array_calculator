@@ -27,7 +27,8 @@ Y modes (matrix probes):
               list: it is solved for each Y value so that the focus lies on the central ray
               at that Y (the effective skew is reported); the skew list is used once.
 
-Each target is a Target, or a Refused with a reason; nothing is silently replaced:
+Each requested law gives a Target, or a Refused with a reason; nothing is silently replaced or
+dropped (in a Y sweep, one result per skew and Y; in a sound-path Y sweep, one per Y):
 - 'critical angle':          sin(alpha) > 1;
 - 'focus not below surface': the focus would have Z <= 0;
 - 'beam parallel to line':   vertical-line mode with the central ray parallel to the line
@@ -173,13 +174,22 @@ def focal_targets(solver, mode: str, value: float, angles_deg: Sequence[float],
     cx, cy, cz = solver.aperture_centre()
     h = abs(cz)
     path_y_sweep = mode == "sound-path" and y_mode == "sweep"
+    # Each refusal stands for one requested law: per skew, times each Y in a Y sweep; in a
+    # sound-path Y sweep, per Y with no skew (the skew list is not used there).
+    per_skew = len(y_list) if y_mode == "sweep" else 1
+
+    def refuse_all(ang, reason):
+        if path_y_sweep:
+            return [Refused(float(ang), None, reason) for _ in y_list]
+        return [Refused(float(ang), float(s), reason) for s in skews_deg for _ in range(per_skew)]
+
     out: list[Union[Target, Refused]] = []
 
     for ang in angles_deg:
         beta = np.radians(ang)
         sin_alpha = v_wedge / v_mat * np.sin(beta)
         if abs(sin_alpha) > 1.0:
-            out += [Refused(float(ang), float(s), "critical angle") for s in skews_deg]
+            out += refuse_all(ang, "critical angle")
             continue
         alpha = np.arcsin(sin_alpha)
         entry = h * np.tan(alpha)
@@ -189,7 +199,7 @@ def focal_targets(solver, mode: str, value: float, angles_deg: Sequence[float],
         # here. A vertical-line focus does (the entry point rotates with skew): it is
         # checked per skew below.
         if mode != "vertical-line" and fz < 0:
-            out += [Refused(float(ang), float(s), "focus not below surface") for s in skews_deg]
+            out += refuse_all(ang, "focus not below surface")
             continue
 
         for s in skews_deg:
@@ -216,10 +226,10 @@ def focal_targets(solver, mode: str, value: float, angles_deg: Sequence[float],
             x, ys, z = skewed_focal(mode, np.radians(s), x_int, fx, beta, fz, f_primary, cy,
                                     y_list, y_mode, entry_offset=entry)
             if z is None:
-                out.append(Refused(float(ang), float(s), "beam parallel to line"))
+                out += [Refused(float(ang), float(s), "beam parallel to line")] * per_skew
                 continue
             if not z > 0:
-                out.append(Refused(float(ang), float(s), "focus not below surface"))
+                out += [Refused(float(ang), float(s), "focus not below surface")] * per_skew
                 continue
             out += [Target(float(ang), float(s), float(x), float(y), float(z)) for y in ys]
     return out

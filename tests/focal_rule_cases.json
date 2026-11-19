@@ -971,6 +971,219 @@
    ]
   },
   {
+   "name": "critical angle in a sound-path y sweep",
+   "inputs": {
+    "probe": {
+     "type": "Matrix",
+     "n": 8,
+     "pitch": 0.001,
+     "ny": 4,
+     "pitch_y": 0.0012,
+     "start": 1,
+     "active": 0,
+     "order": "column-first"
+    },
+    "wedge": {
+     "angle": 30.0,
+     "height": 0.012,
+     "velocity": 2330.0,
+     "offset": 0.003,
+     "roof": 0.0
+    },
+    "material": {
+     "vl": 2000.0,
+     "vs": 1000.0
+    },
+    "mode": "sound-path",
+    "value": 0.04,
+    "angles": [
+     80
+    ],
+    "skews": [
+     0,
+     10
+    ],
+    "wave": "longitudinal",
+    "y_mode": "sweep",
+    "y_values": [
+     0.0,
+     0.002,
+     0.004
+    ]
+   },
+   "targets": [
+    {
+     "angle": 80.0,
+     "skew": null,
+     "reason": "critical angle"
+    },
+    {
+     "angle": 80.0,
+     "skew": null,
+     "reason": "critical angle"
+    },
+    {
+     "angle": 80.0,
+     "skew": null,
+     "reason": "critical angle"
+    }
+   ]
+  },
+  {
+   "name": "critical angle in a depth y sweep",
+   "inputs": {
+    "probe": {
+     "type": "Matrix",
+     "n": 8,
+     "pitch": 0.001,
+     "ny": 4,
+     "pitch_y": 0.0012,
+     "start": 1,
+     "active": 0,
+     "order": "column-first"
+    },
+    "wedge": {
+     "angle": 30.0,
+     "height": 0.012,
+     "velocity": 2330.0,
+     "offset": 0.003,
+     "roof": 0.0
+    },
+    "material": {
+     "vl": 2000.0,
+     "vs": 1000.0
+    },
+    "mode": "constant-depth",
+    "value": 0.03,
+    "angles": [
+     80
+    ],
+    "skews": [
+     0,
+     10
+    ],
+    "wave": "longitudinal",
+    "y_mode": "sweep",
+    "y_values": [
+     0.0,
+     0.002,
+     0.004
+    ]
+   },
+   "targets": [
+    {
+     "angle": 80.0,
+     "skew": 0.0,
+     "reason": "critical angle"
+    },
+    {
+     "angle": 80.0,
+     "skew": 0.0,
+     "reason": "critical angle"
+    },
+    {
+     "angle": 80.0,
+     "skew": 0.0,
+     "reason": "critical angle"
+    },
+    {
+     "angle": 80.0,
+     "skew": 10.0,
+     "reason": "critical angle"
+    },
+    {
+     "angle": 80.0,
+     "skew": 10.0,
+     "reason": "critical angle"
+    },
+    {
+     "angle": 80.0,
+     "skew": 10.0,
+     "reason": "critical angle"
+    }
+   ]
+  },
+  {
+   "name": "parallel vertical line in a y sweep",
+   "inputs": {
+    "probe": {
+     "type": "Matrix",
+     "n": 8,
+     "pitch": 0.001,
+     "ny": 4,
+     "pitch_y": 0.0012,
+     "start": 1,
+     "active": 0,
+     "order": "column-first"
+    },
+    "wedge": {
+     "angle": 30.0,
+     "height": 0.012,
+     "velocity": 2330.0,
+     "offset": 0.003,
+     "roof": 0.0
+    },
+    "material": {
+     "vl": 5920.0,
+     "vs": 3240.0
+    },
+    "mode": "vertical-line",
+    "value": 0.04,
+    "angles": [
+     0,
+     40
+    ],
+    "skews": [
+     0
+    ],
+    "wave": "longitudinal",
+    "y_mode": "sweep",
+    "y_values": [
+     0.0,
+     0.002,
+     0.004
+    ]
+   },
+   "targets": [
+    {
+     "angle": 0.0,
+     "skew": 0.0,
+     "reason": "beam parallel to line"
+    },
+    {
+     "angle": 0.0,
+     "skew": 0.0,
+     "reason": "beam parallel to line"
+    },
+    {
+     "angle": 0.0,
+     "skew": 0.0,
+     "reason": "beam parallel to line"
+    },
+    {
+     "angle": 40.0,
+     "skew": 0.0,
+     "x": 0.04,
+     "y": 0.0,
+     "z": 0.0361975429143616
+    },
+    {
+     "angle": 40.0,
+     "skew": 0.0,
+     "x": 0.04,
+     "y": 0.002,
+     "z": 0.0361975429143616
+    },
+    {
+     "angle": 40.0,
+     "skew": 0.0,
+     "x": 0.04,
+     "y": 0.004,
+     "z": 0.0361975429143616
+    }
+   ]
+  },
+  {
    "name": "depth dual matrix roof",
    "inputs": {
     "probe": {

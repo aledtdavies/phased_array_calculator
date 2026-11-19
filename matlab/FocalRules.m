@@ -57,14 +57,15 @@ classdef FocalRules
             cx = c(1); cy = c(2); h = abs(c(3));
             pathSweep = strcmp(mode, 'sound-path') && strcmp(yMode, 'sweep');
 
+            % Each refusal stands for one requested law: per skew, times each Y in a Y
+            % sweep; in a sound-path Y sweep, per Y with no skew.
+            if strcmp(yMode, 'sweep'), perSkew = numel(yValues); else, perSkew = 1; end
             T = struct('Angle', {}, 'Skew', {}, 'X', {}, 'Y', {}, 'Z', {}, 'Reason', {});
             for ang = anglesDeg(:)'
                 beta = deg2rad(ang);
                 sinAlpha = vWedge / vMat * sin(beta);
                 if abs(sinAlpha) > 1
-                    for s = skewsDeg(:)'
-                        T(end+1) = FocalRules.refused(ang, s, 'critical angle'); %#ok<AGROW>
-                    end
+                    T = [T, FocalRules.refuseAll(ang, skewsDeg, perSkew, pathSweep, numel(yValues), 'critical angle')]; %#ok<AGROW>
                     continue
                 end
                 entry = h * tan(asin(sinAlpha));
@@ -73,9 +74,7 @@ classdef FocalRules
                 % Depth and path foci do not depend on skew; a vertical-line focus does
                 % (the entry point rotates with skew), so it is checked per skew below.
                 if ~strcmp(mode, 'vertical-line') && fz < 0
-                    for s = skewsDeg(:)'
-                        T(end+1) = FocalRules.refused(ang, s, 'focus not below surface'); %#ok<AGROW>
-                    end
+                    T = [T, FocalRules.refuseAll(ang, skewsDeg, perSkew, pathSweep, numel(yValues), 'focus not below surface')]; %#ok<AGROW>
                     continue
                 end
                 for s = skewsDeg(:)'
@@ -111,7 +110,7 @@ classdef FocalRules
                             x = xe + fPrimary * cos(sk); z = fz; ys = ye + fPrimary * sin(sk);
                         case 'vertical-line'
                             if abs(cos(sk)) < FocalRules.ParallelTol || abs(tan(beta)) < FocalRules.ParallelTol
-                                T(end+1) = FocalRules.refused(ang, s, 'beam parallel to line'); %#ok<AGROW>
+                                T = [T, repmat(FocalRules.refused(ang, s, 'beam parallel to line'), 1, perSkew)]; %#ok<AGROW>
                                 continue
                             end
                             f3 = (fx - xe) / cos(sk);
@@ -123,7 +122,7 @@ classdef FocalRules
                         ys = yValues(:)';
                     end
                     if ~(z > 0)
-                        T(end+1) = FocalRules.refused(ang, s, 'focus not below surface'); %#ok<AGROW>
+                        T = [T, repmat(FocalRules.refused(ang, s, 'focus not below surface'), 1, perSkew)]; %#ok<AGROW>
                         continue
                     end
                     for y = ys
@@ -170,6 +169,19 @@ classdef FocalRules
 
         function t = target(ang, skew, x, y, z)
             t = struct('Angle', ang, 'Skew', skew, 'X', x, 'Y', y, 'Z', z, 'Reason', '');
+        end
+
+        function R = refuseAll(ang, skewsDeg, perSkew, pathSweep, nY, reason)
+            % One refusal per requested law of an angle (see targets).
+            if pathSweep
+                R = repmat(FocalRules.refused(ang, NaN, reason), 1, nY);
+                return
+            end
+            R = FocalRules.refused(ang, 0, reason);
+            R = R([]);
+            for s = skewsDeg(:)'
+                R = [R, repmat(FocalRules.refused(ang, s, reason), 1, perSkew)]; %#ok<AGROW>
+            end
         end
 
         function t = refused(ang, skew, reason)
