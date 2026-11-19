@@ -12,7 +12,8 @@ from wedge import Wedge
 from delay_law import DelayLaw
 
 from panels import ProbePanel, WedgePanel, MaterialPanel, ScanPanel, SubAperturePanel
-from plotting import PlottingPanel, DelayHistogramPanel
+from plotting import PlottingPanel, DelayHistogramPanel, Scene3DPanel
+from catalog import Catalog, CatalogError, default_catalog_dir
 
 # Scan Panel focus modes (must match ScanPanel's combobox values)
 FOCUS_CONSTANT_DEPTH = "Constant Depth"
@@ -111,6 +112,19 @@ def _compute_skewed_focal_point(focus_mode, skew_rad, x_int, fx, beta_rad, fz, f
         # default: derived from skew
         fy_list = [center_y + f_primary * np.sin(skew_rad)]
     return lx, fy_list, fz_current
+
+
+def panel_matches(want, have):
+    """True when every catalogue-given panel value is still in the panel (numbers to 1e-9 relative)."""
+    for k, v in want.items():
+        if k not in have:
+            return False
+        if isinstance(v, str):
+            if have[k] != v:
+                return False
+        elif abs(float(have[k]) - float(v)) > 1e-9 * max(1.0, abs(float(v))):
+            return False
+    return True
 
 
 class ScrollableFrame(ttk.Frame):
@@ -230,9 +244,13 @@ class App(tk.Tk):
         self.data_tab = ttk.Frame(self.notebook)
         self.notebook.add(self.data_tab, text="Data Table")
         
-        # Tab 3: Delays Histogram (New)
+        # Tab 3: Delays (bar chart, or aperture map for matrix probes)
         self.hist_tab = DelayHistogramPanel(self.notebook)
         self.notebook.add(self.hist_tab, text="Delays")
+
+        # Tab 4: 3D scene
+        self.scene3d_tab = Scene3DPanel(self.notebook)
+        self.notebook.add(self.scene3d_tab, text="3D View")
 
         # Treeview setup (Tab 2 content)
         cols = ("ID", "Angle", "Skew", "Fx", "Fy", "Fz", "MinD", "MaxD")
@@ -269,6 +287,10 @@ class App(tk.Tk):
         self.tree.bind("<<TreeviewSelect>>", self.on_table_select)
 
         self.last_results = None
+        # Catalogue assets applied to the panels: {'probe': ProbeAsset, 'wedge': WedgeAsset}
+        self.catalog_assets = {}
+        self.loaded_catalog_refs = None
+        self.loaded_panel_values = {}
 
     def on_probe_type_changed(self, event=None):
         vals = self.probe_panel.get_values()
@@ -287,12 +309,18 @@ class App(tk.Tk):
         file_menu.add_separator()
         file_menu.add_command(label="Export Element Coordinates", command=self.export_element_coords)
         file_menu.add_separator()
+        file_menu.add_command(label="Load Probe from Catalogue...",
+                              command=lambda: self.load_from_catalog("probe"))
+        file_menu.add_command(label="Load Wedge from Catalogue...",
+                              command=lambda: self.load_from_catalog("wedge"))
+        file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self.quit)
         menubar.add_cascade(label="File", menu=file_menu)
         
         self.config(menu=menubar)
 
-    def save_config(self):
+    def config_dict(self):
+        """The full setup as saved: panel values and any catalogue references."""
         config = {
             "probe": self.probe_panel.get_values(),
             "wedge": self.wedge_panel.get_values(),
@@ -300,7 +328,30 @@ class App(tk.Tk):
             "scan": self.scan_panel.get_values(),
             "sub_aperture": self.sub_aperture_panel.get_values()
         }
-        
+        refs = self.catalog_status()
+        if refs:
+            config["catalog"] = refs
+        return config
+
+    def apply_config(self, config):
+        """Set the panels from a saved configuration (see config_dict)."""
+        if "probe" in config: self.probe_panel.set_values(config["probe"])
+        if "wedge" in config: self.wedge_panel.set_values(config["wedge"])
+        if "material" in config: self.mat_panel.set_values(config["material"])
+        if "scan" in config: self.scan_panel.set_values(config["scan"])
+        if "sub_aperture" in config: self.sub_aperture_panel.set_values(config["sub_aperture"])
+        # Catalogue references are not re-read from their files: the loaded
+        # values stand on their own, and the references travel on with the
+        # configuration when it is saved again. The panel values as loaded are
+        # kept so that a later edit makes a restored reference's values_match false.
+        self.catalog_assets = {}
+        self.loaded_catalog_refs = config.get("catalog")
+        self.loaded_panel_values = {"probe": self.probe_panel.get_values(),
+                                    "wedge": self.wedge_panel.get_values()}
+
+    def save_config(self):
+        config = self.config_dict()
+
         fpath = filedialog.asksaveasfilename(
             defaultextension=".json",
             filetypes=[("JSON Config", "*.json"), ("All Files", "*.*")]
@@ -321,13 +372,7 @@ class App(tk.Tk):
             try:
                 with open(fpath, 'r') as f:
                     config = json.load(f)
-                
-                if "probe" in config: self.probe_panel.set_values(config["probe"])
-                if "wedge" in config: self.wedge_panel.set_values(config["wedge"])
-                if "material" in config: self.mat_panel.set_values(config["material"])
-                if "scan" in config: self.scan_panel.set_values(config["scan"])
-                if "sub_aperture" in config: self.sub_aperture_panel.set_values(config["sub_aperture"])
-                
+                self.apply_config(config)
                 self.status_var.set(f"Configuration loaded from {os.path.basename(fpath)}")
             except Exception as e:
                 messagebox.showerror("Load Error", str(e))
@@ -357,6 +402,78 @@ class App(tk.Tk):
                 messagebox.showinfo("Success", f"Exported element coordinates to {os.path.basename(fpath)}")
             except Exception as e:
                 messagebox.showerror("Export Error", str(e))
+
+    def load_from_catalog(self, kind):
+        """Fill the probe or wedge panel from a buildFE or nde-knowledge catalogue entry."""
+        from catalog_dialog import CatalogPicker
+        fpath = filedialog.askopenfilename(
+            title=f"Open a {kind} catalogue (buildFE catalog/{kind}s.json or nde-knowledge export)",
+            initialdir=default_catalog_dir() or os.getcwd(),
+            filetypes=[("JSON catalogue", "*.json"), ("All Files", "*.*")])
+        if not fpath:
+            return
+        try:
+            cat = Catalog(fpath)
+            if not cat.entries(kind):
+                raise CatalogError(f"{os.path.basename(fpath)} has no {kind}s")
+            picker = CatalogPicker(self, cat, kind)
+            self.wait_window(picker)
+            if picker.selected is None:
+                return
+            asset = cat.probe(picker.selected) if kind == "probe" else cat.wedge(picker.selected)
+        except CatalogError as e:
+            messagebox.showerror("Catalogue", str(e))
+            return
+
+        if kind == "probe":
+            self.probe_panel.set_values(asset.panel_values())
+        else:
+            self.wedge_panel.set_values(asset.panel_values())
+            self.wedge_panel.mat_var.set("Custom")
+        self.catalog_assets[kind] = asset
+        if self.loaded_catalog_refs:
+            self.loaded_catalog_refs.pop(kind, None)
+
+        lines = [f"{kind.capitalize()}: {asset.ref.label()}"]
+        if asset.ref.stamp == "changed":
+            lines.append("WARNING: the entry's values no longer give its stamped hash; "
+                         "buildFE treats it as a different asset.")
+        if asset.missing:
+            lines.append("Not in the catalogue, enter by hand: " + ", ".join(asset.missing))
+        lines += asset.notes
+        self.status_var.set(f"{kind.capitalize()} from catalogue: {asset.ref.id}")
+        messagebox.showinfo("Catalogue entry applied", "\n".join(lines))
+
+    def catalog_status(self):
+        """
+        Catalogue references for the current setup: each asset's reference and
+        whether the panels still hold its values ('values_match'). References
+        loaded with a saved configuration are passed through unchanged.
+        """
+        refs = {}
+        current = {"probe": self.probe_panel.get_values(), "wedge": self.wedge_panel.get_values()}
+        for kind, asset in self.catalog_assets.items():
+            refs[kind] = dict(asset.ref.as_dict(),
+                              values_match=panel_matches(asset.panel_values(), current[kind]),
+                              missing=list(asset.missing), notes=list(asset.notes))
+        for kind, ref in (self.loaded_catalog_refs or {}).items():
+            if kind in refs or kind not in current:
+                continue
+            ref = dict(ref)
+            snapshot = self.loaded_panel_values.get(kind)
+            ref["values_match"] = bool(ref.get("values_match")) and snapshot is not None                 and panel_matches(snapshot, current[kind])
+            refs[kind] = ref
+        return refs
+
+    def wedge_outline_mm(self):
+        """The catalogue wedge outline (global X-Z, mm) while the wedge panel still matches it."""
+        asset = self.catalog_assets.get("wedge")
+        if asset is None or asset.outline is None:
+            return None
+        wv = self.wedge_panel.get_values()
+        if not panel_matches(asset.panel_values(), wv) or wv.get("roof_angle_deg", 0.0):
+            return None
+        return asset.outline_global_mm()
 
     def get_solver(self):
         # 1. Probe
@@ -481,7 +598,7 @@ class App(tk.Tk):
                  if abs(sin_alpha) > 1.0:
                      # Critical Angle Exceeded
                      for skew_deg in skew_angles:
-                         self._insert_error_row(results, ang, f"{skew_deg:.1f}", "Err", "Brit", "-")
+                         self._insert_error_row(results, ang, f"{skew_deg:.1f}", "Err", "Crit", "-")
                      continue
 
                  alpha_rad = np.arcsin(sin_alpha)
@@ -542,8 +659,9 @@ class App(tk.Tk):
                          idx = len(results) - 1
                          focal_points.append((lx, ly, fz_current))
 
-                         min_d = np.min(delays_us)
-                         max_d = np.max(delays_us)
+                         # Inactive elements are NaN
+                         min_d = np.nanmin(delays_us)
+                         max_d = np.nanmax(delays_us)
 
                          self.tree.insert("", "end", values=(idx+1, f"{ang:.1f}", f"{eff_skew_deg:.1f}", f"{lx*1000:.2f}", f"{ly*1000:.2f}", f"{fz_current*1000:.2f}", f"{min_d:.2f}", f"{max_d:.2f}"), tags=(idx,))
 
@@ -559,17 +677,20 @@ class App(tk.Tk):
                 global_max_delay = 0.0
                 if results:
                     # results stores 'delays_us'
-                    global_max_delay = max(np.max(r['delays_us']) for r in results)
+                    global_max_delay = max(np.nanmax(r['delays_us']) for r in results)
                 
                 thickness_mm = self.mat_panel.get_values().get("thickness_mm", 0.0)
+                outline_mm = self.wedge_outline_mm()
                 self.plot_tab.update_plot(solver, focal_points, wave_type, results=results, is_matrix=is_matrix,
-                                          component_thickness_mm=thickness_mm)
+                                          component_thickness_mm=thickness_mm, outline_mm=outline_mm)
+                self.scene3d_tab.update_plot(solver, focal_points, wave_type, results=results,
+                                             is_matrix=is_matrix, component_thickness_mm=thickness_mm,
+                                             outline_mm=outline_mm)
                 self.hist_tab.update_plot(solver, focal_points, wave_type, global_max_delay=global_max_delay, results=results, is_matrix=is_matrix)
             else:
-                self.plot_tab.ax.clear()
-                self.plot_tab.canvas.draw()
-                self.hist_tab.ax.clear()
-                self.hist_tab.canvas.draw()
+                # No laws: no tab may keep showing (or stepping through) the previous set.
+                for tab in (self.plot_tab, self.hist_tab, self.scene3d_tab):
+                    tab.clear_laws()
             
             if not results:
                  messagebox.showwarning("No Results", "No valid focal laws could be calculated.\nPlease check your geometry, angles, and target coordinates.")
@@ -589,21 +710,13 @@ class App(tk.Tk):
         if not selected:
              return
         
-        item = selected[0]
-        # The values are: ID, Angle, Skew, Fx, Fy, Fz, MinD, MaxD
-        vals = self.tree.item(item, 'values')
-        
-        try:
-            angle_val = float(vals[1])
-            skew_val = float(vals[2])
-            
-            # Update Both Plot Sliders
-            if hasattr(self.plot_tab, 'set_sliders'):
-                self.plot_tab.set_sliders(angle_val, skew_val)
-            if hasattr(self.hist_tab, 'set_sliders'):
-                self.hist_tab.set_sliders(angle_val, skew_val)
-        except Exception:
-            pass
+        # Valid law rows carry their law index as a tag; error rows carry none.
+        tags = self.tree.item(selected[0], 'tags')
+        if not tags:
+            return
+        idx = int(tags[0])
+        for tab in (self.plot_tab, self.hist_tab, self.scene3d_tab):
+            tab.show_law(idx)
 
     def export_csv(self):
         if not self.last_results:

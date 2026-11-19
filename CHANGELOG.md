@@ -1,5 +1,26 @@
 # Changelog
 
+## Review, catalogues and visualisation — 2026-11-19
+
+Catalogues (Python):
+- Load probes and wedges from buildFE catalogues (`catalog/probes.json`, `wedges.json`, format 0.1) or the nde-knowledge export (`exports/catalog`, version 1): File → Load Probe / Wedge from Catalogue. buildFE entries are checked against their stamped content hash, recomputed exactly as `buildfe.asset.digest` (verified against every stamp in buildFE's catalogue). buildFE's wedge frame maps onto this calculator's with X = x, Z = −y: element 1's seat gives the offset and the height at element 1. Saved configurations record each asset's id, file hash, content hash, stamp status and whether the panel still matches it.
+
+Visualisation (Python):
+- New 3D View tab (mplot3d): wedge body, interface and backwall planes, active/inactive elements, rays from every active element (at most 48, ends kept), interface points, the sweep's focal points, camera presets.
+- Delays tab: per-array delay map for matrix probes, labelled with element numbers in the chosen numbering convention; inactive elements marked on the linear bar chart.
+- Catalogue wedges are drawn from their true outline in the X-Z and 3D views.
+- Step buttons and a law readout reach every law, including Y-sweep laws that share an angle and skew; table rows select their exact law in every tab; zoom/pan toolbar on the ray-tracing tab.
+
+Fixes:
+- Dual matrix probes in row-first order selected first-array elements for second-array numbers (Python and MATLAB).
+- Sub-aperture laws gave NaN Min/Max Delay in the table and a NaN Delays-tab scale.
+- Play on matrix sweeps mixed the flat law index with the angle slider.
+- Loading a configuration did not restore the Y focus mode.
+- `main.py`, `verify_delays.py` and `main.m` took the central ray's height from Y instead of Z; `main.m` failed outright on its `calculateLaw(fx, fz, mode)` call, which MATLAB `calculateLaw` now accepts.
+- Critical-angle error rows read "Brit".
+- The manual and README described column-first / row-first the wrong way round (column-first numbers up each column: Y fastest).
+- Generated CSVs and `__pycache__` files are no longer tracked.
+
 ## Sub-aperture central ray — 2026-10-25
 
 - Angle/skew focal targets (constant depth, vertical line, constant sound path) start the refracted central ray at the centre of the active sub-aperture, not the whole array, in both GUIs (`DelayLaw.aperture_centre` / `apertureCentre`). Full-aperture laws are unchanged; 16-element sub-aperture laws on a 32-element array move by up to about 10 mm. Matches buildFE and imageFE.

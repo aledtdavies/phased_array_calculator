@@ -89,15 +89,50 @@ def draw_elements(ax, elements_mm, probe, dim_idx):
                     label="Inactive elements" if sl.start == 0 else None)
 
 
-def draw_wedge_overlay(ax, elements_mm, wedge, dim_idx):
+def wedge_silhouette_xz(elements_mm, wedge):
     """
-    Draw the wedge body under the element footprint (schematic, derived
-    from the wedge angle and transformed element positions) plus a
-    schematic probe body and dimension annotations. Returns a list of
-    (coord, z) points to include in the axis bounds.
+    Schematic X-Z wedge silhouette (mm, Z down) under the element footprint,
+    derived from the wedge angle and the transformed element positions, or
+    None for a contact setup. Used when no catalogue outline is known.
+    """
+    ec = elements_mm[:, 0]
+    ez = elements_mm[:, 2]
+    if float(np.max(np.abs(ez))) < _CONTACT_TOL_MM:
+        return None
+    span = float(np.max(ec) - np.min(ec))
+    margin = max(2.0, 0.15 * span)
+    tan_a = float(np.tan(wedge.angle_rad))
+    if tan_a > 1e-6:
+        # Top-face silhouette line z(x) = -tan_a * x + c through the
+        # highest elements (covers roof-angled duals too).
+        c = float(np.min(ez + tan_a * ec))
+        x_toe = c / tan_a       # z = 0 crossing of the top-face line
+        x_back = float(np.max(ec)) + margin
+        z_back = -tan_a * x_back + c
+        # Cap a very long toe with a vertical end face so a shallow
+        # wedge doesn't dominate the frame.
+        x_front_cap = float(np.min(ec)) - 4.0 * margin
+        if x_toe < x_front_cap:
+            z_front = -tan_a * x_front_cap + c
+            return [(x_front_cap, 0.0), (x_back, 0.0),
+                    (x_back, z_back), (x_front_cap, z_front)]
+        return [(x_toe, 0.0), (x_back, 0.0), (x_back, z_back)]
+    # Flat wedge (delay line): rectangle
+    z_top = float(np.min(ez))
+    return [(np.min(ec) - margin, 0.0), (np.max(ec) + margin, 0.0),
+            (np.max(ec) + margin, z_top), (np.min(ec) - margin, z_top)]
 
-    dim_idx 0 = X-Z view (sloped wedge silhouette), 1 = Y-Z view
-    (rectangular silhouette).
+
+def draw_wedge_overlay(ax, elements_mm, wedge, dim_idx, outline_mm=None):
+    """
+    Draw the wedge body plus a schematic probe body and dimension
+    annotations. Returns a list of (coord, z) points to include in the
+    axis bounds.
+
+    dim_idx 0 = X-Z view, 1 = Y-Z view (rectangular silhouette).
+    outline_mm: the catalogue wedge outline in the global X-Z plane (mm,
+    Z down), drawn as the true wedge body in the X-Z view; None draws the
+    schematic silhouette.
     """
     ec = elements_mm[:, dim_idx]
     ez = elements_mm[:, 2]
@@ -114,8 +149,10 @@ def draw_wedge_overlay(ax, elements_mm, wedge, dim_idx):
 
     if dim_idx == 1:
         # Y-Z silhouette of the wedge block is a rectangle up to its
-        # tallest edge.
+        # tallest edge (the catalogue outline's height when known).
         z_top = float(np.min(ez))
+        if outline_mm is not None:
+            z_top = min(z_top, min(v[1] for v in outline_mm))
         verts = [(np.min(ec) - margin, 0.0), (np.max(ec) + margin, 0.0),
                  (np.max(ec) + margin, z_top), (np.min(ec) - margin, z_top)]
         ax.add_patch(Polygon(verts, closed=True, facecolor=COLOR_WEDGE_FACE,
@@ -123,36 +160,19 @@ def draw_wedge_overlay(ax, elements_mm, wedge, dim_idx):
                              linewidth=1.0, zorder=1.5))
         return verts
 
-    tan_a = float(np.tan(wedge.angle_rad))
-    if tan_a > 1e-6:
-        # Top-face silhouette line z(x) = -tan_a * x + c through the
-        # highest elements (covers roof-angled duals too).
-        c = float(np.min(ez + tan_a * ec))
-        x_toe = c / tan_a       # z = 0 crossing of the top-face line
-        x_back = float(np.max(ec)) + margin
-        z_back = -tan_a * x_back + c
-
-        # Cap a very long toe with a vertical front face so a shallow
-        # wedge doesn't dominate the frame.
-        x_front_cap = float(np.min(ec)) - 4.0 * margin
-        if x_toe < x_front_cap:
-            z_front = -tan_a * x_front_cap + c
-            verts = [(x_front_cap, 0.0), (x_back, 0.0),
-                     (x_back, z_back), (x_front_cap, z_front)]
-        else:
-            verts = [(x_toe, 0.0), (x_back, 0.0), (x_back, z_back)]
+    if outline_mm is not None:
+        verts = [tuple(v) for v in outline_mm]
+        label = "Wedge (catalogue)"
     else:
-        # Flat wedge (delay line): rectangle
-        z_top = float(np.min(ez))
-        verts = [(np.min(ec) - margin, 0.0), (np.max(ec) + margin, 0.0),
-                 (np.max(ec) + margin, z_top), (np.min(ec) - margin, z_top)]
-
+        verts = wedge_silhouette_xz(elements_mm, wedge)
+        label = "Wedge (schematic)"
     ax.add_patch(Polygon(verts, closed=True, facecolor=COLOR_WEDGE_FACE,
                          edgecolor=COLOR_WEDGE_EDGE, alpha=0.16,
-                         linewidth=1.0, zorder=1.5, label="Wedge"))
+                         linewidth=1.0, zorder=1.5, label=label))
     bounds.extend(verts)
 
-    # Schematic probe body sitting on the top face over the element extent
+    # Schematic probe body sitting on the element plane over the element extent
+    tan_a = float(np.tan(wedge.angle_rad))
     if tan_a > 1e-6:
         c_line = float(np.min(ez + tan_a * ec))
         z_at = lambda x: -tan_a * x + c_line
@@ -266,7 +286,7 @@ def finish_projection(ax, bounds, dim_idx, wave_type,
 
 
 def draw_projection(ax, solver, get_law, indices, dim_idx, wave_type,
-                    show_all, component_thickness_mm=0.0):
+                    show_all, component_thickness_mm=0.0, outline_mm=None):
     """
     Draw one full projection (geometry + rays for `indices`).
     `get_law(idx)` must return (interface_points_mm, target_mm).
@@ -276,7 +296,8 @@ def draw_projection(ax, solver, get_law, indices, dim_idx, wave_type,
 
     bounds = [(float(c), float(z))
               for c, z in zip(elements_mm[:, dim_idx], elements_mm[:, 2])]
-    bounds.extend(draw_wedge_overlay(ax, elements_mm, solver.wedge, dim_idx))
+    bounds.extend(draw_wedge_overlay(ax, elements_mm, solver.wedge, dim_idx,
+                                     outline_mm=outline_mm))
     draw_elements(ax, elements_mm, probe, dim_idx)
 
     cmap = matplotlib.colormaps[LAW_CMAP]
@@ -293,3 +314,216 @@ def draw_projection(ax, solver, get_law, indices, dim_idx, wave_type,
     finish_projection(ax, bounds, dim_idx, wave_type,
                       component_thickness_mm=component_thickness_mm,
                       show_legend=(dim_idx == 0))
+
+
+# ---------------------------------------------------------------------------
+# 3D scene
+# ---------------------------------------------------------------------------
+VIEW_PRESETS = {
+    # name: (elev, azim) for mplot3d's view_init; Z is drawn increasing downward.
+    "Iso": (25.0, -60.0),
+    "X-Z": (0.0, -90.0),     # looking along +Y
+    "Y-Z": (0.0, 0.0),       # looking along -X
+    "Top": (90.0, -90.0),
+}
+
+
+def decimate_rays(active, max_rays):
+    """Active element indices to draw rays from: all, or an even subset that keeps both ends."""
+    active = np.asarray(active)
+    if max_rays <= 0 or active.size <= max_rays:
+        return active
+    pick = np.unique(np.round(np.linspace(0, active.size - 1, max_rays)).astype(int))
+    return active[pick]
+
+
+def _wedge_faces_3d(xz_verts, y0, y1):
+    """Faces of a prism: the X-Z polygon extruded across Y from y0 to y1 (mm)."""
+    front = [(x, y0, z) for x, z in xz_verts]
+    back = [(x, y1, z) for x, z in xz_verts]
+    faces = [front, back]
+    n = len(xz_verts)
+    for k in range(n):
+        a, b = xz_verts[k], xz_verts[(k + 1) % n]
+        faces.append([(a[0], y0, a[1]), (b[0], y0, b[1]), (b[0], y1, b[1]), (a[0], y1, a[1])])
+    return faces
+
+
+def draw_scene_3d(ax, solver, law, focal_points_mm, current_idx, wave_type,
+                  component_thickness_mm=0.0, outline_mm=None, max_rays=48,
+                  show_locus=True):
+    """
+    3D view of one focal law on a mplot3d Axes (all mm, global frame: Z > 0
+    in the component, drawn increasing downward).
+
+    law: (interface_points_mm, target_mm) for the selected law.
+    focal_points_mm: (N, 3) focal points of every law, drawn as the sweep
+    locus coloured by law index; current_idx is the selected law.
+    Rays run element -> interface point -> focus for every active element
+    (an even subset of at most max_rays, ends kept, for large apertures).
+    The wedge body is the catalogue outline or the schematic silhouette,
+    extruded across the element footprint in Y; roof angles tilt the
+    elements but are not shown in the body.
+    """
+    from mpl_toolkits.mplot3d.art3d import Poly3DCollection, Line3DCollection
+
+    probe = solver.probe
+    elements = solver.wedge.get_transformed_elements(probe) * 1000
+    int_pts, target = law
+    target = np.asarray(target, dtype=float)
+    act = np.asarray(probe.get_active_element_indices())
+    is_dual = hasattr(probe, "array_separation")
+    n_half = probe.total_elements // 2 if is_dual else probe.total_elements
+
+    pts = [elements, target[None, :], int_pts[act]]
+    if focal_points_mm is not None and len(focal_points_mm):
+        pts.append(np.asarray(focal_points_mm, dtype=float))
+
+    xz = outline_mm if outline_mm is not None else wedge_silhouette_xz(elements, solver.wedge)
+    # Wedge width is not modelled: draw it a little wider than the element
+    # footprint (at least 15 % of the aperture length) so it reads as a body.
+    y_margin = max(3.0, 0.2 * float(np.ptp(elements[:, 1])),
+                   0.15 * float(np.ptp(elements[:, 0])))
+    y0 = float(np.min(elements[:, 1])) - y_margin
+    y1 = float(np.max(elements[:, 1])) + y_margin
+    faces = None
+    if xz is not None:
+        faces = _wedge_faces_3d([tuple(v) for v in xz], y0, y1)
+        pts.append(np.array([p for f in faces for p in f]))
+
+    allp = np.vstack(pts)
+    lo, hi = allp.min(axis=0), allp.max(axis=0)
+    if component_thickness_mm > 0:
+        hi[2] = max(hi[2], component_thickness_mm)
+    pad = np.maximum(2.0, 0.08 * (hi - lo))
+    lo, hi = lo - pad, hi + pad
+
+    def plane(z, colour, alpha, label):
+        quad = [[(lo[0], lo[1], z), (hi[0], lo[1], z), (hi[0], hi[1], z), (lo[0], hi[1], z)]]
+        ax.add_collection3d(Poly3DCollection(quad, facecolor=colour, alpha=alpha,
+                                             edgecolor=colour, linewidth=0.6, label=label))
+    plane(0.0, COLOR_MATERIAL, 0.18, "Interface")
+    if component_thickness_mm > 0:
+        plane(component_thickness_mm, COLOR_BACKWALL, 0.10, "Backwall")
+    if faces is not None:
+        ax.add_collection3d(Poly3DCollection(
+            faces, facecolor=COLOR_WEDGE_FACE, alpha=0.10, edgecolor=COLOR_WEDGE_EDGE,
+            linewidth=0.5,
+            label="Wedge (catalogue)" if outline_mm is not None else "Wedge (schematic)"))
+
+    # Elements: active coloured (Tx/Rx split for duals), inactive hollow grey
+    mask = np.zeros(len(elements), dtype=bool)
+    mask[act] = True
+    idx = np.arange(len(elements))
+    groups = ([(idx < n_half, COLOR_ELEMENT_TX, "Tx elements"),
+               (idx >= n_half, COLOR_ELEMENT_ACTIVE, "Rx elements")]
+              if is_dual else [(idx >= 0, COLOR_ELEMENT_ACTIVE, "Elements")])
+    inactive_labelled = False
+    for sel, colour, label in groups:
+        on, off = sel & mask, sel & ~mask
+        if on.any():
+            ax.scatter(*elements[on].T, marker="s", s=10, color=colour,
+                       depthshade=False, label=label)
+        if off.any():
+            ax.scatter(*elements[off].T, marker="s", s=10, facecolors="none",
+                       edgecolors=COLOR_ELEMENT_INACTIVE, depthshade=False,
+                       label=None if inactive_labelled else "Inactive elements")
+            inactive_labelled = True
+
+    # Rays for the selected law
+    ray_idx = decimate_rays(act, max_rays)
+    segs, cols = [], []
+    for i in ray_idx:
+        c = (COLOR_RAY_TX if i < n_half else COLOR_RAY_RX) if is_dual else COLOR_RAY
+        segs += [[elements[i], int_pts[i]], [int_pts[i], target]]
+        cols += [c, c]
+    if segs:
+        ax.add_collection3d(Line3DCollection(segs, colors=cols, linewidths=0.6, alpha=0.7))
+        ax.scatter(*int_pts[ray_idx].T, s=4, color="k", depthshade=False,
+                   label="Interface points")
+
+    # Sweep locus and the selected focus
+    if show_locus and focal_points_mm is not None and len(focal_points_mm) > 1:
+        fp = np.asarray(focal_points_mm, dtype=float)
+        ax.scatter(*fp.T, c=np.arange(len(fp)), cmap=LAW_CMAP, s=8,
+                   depthshade=False, label="Focal points (sweep)")
+    ax.scatter(*target.T, marker="x", s=60, color="k", depthshade=False,
+               label="Focal point")
+
+    ax.set_xlim(lo[0], hi[0])
+    ax.set_ylim(lo[1], hi[1])
+    ax.set_zlim(hi[2], lo[2])               # depth increases downward
+    ax.set_box_aspect(tuple(hi - lo))       # equal scale on all axes
+    ax.set_xlabel("X (mm)")
+    ax.set_ylabel("Y (mm)")
+    ax.set_zlabel("Z depth (mm)")
+    n_rays = len(ray_idx)
+    note = f", rays from {n_rays} of {act.size} active elements" if n_rays < act.size else ""
+    ax.set_title(f"3D ray scene ({wave_type}{note})", fontsize=10)
+    ax.legend(loc="upper left", fontsize=7, framealpha=0.7)
+
+
+# ---------------------------------------------------------------------------
+# Aperture delay map (matrix probes)
+# ---------------------------------------------------------------------------
+def user_element_numbers(probe):
+    """
+    1-based element numbers in the user's numbering convention, indexed by
+    internal storage position (internal index = block*Nx*Ny + ix*Ny + iy).
+    column-first: Y varies fastest (number = ix*Ny + iy + 1); row-first:
+    X varies fastest (number = iy*Nx + ix + 1); dual probes number the
+    second array after the first.
+    """
+    nx, ny = probe.num_elements, probe.num_elements_y
+    per = nx * ny
+    internal = np.arange(probe.total_elements)
+    block, local = internal // per, internal % per
+    ix, iy = local // ny, local % ny
+    if probe.element_order == "row-first" and ny > 1:
+        local_user = iy * nx + ix
+    else:
+        local_user = local
+    return block * per + local_user + 1
+
+
+def draw_aperture_maps(fig, probe, delays_us, vmax=None, title=""):
+    """
+    One heat map per array of the delay (µs) over the element grid, X across
+    and Y up, inactive elements grey (NaN). Element numbers in the user's
+    convention are written on the cells when the grid is small enough to read.
+    """
+    nx, ny = probe.num_elements, probe.num_elements_y
+    per = nx * ny
+    n_arrays = probe.total_elements // per
+    numbers = user_element_numbers(probe)
+    cmap = matplotlib.colormaps[LAW_CMAP].copy()
+    cmap.set_bad("#e2e8f0")
+    delays_us = np.asarray(delays_us, dtype=float)
+    finite = delays_us[np.isfinite(delays_us)]
+    if vmax is None or not np.isfinite(vmax) or vmax <= 0:
+        vmax = float(finite.max()) if finite.size and finite.max() > 0 else 1.0
+    names = ["Tx array", "Rx array"] if n_arrays == 2 else ["Aperture"]
+    axes, im = [], None
+    for b in range(n_arrays):
+        ax = fig.add_subplot(1, n_arrays, b + 1)
+        grid = delays_us[b * per:(b + 1) * per].reshape(nx, ny).T     # rows = Y, cols = X
+        im = ax.imshow(np.ma.masked_invalid(grid), origin="lower", cmap=cmap,
+                       vmin=0.0, vmax=vmax, aspect="equal",
+                       extent=(0.5, nx + 0.5, 0.5, ny + 0.5))
+        if nx * ny <= 256:
+            nums = numbers[b * per:(b + 1) * per].reshape(nx, ny)
+            for ix in range(nx):
+                for iy in range(ny):
+                    v = grid[iy, ix]
+                    colour = ("#475569" if not np.isfinite(v)
+                              else ("k" if v > 0.6 * vmax else "w"))
+                    ax.text(ix + 1, iy + 1, str(nums[ix, iy]), ha="center", va="center",
+                            fontsize=6, color=colour)
+        ax.set_xlabel("X element index")
+        ax.set_ylabel("Y element index")
+        ax.set_title(names[b], fontsize=9)
+        axes.append(ax)
+    fig.colorbar(im, ax=axes, label="Delay (µs)", shrink=0.8)
+    if title:
+        fig.suptitle(title, fontsize=10)
+    return axes
