@@ -272,6 +272,15 @@ class RayTab(PlayMixin, LawTab):
         self.yz.setVisible(probe.num_elements_y > 1 or hasattr(probe, "array_separation"))
         self.update_navigation(solver, focal_points, wave_type, results, is_matrix)
 
+    def reset_focus_marker(self):
+        """Put the X-Z marker back on the focus shown (after a refused drag); no solve follows."""
+        if not self.focal_points:
+            return
+        f = self.current_focal() * 1e3
+        self.xz._placing_focus = True
+        self.xz.focus.setPos(float(f[0]), float(f[2]))
+        self.xz._placing_focus = False
+
     def _element_clicked(self, idx):
         self.highlight_element(idx)
         self.element_selected.emit(idx)
@@ -318,6 +327,9 @@ class DelayTab(LawTab):
         self.view = pg.GraphicsLayoutWidget()
         lay.addWidget(self.view, 1)
         self.items = {}
+        # One handler for the life of the view: it reads the current layout, so a rebuilt
+        # layout never leaves handlers bound to removed plots.
+        self.view.scene().sigMouseClicked.connect(self._scene_clicked)
 
     def _blank_view(self):
         self.view.clear()
@@ -358,7 +370,6 @@ class DelayTab(LawTab):
                 p.addItem(pg.InfiniteLine(pos=n / 2 + 0.5, angle=90, pen=pg.mkPen("#64748b", style=QtCore.Qt.DotLine)))
             p.setXRange(0.5, n + 0.5, padding=0)
             p.setYRange(0, vmax * 1.1, padding=0)
-            p.scene().sigMouseClicked.connect(lambda ev, pl=p: self._bar_clicked(ev, pl, n))
             self.items = {"plot": p, "bars": bars, "inactive": inactive, "pick": pick}
             return
         nx, ny = probe.num_elements, probe.num_elements_y
@@ -401,7 +412,6 @@ class DelayTab(LawTab):
             pick.setPen(pen)
             pick.setVisible(False)
             p.addItem(pick)
-            p.scene().sigMouseClicked.connect(lambda ev, pl=p, blk=b: self._cell_clicked(ev, pl, blk, nx, ny))
             images.append(img)
             texts.append(cell_texts)
             picks.append(pick)
@@ -444,7 +454,9 @@ class DelayTab(LawTab):
 
     def highlight_element(self, idx):
         super().highlight_element(idx)
-        if not self.items or self.solver is None:
+        if not self.items or self._stale_layout():
+            return      # applied by refresh_plot after the layout is rebuilt
+        if idx is not None and not 0 <= idx < self.solver.probe.total_elements:
             return
         if "bars" in self.items:
             if idx is None:
@@ -463,19 +475,36 @@ class DelayTab(LawTab):
             r.setRect(ix + 0.5, iy + 0.5, 1, 1)
             r.setVisible(True)
 
-    def _bar_clicked(self, ev, plot, n):
-        pos = plot.vb.mapSceneToView(ev.scenePos())
-        k = int(round(pos.x()))
-        if plot.sceneBoundingRect().contains(ev.scenePos()) and 1 <= k <= n and abs(pos.x() - k) <= 0.4:
-            self.highlight_element(k - 1)
-            self.element_selected.emit(k - 1)
+    def element_at_scene(self, scene_pos):
+        """The element under a scene position in the current layout (a bar or a map cell), or None."""
+        if not self.items or self._stale_layout():
+            return None
+        if "bars" in self.items:
+            plot = self.items["plot"]
+            if not plot.vb.sceneBoundingRect().contains(scene_pos):
+                return None
+            pos = plot.vb.mapSceneToView(scene_pos)
+            k = int(round(pos.x()))
+            n = self.solver.probe.total_elements
+            return k - 1 if 1 <= k <= n and abs(pos.x() - k) <= 0.4 else None
+        nx, ny, per = self.items["shape"]
+        for block, plot in enumerate(self.items["plots"]):
+            if plot.vb.sceneBoundingRect().contains(scene_pos):
+                pos = plot.vb.mapSceneToView(scene_pos)
+                ix, iy = int(round(pos.x())) - 1, int(round(pos.y())) - 1
+                if 0 <= ix < nx and 0 <= iy < ny:
+                    return block * per + ix * ny + iy
+        return None
 
-    def _cell_clicked(self, ev, plot, block, nx, ny):
-        if not plot.sceneBoundingRect().contains(ev.scenePos()):
-            return
-        pos = plot.vb.mapSceneToView(ev.scenePos())
-        ix, iy = int(round(pos.x())) - 1, int(round(pos.y())) - 1
-        if 0 <= ix < nx and 0 <= iy < ny:
-            idx = block * nx * ny + ix * ny + iy
+    def _scene_clicked(self, ev):
+        idx = self.element_at_scene(ev.scenePos())
+        if idx is not None:
             self.highlight_element(idx)
             self.element_selected.emit(idx)
+
+    def _stale_layout(self):
+        """True while the plots were built for another probe (this tab not yet redrawn)."""
+        if self.solver is None:
+            return True
+        p = self.solver.probe
+        return self._layout_key != (p.total_elements, p.num_elements_y)

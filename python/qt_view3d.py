@@ -174,9 +174,10 @@ class Scene3DTab(PlayMixin, LawTab):
                 "delay_us": delay, "tof_us": tof}
 
     def highlight_element(self, idx):
-        """Selected in another tab: show it here too."""
+        """Selected in another tab: show it here too (now, or when this tab is next drawn)."""
         super().highlight_element(idx)
-        if self.scene is not None:
+        self.picked = None if idx is None else int(idx)
+        if self.scene is not None and self._setup_drawn and not self._stale:
             self.pick_element(idx)
 
     def pick_element(self, idx):
