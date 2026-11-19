@@ -13,7 +13,8 @@ Computes element-level time delays (focal laws) for ultrasonic phased array insp
 - **Wave types**: Longitudinal and Shear
 - **3D beam steering** with azimuth and skew angles
 - **Sub-aperture selection**: choose start element and active element count; configurable element numbering convention (Column-first / Row-first) for matrix arrays
-- **Interactive GUI** with Ray Tracing, Data Table, and Delays histogram tabs
+- **Interactive GUI** with Ray Tracing (X-Z / Y-Z), 3D View, Data Table, and Delays tabs (bar chart, or per-array delay map for matrix probes)
+- **Probe and wedge catalogues**: load entries from buildFE (`catalog/*.json`, content hash verified) or the nde-knowledge export; catalogue wedges are drawn from their true outline
 - **Export**: focal laws CSV, element coordinates (CSV / MAT / MATLAB script), configuration JSON
 - **Python** (Tkinter GUI + importable library) and **MATLAB** (legacy-style GUI + classdef library) implementations with identical physics
 
@@ -69,8 +70,8 @@ Operators can restrict which elements fire by setting **Start Element** and **Ac
 
 | Convention | Description |
 |---|---|
-| **Column-first** *(default)* | Elements numbered along rows (X increments fastest) |
-| **Row-first** | Elements numbered up columns (Y increments fastest) |
+| **Column-first** *(default)* | Elements numbered up each column (Y increments fastest) |
+| **Row-first** | Elements numbered along each row (X increments fastest) |
 
 Inactive elements produce `NaN` entries in exported delay arrays.
 
@@ -130,8 +131,10 @@ phased_array_calculator/
 │   ├── wedge.py        — Wedge geometry and coordinate transform
 │   ├── material.py     — Material velocities
 │   ├── panels.py       — Input panels (incl. SubAperturePanel)
-│   ├── scene.py        — Toolkit-independent ray-scene drawing
-│   └── plotting.py     — Ray tracing and histogram panels
+│   ├── scene.py        — Toolkit-independent drawing: projections, 3D scene, delay maps
+│   ├── plotting.py     — Ray tracing, 3D view and delay panels
+│   ├── catalog.py      — buildFE / nde-knowledge probe and wedge catalogue reader
+│   └── catalog_dialog.py — Catalogue entry picker
 ├── matlab/
 │   ├── PhasedArrayGUI.m — GUI
 │   ├── Probe.m          — Probe class with sub-aperture support
