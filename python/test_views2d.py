@@ -88,6 +88,24 @@ class Views2D(_WindowCase):
         tab.chk_all.setChecked(False)
         self.assertEqual(tab.xz.all_items, [])
 
+    def test_show_all_overlays_are_reused_while_navigating(self):
+        """Review of PR #27: Show All is built once per calculation, not per law."""
+        w = self.calc(DUAL, {"array_sep_mm": 10})
+        tab = w.plot_tab
+        tab.chk_all.setChecked(True)
+        kept = [list(p.all_items) for p in (tab.xz, tab.yz)]
+        self.assertTrue(all(kept))
+        for law in range(len(w.last_results)):
+            tab.show_law(law)
+            self.assertEqual([list(p.all_items) for p in (tab.xz, tab.yz)], kept)
+        tab.chk_all.setChecked(False)
+        self.assertEqual(tab.xz.all_items, [])
+        tab.chk_all.setChecked(True)                    # rebuilt after leaving Show All
+        self.assertEqual(len(tab.xz.all_items), len(kept[0]))
+        self.calc(DUAL, {"array_sep_mm": 12})            # a new calculation rebuilds them
+        self.assertTrue(tab.xz.all_items)
+        self.assertNotEqual(tab.xz.all_items[0], kept[0][0])
+
     def test_linear_hides_the_yz_view(self):
         w = self.calc(LINEAR)
         self.assertFalse(w.plot_tab.yz.isVisibleTo(w.plot_tab))

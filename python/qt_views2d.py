@@ -243,6 +243,7 @@ class RayTab(PlayMixin, LawTab):
         self.component_thickness_mm = 0.0
         self.outline_mm = None
         self._setup_drawn = False
+        self._all_drawn = False      # Show All overlays exist for this calculation
 
     def _make_view(self, lay):
         self.splitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
@@ -262,12 +263,14 @@ class RayTab(PlayMixin, LawTab):
         for p in (self.xz, self.yz):
             p.clear_setup()
         self._setup_drawn = False
+        self._all_drawn = False
 
     def update_plot(self, solver, focal_points, wave_type, results=None, is_matrix=False,
                     component_thickness_mm=0.0, outline_mm=None):
         self.component_thickness_mm = component_thickness_mm
         self.outline_mm = outline_mm
         self._setup_drawn = False
+        self._all_drawn = False
         probe = solver.probe
         self.yz.setVisible(probe.num_elements_y > 1 or hasattr(probe, "array_separation"))
         self.update_navigation(solver, focal_points, wave_type, results, is_matrix)
@@ -296,6 +299,9 @@ class RayTab(PlayMixin, LawTab):
         if not self.solver or not self.focal_points:
             return
         show_all = self.chk_all.isChecked() and not self.custom
+        if show_all and self._setup_drawn and self._all_drawn:
+            self.lbl_angle.setText(f"All {len(self.focal_points)} Laws")   # the same for every law
+            return
         indices = list(range(len(self.focal_points))) if show_all else [self.nav.current]
         scene = build_scene(self.solver, self._get_law_data, indices, outline_mm=self.outline_mm)
         if not self._setup_drawn:
@@ -309,6 +315,7 @@ class RayTab(PlayMixin, LawTab):
                 p.set_all(scene, indices)
             else:
                 p.set_law(scene, self.nav.current)
+        self._all_drawn = show_all
         if show_all:
             self.lbl_angle.setText(f"All {len(self.focal_points)} Laws")
             if self.is_matrix:
