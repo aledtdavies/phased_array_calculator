@@ -5,7 +5,7 @@ Draws scene_model's scene with scene_vtk: wedge (catalogue outline or schematic)
 as translucent solids, element footprints at their catalogue size where known, the selected
 law's rays, interface points and focus, and the sweep's foci. Camera presets keep depth
 downward; axis views are parallel projections. A section plane through the active aperture's
-centre cuts the solids open. Clicking near an element picks it: its number in the chosen
+centre cuts the solids open. Clicking on an element (in screen space) picks it: its number in the chosen
 numbering convention, its array, grid position, delay and time of flight, and its ray drawn
 bold. Navigation (sliders, steps, Play, table selection) as the other tabs.
 """
@@ -18,7 +18,7 @@ from qtpy import QtWidgets
 
 from qt_plotting import LawTab, PlayMixin
 from scene_model import build_scene, user_element_numbers
-from scene_vtk import VIEWS, add_law, add_setup, nearest_element, set_camera
+from scene_vtk import VIEWS, add_law, add_setup, element_at_display, set_camera
 
 
 class Scene3DTab(PlayMixin, LawTab):
@@ -61,8 +61,28 @@ class Scene3DTab(PlayMixin, LawTab):
         self.plotter = QtInteractor(self)
         self.plotter.set_background("white")
         lay.addWidget(self.plotter.interactor, 1)
-        self.plotter.enable_point_picking(callback=self._clicked, left_clicking=True,
-                                          show_message=False, show_point=False, picker="cell")
+        # Elements are picked in screen space (scene_vtk.element_at_display), not by ray
+        # casting, so the translucent solids, rays and highlights never intercept a click.
+        # A click is a left press and release at the same place; a drag (rotation) is not.
+        # VTK swallows release events on the interactor; pyvista's add_observer registers
+        # them on the interactor style instead (pyvista issue #4976).
+        self._press_xy = None
+        self.plotter.iren.add_observer("LeftButtonPressEvent", self._on_press)
+        self.plotter.iren.add_observer("LeftButtonReleaseEvent", self._on_release)
+
+    CLICK_SLOP_PX = 3
+
+    def _event_xy(self):
+        return self.plotter.iren.interactor.GetEventPosition()
+
+    def _on_press(self, *_):
+        self._press_xy = self._event_xy()
+
+    def _on_release(self, *_):
+        xy = self._event_xy()
+        start, self._press_xy = self._press_xy, None
+        if start is not None and max(abs(xy[0] - start[0]), abs(xy[1] - start[1])) <= self.CLICK_SLOP_PX:
+            self._clicked(xy)
 
     def _blank_view(self):
         self.plotter.clear()
@@ -130,14 +150,14 @@ class Scene3DTab(PlayMixin, LawTab):
             self.plotter.render()
 
     # -- picking ---------------------------------------------------------------------
-    def _clicked(self, point, *_):
-        if self.scene is None or point is None:
-            return
-        probe = self.solver.probe
-        reach = 0.75 * 1e3 * max(probe.pitch, probe.pitch_y or 0.0)
-        idx = nearest_element(self.scene, point, reach)
+    def _clicked(self, xy, *_):
+        """A left click at display position xy (pixels): pick the element drawn there, if any."""
+        if self.scene is None or xy is None:
+            return None
+        idx = element_at_display(self.scene, self.plotter.renderer, xy)
         if idx is not None:
             self.pick_element(idx)
+        return idx
 
     def element_info(self, idx):
         """What the 3D tab reports for internal element idx in the current law."""

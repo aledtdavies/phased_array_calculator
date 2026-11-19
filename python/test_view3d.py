@@ -125,40 +125,101 @@ class TestPicking(unittest.TestCase):
         from qtpy import QtWidgets
         cls.qapp = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
 
+    @staticmethod
+    def click(tab, xy, drag=(0, 0)):
+        """A left press and release through the VTK interactor, as a mouse click delivers it."""
+        iren = tab.plotter.iren.interactor
+        x, y = int(round(xy[0])), int(round(xy[1]))
+        iren.SetEventInformation(x, y)
+        iren.InvokeEvent("LeftButtonPressEvent")
+        iren.SetEventInformation(x + drag[0], y + drag[1])
+        iren.InvokeEvent("LeftButtonReleaseEvent")
+
     def test_dual_matrix_numbering(self):
-        """Picking reports the element's number in the chosen convention (plan step 3)."""
+        """
+        Clicking each element on screen picks it and reports its number in the chosen
+        convention (plan step 3; review of PR #26): real click events at the projected element
+        centres, Iso and Top views, with highlights and rays present, and a background click.
+        """
         from qt_view3d import Scene3DTab
+        from scene_vtk import display_positions
         pv_ = {"probe_type": "Dual Matrix", "num_elements": 4, "pitch_mm": 1.0, "num_elements_y": 3,
                "pitch_y_mm": 1.5, "freq_mhz": 5}
         wv = {"angle_deg": 20, "height_mm": 8, "velocity_ms": 2330, "offset_mm": 0, "array_sep_mm": 12,
               "roof_angle_deg": 3}
         for order in ("column-first", "row-first"):
-            with self.subTest(order):
-                s, c = calc_for(pv_, wv, {"start_element": 3, "num_active_elements": 18, "element_order": order})
-                tab = Scene3DTab()
-                tab.update_plot(s, c.focal_points, c.wave_type, results=c.results, is_matrix=True,
-                                component_thickness_mm=30)
-                centres = s.wedge.get_transformed_elements(s.probe) * 1e3
-                numbers = user_element_numbers(s.probe)
-                act = set(s.probe.get_active_element_indices())
-                for idx, p in enumerate(centres):
-                    tab._clicked(p + np.array([0.2, 0.1, 0.0]))     # a click near, not on, the centre
-                    info = tab.element_info(tab.picked)
-                    self.assertEqual(tab.picked, idx)
-                    self.assertEqual(info["number"], numbers[idx])
-                    self.assertEqual(info["array"], "Tx" if idx < 12 else "Rx")
-                    self.assertEqual(info["active"], idx in act)
-                    # The grid position matches the number: row-first runs along X first.
-                    n0 = (numbers[idx] - 1) % 12
-                    want = (n0 % 4 + 1, n0 // 4 + 1) if order == "row-first" else (n0 // 3 + 1, n0 % 3 + 1)
-                    self.assertEqual((info["x_index"], info["y_index"]), want)
-                    if info["active"]:
-                        self.assertEqual(info["delay_us"], c.results[tab.current_idx]["delays_us"][idx])
-                tab._clicked(centres[0] + np.array([0.0, 0.0, -50.0]))   # far from every element
-                self.assertEqual(tab.picked, len(centres) - 1)           # unchanged
-                self.assertIn("pick:element", tab.plotter.renderer.actors)
-                tab.plotter.close()
-                tab.deleteLater()
+            s, c = calc_for(pv_, wv, {"start_element": 3, "num_active_elements": 18, "element_order": order})
+            tab = Scene3DTab()
+            tab.resize(900, 700)
+            tab.plotter.window_size = (900, 700)     # hidden widget: give the render window a size
+            tab.update_plot(s, c.focal_points, c.wave_type, results=c.results, is_matrix=True,
+                            component_thickness_mm=30)
+            centres = s.wedge.get_transformed_elements(s.probe) * 1e3
+            numbers = user_element_numbers(s.probe)
+            act = set(s.probe.get_active_element_indices())
+            for view in ("Iso", "Top"):
+                with self.subTest(order=order, view=view):
+                    tab.set_view(view)
+                    tab.plotter.render()
+                    disp = display_positions(tab.plotter.renderer, centres)
+                    for idx in range(len(centres)):
+                        self.click(tab, disp[idx, :2] + 1.0)        # a pixel off the centre
+                        self.assertEqual(tab.picked, idx, f"{order} {view}: clicked {idx}")
+                        info = tab.element_info(idx)
+                        self.assertEqual(info["number"], numbers[idx])
+                        self.assertEqual(info["array"], "Tx" if idx < 12 else "Rx")
+                        self.assertEqual(info["active"], idx in act)
+                        n0 = (numbers[idx] - 1) % 12
+                        want = (n0 % 4 + 1, n0 // 4 + 1) if order == "row-first" else (n0 // 3 + 1, n0 % 3 + 1)
+                        self.assertEqual((info["x_index"], info["y_index"]), want)
+                        self.assertIn(f"Element {numbers[idx]} ", tab.lbl_pick.text() + " ")
+                        if info["active"]:
+                            self.assertEqual(info["delay_us"], c.results[tab.current_idx]["delays_us"][idx])
+                    self.assertIn("pick:element", tab.plotter.renderer.actors)
+                    last = tab.picked
+                    self.click(tab, (3, 3))                       # background corner: nothing
+                    self.assertEqual(tab.picked, last)
+                    self.click(tab, disp[0, :2], drag=(30, 0))    # a drag (rotation) does not pick
+                    self.assertEqual(tab.picked, last)
+            tab.plotter.close()
+            tab.deleteLater()
+
+
+    def test_real_qt_mouse_clicks(self):
+        """A mouse click through Qt (QTest) on the shown view picks the element under it."""
+        from qtpy import QtCore
+        from qtpy.QtTest import QTest
+        from qt_view3d import Scene3DTab
+        from scene_vtk import display_positions
+        pv_ = {"probe_type": "Dual Matrix", "num_elements": 4, "pitch_mm": 1.0, "num_elements_y": 3,
+               "pitch_y_mm": 1.5, "freq_mhz": 5}
+        wv = {"angle_deg": 20, "height_mm": 8, "velocity_ms": 2330, "offset_mm": 0, "array_sep_mm": 12,
+              "roof_angle_deg": 3}
+        s, c = calc_for(pv_, wv, {"start_element": 3, "num_active_elements": 18, "element_order": "row-first"})
+        tab = Scene3DTab()
+        tab.resize(900, 700)
+        tab.show()
+        self.qapp.processEvents()
+        tab.update_plot(s, c.focal_points, c.wave_type, results=c.results, is_matrix=True,
+                        component_thickness_mm=30)
+        tab.plotter.render()
+        self.qapp.processEvents()
+        widget = tab.plotter.interactor
+        dpr = widget.devicePixelRatioF()
+        height = tab.plotter.render_window.GetSize()[1]
+        centres = s.wedge.get_transformed_elements(s.probe) * 1e3
+        for view in ("Iso", "Top"):
+            tab.set_view(view)
+            self.qapp.processEvents()
+            disp = display_positions(tab.plotter.renderer, centres)
+            for idx in range(len(centres)):
+                pos = QtCore.QPoint(int(round(disp[idx, 0] / dpr)), int(round((height - 1 - disp[idx, 1]) / dpr)))
+                QTest.mouseClick(widget, QtCore.Qt.LeftButton, QtCore.Qt.NoModifier, pos)
+                self.qapp.processEvents()
+                self.assertEqual(tab.picked, idx, f"{view}: Qt click on element {idx}")
+        tab.plotter.close()
+        tab.close()
+        tab.deleteLater()
 
 
 if __name__ == "__main__":
