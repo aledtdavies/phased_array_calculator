@@ -101,6 +101,11 @@ Each step states its finish criteria and what it is needed for. Steps 1–4 repl
 
 ### 2. Qt shell with matplotlib canvases
 
+**Status: done 2026-11-19, except retiring the Tk window, which is left for the owner to accept first.**
+- **Qt window:** `qt_app.py`, sharing `session.py` with the Tk window.
+- **Parity tests:** `test_qt_gui.py`, covering identical tables, configurations both ways and the ported GUI regressions.
+- **Carried from #24's review:** one refusal per requested law in Y sweeps.
+
 - Port the panels, menus, table and dialogs (catalogue picker, configuration) to qtpy/PySide6.
 - Embed the existing matplotlib views with `FigureCanvasQTAgg`.
 - Keep the Tk app until this one reaches parity, then retire it.

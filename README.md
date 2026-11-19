@@ -28,7 +28,8 @@ Computes element-level time delays (focal laws) for ultrasonic phased array insp
 
 ```bash
 pip install -r python/requirements.txt
-python python/app.py
+python python/qt_app.py      # the Qt window
+python python/app.py         # the Tk window (kept until the Qt window is accepted)
 ```
 
 Standalone executable:
@@ -125,7 +126,10 @@ disp(result.ActiveIndices)      % 1-based active element list
 ```
 phased_array_calculator/
 ├── python/
-│   ├── app.py          — GUI application
+│   ├── qt_app.py       — Qt GUI (qt_panels.py, qt_plotting.py, qt_catalog_dialog.py)
+│   ├── app.py          — Tk GUI (to be retired)
+│   ├── session.py      — Calculation, table rows, CSV and catalogue links shared by both GUIs
+│   ├── navigation.py   — Law navigation (sliders, step, table selection), toolkit-free
 │   ├── probe.py        — Probe, DualProbe, sub-aperture logic
 │   ├── delay_law.py    — Fermat solver, focal law calculation
 │   ├── focal_rules.py  — Focal targets: constant depth, vertical line, sound path, skew, Y modes
