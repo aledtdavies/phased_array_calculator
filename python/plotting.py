@@ -74,6 +74,7 @@ class LawNavigatorPanel(ttk.Frame):
         self.is_matrix = is_matrix
         self.results = results if results else []
         self._pinned_idx = None
+        self.current_idx = 0        # a new law set: never keep an index from the old one
 
         if self.results:
             self.angle_values = sorted({r['angle'] for r in self.results})
@@ -143,7 +144,12 @@ class LawNavigatorPanel(ttk.Frame):
             az_val = self.angle_values[min(i_az, len(self.angle_values) - 1)]
             sk_val = (self.skew_values[i_sk]
                       if self.skew_values and i_sk < len(self.skew_values) else 0.0)
-            idx = self.index_map.get((az_val, sk_val), self.current_idx)
+            idx = self.index_map.get((az_val, sk_val))
+            if idx is None:
+                # Not every (angle, skew) pair exists (Constant Sound Path Y
+                # sweeps give angle-dependent skews): take the first law at
+                # this angle, else the first law.
+                idx = next((i for i, r in enumerate(self.results) if r['angle'] == az_val), 0)
             # A law picked by index keeps its place while the sliders agree with it.
             pinned = self._pinned_idx
             if pinned is not None and pinned < len(self.results):
@@ -155,6 +161,8 @@ class LawNavigatorPanel(ttk.Frame):
             self.current_idx = idx
         else:
             self.current_idx = i_az
+        if self.focal_points:
+            self.current_idx = min(max(self.current_idx, 0), len(self.focal_points) - 1)
         self._update_labels()
 
         if not self.is_playing:
