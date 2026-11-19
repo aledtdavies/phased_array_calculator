@@ -801,6 +801,72 @@
    ]
   },
   {
+   "name": "path y sweep at 0 deg (no reach), centre Y = 0",
+   "inputs": {
+    "probe": {
+     "type": "Linear",
+     "n": 16,
+     "pitch": 0.0006,
+     "start": 1,
+     "active": 0
+    },
+    "wedge": {
+     "angle": 30.0,
+     "height": 0.012,
+     "velocity": 2330.0,
+     "offset": 0.003,
+     "roof": 0.0
+    },
+    "material": {
+     "vl": 5920.0,
+     "vs": 3240.0
+    },
+    "mode": "sound-path",
+    "value": 0.04,
+    "angles": [
+     0,
+     30
+    ],
+    "skews": [
+     0
+    ],
+    "wave": "longitudinal",
+    "y_mode": "sweep",
+    "y_values": [
+     0.0,
+     0.01
+    ]
+   },
+   "targets": [
+    {
+     "angle": 0.0,
+     "skew": 0.0,
+     "x": 0.006897114317029974,
+     "y": 0.0,
+     "z": 0.04
+    },
+    {
+     "angle": 0.0,
+     "skew": null,
+     "reason": "Y out of reach"
+    },
+    {
+     "angle": 30.0,
+     "skew": 0.0,
+     "x": 0.029757309044844263,
+     "y": 0.0,
+     "z": 0.034641016151377546
+    },
+    {
+     "angle": 30.0,
+     "skew": 25.940758299664456,
+     "x": 0.027454071849544074,
+     "y": 0.01,
+     "z": 0.034641016151377546
+    }
+   ]
+  },
+  {
    "name": "depth dual matrix roof",
    "inputs": {
     "probe": {
