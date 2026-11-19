@@ -156,15 +156,40 @@ def set_camera(pl, view, lo, hi):
     pl.reset_camera(bounds=(lo[0], hi[0], lo[1], hi[1], lo[2], hi[2]))
 
 
-def nearest_element(scene, point, max_distance_mm):
-    """The internal index of the element centre nearest `point` (mm), or None beyond max_distance_mm."""
-    best, best_d = None, max_distance_mm
-    for p in scene.find("element"):
-        d = np.linalg.norm(p.coords - np.asarray(point, dtype=float), axis=1)
-        k = int(np.argmin(d))
-        if d[k] <= best_d:
-            best, best_d = int(p.meta["indices"][k]), float(d[k])
-    return best
+def display_positions(renderer, pts_mm):
+    """(N, 3) world points (mm) -> (N, 3) display coordinates: pixel x, y and depth (0 near, 1 far)."""
+    out = np.empty((len(pts_mm), 3))
+    for k, p in enumerate(np.asarray(pts_mm, dtype=float)):
+        renderer.SetWorldPoint(p[0], p[1], p[2], 1.0)
+        renderer.WorldToDisplay()
+        out[k] = renderer.GetDisplayPoint()
+    return out
+
+
+def element_at_display(scene, renderer, xy, max_px=None):
+    """
+    The internal index of the element whose centre is drawn nearest the screen position xy
+    (pixels, as VTK reports a click), or None when none is within max_px. Picking in screen
+    space: solids, rays and highlights in front of an element cannot intercept it. Ties (one
+    element drawn over another) go to the element nearer the camera. max_px defaults to
+    half the smallest on-screen spacing between element centres, between 4 and 20 pixels.
+    """
+    groups = scene.find("element")
+    if not groups:
+        return None
+    centres = np.vstack([p.coords for p in groups])
+    index = np.concatenate([p.meta["indices"] for p in groups])
+    disp = display_positions(renderer, centres)
+    if max_px is None:
+        d2 = np.linalg.norm(disp[:, None, :2] - disp[None, :, :2], axis=2)
+        d2[np.diag_indices_from(d2)] = np.inf
+        max_px = float(np.clip(0.5 * d2.min(), 4.0, 20.0)) if len(disp) > 1 else 20.0
+    dist = np.hypot(disp[:, 0] - xy[0], disp[:, 1] - xy[1])
+    near = np.flatnonzero(dist <= max_px)
+    if near.size == 0:
+        return None
+    best = near[np.lexsort((disp[near, 2], np.round(dist[near], 1)))[0]]
+    return int(index[best])
 
 
 def render_scene(scene, component_thickness_mm=0.0, view="Iso", window_size=(1200, 800),
