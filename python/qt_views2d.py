@@ -87,9 +87,9 @@ class ProjectionPlot(pg.PlotWidget):
         self.legend.clear()
         d = self.dim
 
-        def add(item, z=1, name=None):
+        def add(item, z=1, name=None, ignore_bounds=False):
             item.setZValue(z)
-            self.addItem(item)
+            self.addItem(item, ignoreBounds=ignore_bounds)
             self.setup_items.append(item)
             if name:
                 self.legend.addItem(item, name)
@@ -139,7 +139,7 @@ class ProjectionPlot(pg.PlotWidget):
         comp = QtWidgets.QGraphicsRectItem(lo[0] - 1e3, 0.0, (hi[0] - lo[0]) + 2e3, bottom)
         comp.setBrush(QtGui.QBrush(_rgba(COLOR_MATERIAL, 0.15)))
         comp.setPen(QtGui.QPen(QtCore.Qt.NoPen))
-        add(comp, 0)
+        add(comp, 0, ignore_bounds=True)     # a backdrop: Auto Range frames the geometry, not it
         add(pg.InfiniteLine(pos=0.0, angle=0, pen=pg.mkPen("k", width=2)), 3)
         if component_thickness_mm > 0:
             add(pg.InfiniteLine(pos=component_thickness_mm, angle=0, pen=pg.mkPen(COLOR_BACKWALL, width=1.5)), 2)
