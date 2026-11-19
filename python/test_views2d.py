@@ -106,6 +106,20 @@ class Views2D(_WindowCase):
         self.assertTrue(tab.xz.all_items)
         self.assertNotEqual(tab.xz.all_items[0], kept[0][0])
 
+    def test_auto_range_frames_the_geometry(self):
+        """Review of PR #27: the component backdrop does not enter Auto Range."""
+        for thickness in (0.0, 30.0):
+            with self.subTest(thickness=thickness):
+                w = self.win
+                w.mat_panel.set_values({"thickness_mm": thickness})
+                self.calc(LINEAR)
+                for plot in (w.plot_tab.xz,):
+                    plot.getPlotItem().vb.autoRange()
+                    (x0, x1), (z0, z1) = plot.getPlotItem().vb.viewRange()
+                    self.assertGreater(x0, -100)
+                    self.assertLess(x1, 200)
+                    self.assertLess(z1, max(thickness, 60) + 50)
+
     def test_linear_hides_the_yz_view(self):
         w = self.calc(LINEAR)
         self.assertFalse(w.plot_tab.yz.isVisibleTo(w.plot_tab))
