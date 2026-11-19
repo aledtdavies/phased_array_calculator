@@ -177,6 +177,13 @@ class Scene3DTab(PlayMixin, LawTab):
         """Selected in another tab: show it here too (now, or when this tab is next drawn)."""
         super().highlight_element(idx)
         self.picked = None if idx is None else int(idx)
+        if idx is None:                                   # deselection
+            self.plotter.remove_actor("pick:ray", render=False)
+            self.plotter.remove_actor("pick:element", render=False)
+            self.lbl_pick.setText("Click near an element to inspect it.")
+            if self.scene is not None:
+                self.plotter.render()
+            return
         if self.scene is not None and self._setup_drawn and not self._stale:
             self.pick_element(idx)
 
