@@ -87,7 +87,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.probe_panel.probe_type_changed.connect(self.on_probe_type_changed)
         for tab in self.law_tabs():
             tab.element_selected.connect(self.select_element)
-            tab.left_custom.connect(self.on_left_custom)
+            tab.law_changed.connect(self.on_law_changed)
         self.plot_tab.focus_dragged.connect(self.on_focus_dragged)
         self.on_probe_type_changed(self.probe_panel.type_combo.currentText())
 
@@ -288,10 +288,11 @@ class MainWindow(QtWidgets.QMainWindow):
         for tab in self.law_tabs():
             tab.highlight_element(idx)
 
-    def on_left_custom(self, idx):
-        """One tab navigated away from a dragged focus: every tab returns to that sweep law."""
+    def on_law_changed(self, idx):
+        """One tab chose sweep law idx: every tab shows it (hidden tabs draw it when shown)."""
+        source = self.sender()
         for t in self.law_tabs():
-            if t.custom is not None:
+            if t is not source and (t.custom is not None or t.current_idx != idx):
                 t.show_law(idx, notify=False)
 
     def on_focus_dragged(self, x, z):
@@ -322,8 +323,8 @@ class MainWindow(QtWidgets.QMainWindow):
         idx = self.tree.item(rows[0].row(), 0).data(QtCore.Qt.UserRole)
         if idx is None:      # a refused law
             return
-        for tab in (self.plot_tab, self.hist_tab, self.scene3d_tab):
-            tab.show_law(idx)
+        for tab in self.law_tabs():
+            tab.show_law(idx, notify=False)
 
     # -- exports ----------------------------------------------------------------------
     def export_csv(self):

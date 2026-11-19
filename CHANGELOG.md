@@ -9,6 +9,7 @@ Plan step 4 (`docs/plans/PLAN-2026-11-qt-vtk-migration.md`).
   - X-Z, plus Y-Z for matrix and dual probes, with the wedge, probe body, dimensions, elements, envelope rays, focus and component;
   - Delays shows a bar chart (linear) or per-array delay maps with element numbers and a colour bar (matrix).
 - **Drag the focus in X-Z.** The law for the dragged focus is solved live and shown in every tab, marked "dragged focus (not in the sweep)". The table and CSV are unchanged; any slider, step or table selection returns to the sweep. A focus dragged above the surface is refused.
+- **One current law for every tab.** A slider, step, Play or table selection in any tab moves them all; hidden tabs draw it when shown.
 - **Linked element selection.** Clicking an element marker, a delay bar, a map cell or an element in the 3D view selects it in every tab.
 - **Hidden tabs redraw only when shown,** and the 3D tab updates the law's meshes in place: a 3D redraw per law went from about 125–156 ms to 42–48 ms.
 - **Redraw per law** (dev laptop, `tests/benchmarks/redraw_timing.py`, medians):

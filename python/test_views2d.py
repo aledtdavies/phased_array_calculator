@@ -200,6 +200,54 @@ class ReviewFixes(_WindowCase):
                     self.assertEqual(t.current_idx, idx, (how, type(t).__name__))
                     np.testing.assert_allclose(t.current_focal(), t.focal_points[idx])
 
+    def test_ordinary_navigation_keeps_every_tab_on_one_law(self):
+        """Review of PR #27: slider, step and Play in any tab move every tab, before and after a drag."""
+        w = self.calc(LINEAR)
+        n = len(w.last_results)
+
+        def same(label):
+            idx = {t.current_idx for t in w.law_tabs()}
+            self.assertEqual(len(idx), 1, (label, [t.current_idx for t in w.law_tabs()]))
+            k = idx.pop()
+            for t in w.law_tabs():
+                self.assertIsNone(t.custom, label)
+                np.testing.assert_allclose(t.current_focal(), t.focal_points[k])
+            return k
+
+        for source in w.law_tabs():
+            name = type(source).__name__
+            source.step_law(1)
+            same(f"{name} step")
+            source.slider.setValue((source.slider.value() + 2) % n)
+            same(f"{name} slider")
+            if hasattr(source, "toggle_play"):              # Delays has no Play
+                source.toggle_play()
+                source.animate()
+                source.toggle_play()
+                same(f"{name} play")
+            w.plot_tab.xz.focus.setPos(30.0, 15.0)
+            source.step_law(1)
+            k = same(f"{name} step after drag")
+            source.step_law(1)
+            self.assertEqual(same(f"{name} second step after drag"), (k + 1) % n)
+
+    def test_hidden_tabs_open_on_the_shared_law(self):
+        w = self.win
+        w.resize(1000, 700)
+        w.show()
+        self.calc(LINEAR)
+        w.tabs.setCurrentIndex(0)
+        self.qapp.processEvents()
+        for _ in range(4):
+            w.plot_tab.step_law(1)
+        self.assertTrue(w.hist_tab._stale and w.scene3d_tab._stale)
+        w.tabs.setCurrentIndex(2)
+        self.qapp.processEvents()
+        self.assertIn(f"law {w.plot_tab.current_idx + 1}", w.hist_tab.items["plot"].titleLabel.text)
+        w.tabs.setCurrentIndex(3)
+        self.qapp.processEvents()
+        self.assertEqual(w.scene3d_tab.scene.find("ray")[0].meta["law"], w.plot_tab.current_idx)
+
     def test_one_delay_click_handler_through_rebuilds(self):
         w = self.calc(LINEAR)
         selected = []
