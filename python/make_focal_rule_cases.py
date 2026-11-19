@@ -43,6 +43,9 @@ CASES = [
     ("path y sweep at 0 deg (no reach), centre Y = 0", LIN, WEDGE, STEEL, "sound-path", 0.04, [0, 30], [0], "longitudinal", "sweep", [0.0, 0.01]),
     ("vertical line reached only with skew", MAT_FULL, WEDGE, STEEL, "vertical-line", 0.00872776354658795, [40], [0, 60], "longitudinal", "from-skew", None),
     ("zero sound path y sweep", MAT_FULL, WEDGE, STEEL, "sound-path", 0.0, [30], [0], "longitudinal", "sweep", [0.0, 0.002]),
+    ("critical angle in a sound-path y sweep", MAT_FULL, WEDGE, SLOW, "sound-path", 0.04, [80], [0, 10], "longitudinal", "sweep", [0.0, 0.002, 0.004]),
+    ("critical angle in a depth y sweep", MAT_FULL, WEDGE, SLOW, "constant-depth", 0.03, [80], [0, 10], "longitudinal", "sweep", [0.0, 0.002, 0.004]),
+    ("parallel vertical line in a y sweep", MAT_FULL, WEDGE, STEEL, "vertical-line", 0.04, [0, 40], [0], "longitudinal", "sweep", [0.0, 0.002, 0.004]),
     ("depth dual matrix roof", DUAL, WEDGE_ROOF, STEEL, "constant-depth", 0.02, [45, 60], [-10, 10], "longitudinal", "from-skew", None),
 ]
 

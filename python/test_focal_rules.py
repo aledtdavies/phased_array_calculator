@@ -198,6 +198,25 @@ class TestRefusals(unittest.TestCase):
                     if isinstance(t, Target):
                         self.assertGreater(t.z, 0, (mode, value, y_mode, t))
 
+    def test_one_refusal_per_requested_law(self):
+        """Y sweeps: refusals per skew x Y; sound-path Y sweeps: per Y with no skew (review of PR #24)."""
+        s = solver()
+        slow = DelayLaw(s.probe, s.wedge, Material(2000.0, 1000.0))
+        ys = [0.0, 0.002, 0.004]
+        path = focal_targets(slow, "sound-path", 0.04, [80], [0, 10], y_mode="sweep", y_values=ys)
+        self.assertEqual([(r.skew_deg, r.reason) for r in path], [(None, "critical angle")] * 3)
+        depth = focal_targets(slow, "constant-depth", 0.03, [80], [0, 10], y_mode="sweep", y_values=ys)
+        self.assertEqual([r.skew_deg for r in depth], [0.0] * 3 + [10.0] * 3)
+        par = focal_targets(s, "vertical-line", 0.04, [0], [0], y_mode="sweep", y_values=ys)
+        self.assertEqual([r.reason for r in par], ["beam parallel to line"] * 3)
+        neg = focal_targets(s, "constant-depth", -0.01, [40], [0, 5], y_mode="sweep", y_values=ys)
+        self.assertEqual(len(neg), 6)
+        fixed = focal_targets(slow, "constant-depth", 0.03, [80], [0, 10], y_mode="fixed", y_values=[0.0])
+        self.assertEqual(len(fixed), 2)
+        # The count of results equals the count of requested laws whenever nothing is refused.
+        ok = focal_targets(s, "constant-depth", 0.03, [40], [0, 10], y_mode="sweep", y_values=ys)
+        self.assertEqual(len(ok), 6)
+
     def test_bad_inputs(self):
         s = solver()
         for kw in ({"mode": "banana"}, {"wave": "banana"}, {"y_mode": "sweep"}):

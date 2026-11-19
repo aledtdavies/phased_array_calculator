@@ -3,7 +3,7 @@ import os
 import shutil
 
 # Define the main script and output directory
-main_script = os.path.join("python", "app.py")
+main_script = os.path.join("python", "qt_app.py")   # the Qt window (plan step 2)
 output_name = "PhasedArrayCalculator"
 output_dir = os.path.abspath(os.path.join(os.getcwd(), "..", "phased_array_calculator_executable"))
 
@@ -21,9 +21,8 @@ args = [
     f"--distpath={output_dir}",
     "--workpath=build",
     "--specpath=.",
-    "--add-data=UserManual.html;.", # Include UserManual.html in the root of the output
-    "--add-data=python/*.csv;python", # Include CSV files if they are needed by app.py
-    "--add-data=python/*.json;python", # Include JSON files if they are needed by app.py
+    "--add-data=UserManual.md;.",          # the user manual, in the root of the output
+    "--add-data=python/materials.json;.",  # material presets, read beside the modules
 ]
 
 # Run PyInstaller
