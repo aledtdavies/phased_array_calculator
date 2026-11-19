@@ -867,6 +867,110 @@
    ]
   },
   {
+   "name": "vertical line reached only with skew",
+   "inputs": {
+    "probe": {
+     "type": "Matrix",
+     "n": 8,
+     "pitch": 0.001,
+     "ny": 4,
+     "pitch_y": 0.0012,
+     "start": 1,
+     "active": 0,
+     "order": "column-first"
+    },
+    "wedge": {
+     "angle": 30.0,
+     "height": 0.012,
+     "velocity": 2330.0,
+     "offset": 0.003,
+     "roof": 0.0
+    },
+    "material": {
+     "vl": 5920.0,
+     "vs": 3240.0
+    },
+    "mode": "vertical-line",
+    "value": 0.00872776354658795,
+    "angles": [
+     40
+    ],
+    "skews": [
+     0,
+     60
+    ],
+    "wave": "longitudinal",
+    "y_mode": "from-skew",
+    "y_values": null
+   },
+   "targets": [
+    {
+     "angle": 40.0,
+     "skew": 0.0,
+     "reason": "focus not below surface"
+    },
+    {
+     "angle": 40.0,
+     "skew": 60.0,
+     "x": 0.00872776354658795,
+     "y": 0.006470777476431234,
+     "z": 0.0021425144548956653
+    }
+   ]
+  },
+  {
+   "name": "zero sound path y sweep",
+   "inputs": {
+    "probe": {
+     "type": "Matrix",
+     "n": 8,
+     "pitch": 0.001,
+     "ny": 4,
+     "pitch_y": 0.0012,
+     "start": 1,
+     "active": 0,
+     "order": "column-first"
+    },
+    "wedge": {
+     "angle": 30.0,
+     "height": 0.012,
+     "velocity": 2330.0,
+     "offset": 0.003,
+     "roof": 0.0
+    },
+    "material": {
+     "vl": 5920.0,
+     "vs": 3240.0
+    },
+    "mode": "sound-path",
+    "value": 0.0,
+    "angles": [
+     30
+    ],
+    "skews": [
+     0
+    ],
+    "wave": "longitudinal",
+    "y_mode": "sweep",
+    "y_values": [
+     0.0,
+     0.002
+    ]
+   },
+   "targets": [
+    {
+     "angle": 30.0,
+     "skew": null,
+     "reason": "focus not below surface"
+    },
+    {
+     "angle": 30.0,
+     "skew": null,
+     "reason": "focus not below surface"
+    }
+   ]
+  },
+  {
    "name": "depth dual matrix roof",
    "inputs": {
     "probe": {

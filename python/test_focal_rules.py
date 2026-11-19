@@ -170,6 +170,34 @@ class TestRefusals(unittest.TestCase):
         behind = focal_targets(s, "vertical-line", -0.05, [40], [0, 60])
         self.assertTrue(all(r.reason == "focus not below surface" for r in behind))
 
+    def test_vertical_line_reached_only_with_skew(self):
+        """The skewed entry point can put the line's focus below the surface when zero skew cannot."""
+        s = solver()
+        fx = 0.00872776354658795
+        r0, t60 = focal_targets(s, "vertical-line", fx, [40], [0, 60])
+        self.assertEqual(r0.reason, "focus not below surface")
+        self.assertIsInstance(t60, Target)
+        self.assertGreater(t60.z, 0)
+        self.assertEqual(t60.x, fx)
+        TestInvariants().check_on_ray(s, [t60])
+        s.calculate_law(*t60.point)     # a valid law
+
+    def test_zero_sound_path_sweep_is_refused(self):
+        ts = focal_targets(solver(), "sound-path", 0.0, [30], [0], y_mode="sweep", y_values=[0.0, 0.002])
+        self.assertEqual([t.reason for t in ts], ["focus not below surface"] * 2)
+
+    def test_no_target_above_the_surface(self):
+        s = solver()
+        for mode, value in (("constant-depth", 0.0), ("vertical-line", 0.001), ("vertical-line", -0.02),
+                            ("sound-path", 0.0)):
+            for y_mode, ys in (("from-skew", None), ("sweep", [0.0, 0.003])):
+                if y_mode == "sweep" and mode == "vertical-line" and value < 0:
+                    continue
+                for t in focal_targets(s, mode, value, [-30, 0, 30, 60], [-60, 0, 60],
+                                       y_mode=y_mode, y_values=ys):
+                    if isinstance(t, Target):
+                        self.assertGreater(t.z, 0, (mode, value, y_mode, t))
+
     def test_bad_inputs(self):
         s = solver()
         for kw in ({"mode": "banana"}, {"wave": "banana"}, {"y_mode": "sweep"}):

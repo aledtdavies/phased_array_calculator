@@ -20,6 +20,7 @@ LIN = {"type": "Linear", "n": 16, "pitch": 0.6e-3, "start": 1, "active": 0}
 LIN_SUB = dict(LIN, start=5, active=8)
 MAT = {"type": "Matrix", "n": 8, "pitch": 1.0e-3, "ny": 4, "pitch_y": 1.2e-3, "start": 3,
        "active": 20, "order": "row-first"}
+MAT_FULL = dict(MAT, start=1, active=0, order="column-first")
 DUAL = {"type": "Dual Matrix", "n": 8, "pitch": 1.0e-3, "ny": 2, "pitch_y": 1.5e-3, "sep": 10e-3,
         "start": 1, "active": 0, "order": "column-first"}
 WEDGE = {"angle": 30.0, "height": 0.012, "velocity": 2330.0, "offset": 0.003, "roof": 0.0}
@@ -40,6 +41,8 @@ CASES = [
     ("vertical matrix y sweep", MAT, WEDGE, STEEL, "vertical-line", 0.035, [40, 60], [0, 10], "longitudinal", "sweep", [-0.004, 0.0, 0.004]),
     ("path matrix y sweep", MAT, WEDGE, STEEL, "sound-path", 0.04, [30, 60], [-20, 0, 20], "longitudinal", "sweep", [0.0, 0.01, 0.2]),
     ("path y sweep at 0 deg (no reach), centre Y = 0", LIN, WEDGE, STEEL, "sound-path", 0.04, [0, 30], [0], "longitudinal", "sweep", [0.0, 0.01]),
+    ("vertical line reached only with skew", MAT_FULL, WEDGE, STEEL, "vertical-line", 0.00872776354658795, [40], [0, 60], "longitudinal", "from-skew", None),
+    ("zero sound path y sweep", MAT_FULL, WEDGE, STEEL, "sound-path", 0.0, [30], [0], "longitudinal", "sweep", [0.0, 0.002]),
     ("depth dual matrix roof", DUAL, WEDGE_ROOF, STEEL, "constant-depth", 0.02, [45, 60], [-10, 10], "longitudinal", "from-skew", None),
 ]
 
