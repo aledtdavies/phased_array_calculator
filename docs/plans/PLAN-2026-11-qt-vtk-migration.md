@@ -16,7 +16,7 @@ It moves onto the libraries the suite already uses rather than adding new ones.
 |---|---|
 | D1 | The MATLAB GUI may diverge from the Python one. Parity is kept for physics and exports (cross-checked by tests in both languages); the MATLAB GUI stays as it is. |
 | D2 | A larger executable is acceptable. Docker: see [Docker](#docker). |
-| D3 | Shared widgets with viewFE and scaneval go through the suite register (FBK entry raised with this plan); no direct edits to their repositories. |
+| D3 | Shared widgets go through the suite register (FBK-0019). Owner's answer, 2026-11-19: **the calculator may use parts of other suite components**, copied with an attribution header (origin repository, file, commit); nothing is asked of them, and their repositories are not edited. |
 
 ## Current stack and target
 
@@ -174,9 +174,15 @@ Docker is useful here for testing and for regenerating the documentation images.
 - **For headless work:** a Linux image that runs the tests and renders the off-screen VTK screenshots (as the prototype does) would make the images and regression screenshots reproducible, for CI or for the cluster.
 - **What still needs checking:** which VTK build renders off-screen headless (an OSMesa or EGL variant, or xvfb). Docker is not installed on this laptop, so nothing was tested. Proposed as optional step 7, after step 3.
 
-## Shared widgets (suite register, D3)
+## Parts from other suite components (D3, FBK-0019)
 
-viewFE (PyVista/pyvistaqt, PySide6) and scaneval (pyqtgraph, PySide6) already contain pieces this plan needs: a VTK scene widget, image panels and colour-map handling. An `FBK` entry asks whether they will offer these as shared, versioned widgets. Until they answer, the calculator builds its own and copies nothing from them.
+viewFE (PyVista/pyvistaqt, PySide6) and scaneval (pyqtgraph, PySide6) already contain pieces this plan needs: a VTK scene widget, image panels and colour-map handling. The owner allows copying them.
+
+How a copy is made:
+- It carries a header naming the origin repository, file and commit. Its tests come with it, or are written for it.
+- The copy becomes the calculator's own code. A fault found in it goes back to the origin component as a pull request (DEC-0018).
+- No runtime dependency on viewFE or scaneval: viewFE is internal-only (its ADR-012), and the calculator must install on its own.
+- Candidates are named at steps 3 and 4: viewFE's pyvistaqt viewer and camera handling; scaneval's pyqtgraph image panels and dB colour maps.
 
 ## Risks
 
