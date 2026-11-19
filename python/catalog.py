@@ -63,10 +63,57 @@ class CatalogError(ValueError):
 # ---------------------------------------------------------------------------
 # buildFE content hash (buildfe.asset.digest / buildfe.config.canonical)
 # ---------------------------------------------------------------------------
+def _numeric_array(x):
+    """
+    The values of a JSON list as MATLAB's jsondecode holds them, flattened as
+    buildfe.config.canonical writes them (x(:)', column-major), or None when
+    jsondecode would give a cell array (mixed or ragged content). A list of
+    numbers is a vector; equal-length nested numeric lists are a matrix (or
+    N-D array) whose first index is the outer list.
+    """
+    def numeric(v):
+        return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+    def shape(v):
+        if numeric(v):
+            return ()
+        if isinstance(v, (list, tuple)) and v:
+            inner = {shape(e) for e in v}
+            if len(inner) == 1 and None not in inner:
+                return (len(v),) + inner.pop()
+        return None
+
+    s = shape(x)
+    if not s:
+        return None
+    flat = []
+
+    # Index tuples with the first index varying fastest (column-major).
+    def indices(dims):
+        if not dims:
+            yield ()
+            return
+        for rest in indices(dims[1:]):
+            for i in range(dims[0]):
+                yield (i,) + rest
+
+    for idx in indices(s):
+        v = x
+        for i in idx:
+            v = v[i]
+        flat.append(v)
+    return flat
+
+
 def _canonical(x) -> str:
     if isinstance(x, dict):
         return "{" + ",".join(json.dumps(k) + ":" + _canonical(x[k]) for k in sorted(x)) + "}"
     if isinstance(x, (list, tuple)):
+        flat = _numeric_array(x)
+        if flat is not None:
+            if len(flat) == 1:
+                return _canonical(flat[0])      # jsondecode gives a scalar
+            return "[" + ",".join(_canonical(v) for v in flat) + "]"
         return "[" + ",".join(_canonical(v) for v in x) + "]"
     if isinstance(x, bool):
         return "true" if x else "false"

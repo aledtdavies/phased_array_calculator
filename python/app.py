@@ -290,6 +290,7 @@ class App(tk.Tk):
         # Catalogue assets applied to the panels: {'probe': ProbeAsset, 'wedge': WedgeAsset}
         self.catalog_assets = {}
         self.loaded_catalog_refs = None
+        self.loaded_panel_values = {}
 
     def on_probe_type_changed(self, event=None):
         vals = self.probe_panel.get_values()
@@ -318,7 +319,8 @@ class App(tk.Tk):
         
         self.config(menu=menubar)
 
-    def save_config(self):
+    def config_dict(self):
+        """The full setup as saved: panel values and any catalogue references."""
         config = {
             "probe": self.probe_panel.get_values(),
             "wedge": self.wedge_panel.get_values(),
@@ -329,7 +331,27 @@ class App(tk.Tk):
         refs = self.catalog_status()
         if refs:
             config["catalog"] = refs
-        
+        return config
+
+    def apply_config(self, config):
+        """Set the panels from a saved configuration (see config_dict)."""
+        if "probe" in config: self.probe_panel.set_values(config["probe"])
+        if "wedge" in config: self.wedge_panel.set_values(config["wedge"])
+        if "material" in config: self.mat_panel.set_values(config["material"])
+        if "scan" in config: self.scan_panel.set_values(config["scan"])
+        if "sub_aperture" in config: self.sub_aperture_panel.set_values(config["sub_aperture"])
+        # Catalogue references are not re-read from their files: the loaded
+        # values stand on their own, and the references travel on with the
+        # configuration when it is saved again. The panel values as loaded are
+        # kept so that a later edit makes a restored reference's values_match false.
+        self.catalog_assets = {}
+        self.loaded_catalog_refs = config.get("catalog")
+        self.loaded_panel_values = {"probe": self.probe_panel.get_values(),
+                                    "wedge": self.wedge_panel.get_values()}
+
+    def save_config(self):
+        config = self.config_dict()
+
         fpath = filedialog.asksaveasfilename(
             defaultextension=".json",
             filetypes=[("JSON Config", "*.json"), ("All Files", "*.*")]
@@ -350,18 +372,7 @@ class App(tk.Tk):
             try:
                 with open(fpath, 'r') as f:
                     config = json.load(f)
-                
-                if "probe" in config: self.probe_panel.set_values(config["probe"])
-                if "wedge" in config: self.wedge_panel.set_values(config["wedge"])
-                if "material" in config: self.mat_panel.set_values(config["material"])
-                if "scan" in config: self.scan_panel.set_values(config["scan"])
-                if "sub_aperture" in config: self.sub_aperture_panel.set_values(config["sub_aperture"])
-                # Catalogue references are not re-read from their files: the
-                # loaded values stand on their own, and the references travel
-                # on with the configuration when it is saved again.
-                self.catalog_assets = {}
-                self.loaded_catalog_refs = config.get("catalog")
-                
+                self.apply_config(config)
                 self.status_var.set(f"Configuration loaded from {os.path.basename(fpath)}")
             except Exception as e:
                 messagebox.showerror("Load Error", str(e))
@@ -446,7 +457,12 @@ class App(tk.Tk):
                               values_match=panel_matches(asset.panel_values(), current[kind]),
                               missing=list(asset.missing), notes=list(asset.notes))
         for kind, ref in (self.loaded_catalog_refs or {}).items():
-            refs.setdefault(kind, ref)
+            if kind in refs or kind not in current:
+                continue
+            ref = dict(ref)
+            snapshot = self.loaded_panel_values.get(kind)
+            ref["values_match"] = bool(ref.get("values_match")) and snapshot is not None                 and panel_matches(snapshot, current[kind])
+            refs[kind] = ref
         return refs
 
     def wedge_outline_mm(self):

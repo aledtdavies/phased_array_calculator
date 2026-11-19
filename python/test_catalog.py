@@ -74,6 +74,34 @@ class TestBuildfeFormat(CatalogFiles):
         c = Catalog(self.write("w3.json", {"catalogVersion": "0.1", "wedges": [e]}))
         self.assertEqual(c.wedge("other").ref.stamp, "unstamped")
 
+    def test_polygon_digest_matches_buildfe(self):
+        """A non-square vertex matrix: buildFE flattens numeric matrices column-major."""
+        # Stamp computed by buildFE's MATLAB buildfe.array.catalogEntry + buildfe.asset.digest
+        # (buildFE 376c414) for exactly this entry; its canonical outline is
+        # {"faceEdge":[5,4],...,"vertices":[0,0.05,0.05,0.02,0,0,0,0.03,0.03,0.002]}.
+        stamp = "6f2174fc617ab754c5cd303b37ae4dd56c4939d2a6ad6ca6559c0edc8a048eb5"
+        e = {"id": "poly", "sha256": stamp, "manufacturer": "T", "model": "T",
+             "material": {"name": v("Rexolite"), "density": v(1049), "longitudinalSpeed": v(2337),
+                          "shearSpeed": v(1157)},
+             "outline": {"type": v("polygon"),
+                         "vertices": v([[0, 0], [0.05, 0], [0.05, 0.03], [0.02, 0.03], [0, 0.002]]),
+                         "faceEdge": v([5, 4]), "firstElementAlong": v(0.01)},
+             "sources": SRC}
+        w = Catalog(self.write("w.json", {"catalogVersion": "0.1", "wedges": [e]})).wedge("poly")
+        self.assertEqual(w.ref.sha256, stamp)
+        self.assertEqual(w.ref.stamp, "ok")
+        # A changed vertex is a different asset.
+        e["outline"]["vertices"]["value"][3] = [0.021, 0.03]
+        w = Catalog(self.write("w2.json", {"catalogVersion": "0.1", "wedges": [e]})).wedge("poly")
+        self.assertEqual(w.ref.stamp, "changed")
+
+    def test_canonical_follows_jsondecode_shapes(self):
+        from catalog import _canonical
+        self.assertEqual(_canonical([[1, 2, 3], [4, 5, 6]]), "[1,4,2,5,3,6]")  # column-major
+        self.assertEqual(_canonical([0.5]), "0.5")                            # 1-element: scalar
+        self.assertEqual(_canonical([[1, 2], [3]]), "[[1,2],3]")               # ragged: cell array
+        self.assertEqual(_canonical(["a", "b"]), '["a","b"]')
+
     def test_canonical_form(self):
         self.assertEqual(buildfe_digest({"b": -0.0, "a": [1, 0.1]}, "probe"),
                          buildfe_digest({"a": [1.0, 0.1], "b": 0}, "probe"))
