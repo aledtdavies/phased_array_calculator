@@ -1,5 +1,21 @@
 # Changelog
 
+## Migration step 2: the Qt window — 2026-11-19
+
+Plan step 2 (`docs/plans/PLAN-2026-11-qt-vtk-migration.md`).
+
+- **Qt window** (`python/qt_app.py`; qtpy with PySide6), with every feature of the Tk window:
+  - the same panels, with the same keys, defaults and visibility rules;
+  - menus: configurations, element coordinates, catalogue loading with a filterable picker;
+  - Calculate and Export CSV, and a Data Table whose rows select their law;
+  - Ray Tracing (toolbar, Show All, Play), Delays (bar chart or per-array delay maps) and 3D View (presets, sweep foci).
+
+  Numbers are read exactly as typed, and a field that isn't a number is refused by name.
+- **Shared core:** `session.py` holds the calculation, table rows, CSV and catalogue links, and both windows call it. Identical output is tested: the Tk and Qt tables match for six scan cases, and configurations load both ways. The Tk window's images are unchanged (61/61). `navigation.py` holds the law navigation for the Qt tabs.
+- **Refusals in Y sweeps** (review of PR #24): one per requested law, so per skew × Y, and per Y in a sound-path sweep. Python and MATLAB, with three shared cases.
+- `build_executable.py` builds the Qt window and bundles `UserManual.md` and `materials.json`. It was still referring to the removed `UserManual.html` and CSVs.
+- `requirements.txt` adds PySide6 and qtpy.
+
 ## Migration step 1: focal rules and scene model in the library — 2026-11-19
 
 Plan step 1 (`docs/plans/PLAN-2026-11-qt-vtk-migration.md`).

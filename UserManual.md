@@ -56,7 +56,8 @@ Both **Python** (Tkinter GUI + importable library) and **MATLAB** (App Designer 
 
 ```bash
 pip install numpy scipy matplotlib
-python python/app.py
+python python/qt_app.py      # the Qt window
+python python/app.py         # the Tk window (kept until the Qt window is accepted)
 ```
 
 To build a standalone executable:
@@ -570,7 +571,11 @@ Pitch (Y-axis rotation by θ):          Roll (X-axis rotation by φ):
 | `material.py` | `Material` class storing longitudinal and shear velocities |
 | `focal_rules.py` | `focal_targets`: focal points for angle/skew/Y sweeps in every focus mode, with refusal reasons |
 | `scene_model.py` | `build_scene`: the geometry every view draws, as primitives in the global frame |
-| `app.py` | Tkinter GUI application, scan engine, CSV export |
+| `qt_app.py` | Qt GUI (qtpy/PySide6): main window, menus, table, dialogs |
+| `qt_panels.py`, `qt_plotting.py`, `qt_catalog_dialog.py` | Qt input panels, plot tabs and catalogue picker |
+| `app.py` | Tkinter GUI (to be retired once the Qt window is accepted) |
+| `session.py` | Solver from panel values, sweep into laws and table rows, focal-law CSV, catalogue links (shared by both GUIs) |
+| `navigation.py` | Law navigation: angle/skew sliders, step buttons, table selection |
 | `panels.py` | Input panels (Probe, Wedge, Material, Scan, SubAperture) |
 | `plotting.py` | Ray tracing, 3D view and delay GUI panels |
 | `scene.py` | Toolkit-independent scene drawing (2D projections, 3D scene, aperture delay maps) shared by the GUI and scripts |
