@@ -383,6 +383,11 @@ class ScanPanel(ttk.LabelFrame):
         if "wave_type" in values:
             self.wave_type.set(values["wave_type"])
 
+        if "y_focus_mode" in values:
+            self.y_focus_mode.set(values["y_focus_mode"])
+            if hasattr(self, "has_skew"):
+                self.on_y_mode_changed()
+
 class SubAperturePanel(ttk.LabelFrame):
     """
     Panel for sub-aperture element selection settings.

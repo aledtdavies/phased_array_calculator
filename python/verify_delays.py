@@ -56,7 +56,7 @@ def check_curvature():
     alpha = np.arcsin(sin_a)
     
     # Distance to interface (vertical)
-    dist_to_int = abs(p_center[1])
+    dist_to_int = abs(p_center[2])  # z: height above the interface
     x_int = p_center[0] + dist_to_int * np.tan(alpha)
     
     # Target 2: Far (Plane wave approximation)
