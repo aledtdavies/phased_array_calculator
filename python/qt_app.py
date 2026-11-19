@@ -84,6 +84,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.calc_btn.clicked.connect(self.run_calculation)
         self.export_btn.clicked.connect(self.export_csv)
         self.tree.itemSelectionChanged.connect(self.on_table_select)
+        # A click on the row already selected changes no selection but still returns the
+        # tabs to that law (for instance from a dragged focus).
+        self.tree.cellClicked.connect(lambda *_: self.on_table_select())
         self.probe_panel.probe_type_changed.connect(self.on_probe_type_changed)
         for tab in self.law_tabs():
             tab.element_selected.connect(self.select_element)

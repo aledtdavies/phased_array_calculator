@@ -266,6 +266,31 @@ class ReviewFixes(_WindowCase):
         self.qapp.processEvents()
         self.assertEqual(w.scene3d_tab.scene.find("ray")[0].meta["law"], w.plot_tab.current_idx)
 
+    def test_clicking_the_selected_row_leaves_a_dragged_focus(self):
+        w = self.calc(LINEAR)
+        w.tree.selectRow(2)
+        w.plot_tab.xz.focus.setPos(30.0, 15.0)
+        self.assertTrue(all(t.custom is not None for t in w.law_tabs()))
+        w.tree.cellClicked.emit(2, 0)                       # the same row again
+        for t in w.law_tabs():
+            self.assertIsNone(t.custom)
+            self.assertEqual(t.current_idx, 2)
+
+    def test_deselection(self):
+        for deferred in (False, True):
+            with self.subTest(deferred=deferred):
+                w = self.calc(DUAL, {"array_sep_mm": 10})
+                w.select_element(5)
+                self.assertIn("pick:element", w.scene3d_tab.plotter.renderer.actors)
+                w.scene3d_tab._stale = deferred
+                w.select_element(None)                      # no TypeError
+                for t in w.law_tabs():
+                    self.assertIsNone(t.selected_element)
+                self.assertNotIn("pick:element", w.scene3d_tab.plotter.renderer.actors)
+                self.assertEqual(w.scene3d_tab.lbl_pick.text(), "Click near an element to inspect it.")
+                self.assertEqual(w.plot_tab.xz.pick.getData()[0].size, 0)
+                w.scene3d_tab._stale = False
+
     def test_one_delay_click_handler_through_rebuilds(self):
         w = self.calc(LINEAR)
         selected = []
