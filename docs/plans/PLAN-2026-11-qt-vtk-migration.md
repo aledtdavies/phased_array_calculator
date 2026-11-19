@@ -85,6 +85,8 @@ Each step states its finish criteria and what it is needed for. Steps 1–4 repl
 
 ### 1. Scene model and library focal rules (no visible change)
 
+**Status: done 2026-11-19** (`focal_rules.py`, `FocalRules.m`, `scene_model.py`; see CHANGELOG). The finish criteria are met: 61 of 61 reference images are identical apart from the intended refusal of the parallel vertical-line law, and MATLAB matches the 12 shared cases.
+
 - Move the focal-target rules (constant depth, vertical line, sound path, skew, Y modes) out of `app.py` into a tested library module.
 - Add the scene model: dataclasses for primitives in the global frame, in mm, with a role used for styling.
 - Make today's matplotlib drawing (`scene.py`) a renderer of that model.

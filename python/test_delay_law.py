@@ -89,8 +89,8 @@ class TestDelayLaw(unittest.TestCase):
         np.testing.assert_array_equal(s.solve_fermat_point_3d([.01,.02,0],[.03,.04,.05],5900,5900),[.01,.02])
 
     def test_gui_skew_rotates_both_legs_of_the_centre_ray(self):
-        from app import (_compute_base_focal, _compute_skewed_focal_point,
-                         FOCUS_CONSTANT_DEPTH, Y_MODE_DERIVED_FROM_SKEW)
+        from focal_rules import base_focal as _compute_base_focal, skewed_focal as _compute_skewed_focal_point
+        FOCUS_CONSTANT_DEPTH, Y_MODE_DERIVED_FROM_SKEW = "constant-depth", "from-skew"
         beta=math.radians(45); skew=math.radians(30)
         entry=.01*math.tan(math.asin(1480/5900*math.sin(beta)))
         z,primary,fx=_compute_base_focal(FOCUS_CONSTANT_DEPTH,.01,beta,entry)

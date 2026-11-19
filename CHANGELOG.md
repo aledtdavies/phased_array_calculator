@@ -1,5 +1,13 @@
 # Changelog
 
+## Migration step 1: focal rules and scene model in the library — 2026-11-19
+
+Plan step 1 (`docs/plans/PLAN-2026-11-qt-vtk-migration.md`).
+
+- **Focal rules move out of the GUIs.** `python/focal_rules.py` (`focal_targets`) and its MATLAB twin `matlab/FocalRules.m` (`FocalRules.targets`) cover constant depth, vertical line and sound path, with skew and the three Y modes. Both GUIs call them. `tests/focal_rule_cases.json` (from `python/make_focal_rule_cases.py`) holds 12 shared cases: Python checks that the file is current, and MATLAB's `testFocalRules` gives the same targets and refusals.
+- **Refusals instead of silent outcomes.** A vertical-line law parallel to its line (0° refracted angle, or 90° skew) is refused. The Python GUI used to aim it 1000 km down; MATLAB skipped it. A skew that puts a vertical-line focus above the surface is refused per law; Python used to abort the whole calculation. Refused rows in the Data Table show "-" instead of repeating the next law's number. The MATLAB GUI reports how many laws were refused.
+- **Scene model.** `python/scene_model.py` builds every view's geometry as primitives in the global frame (mm), each with a role: elements, wedge, probe body, dimensions, envelope rays, rays, interface points, foci. `scene.py` only draws them. All 61 reference images (seven setups in both projections, 3D and delay maps, plus eight GUI scan cases) are pixel-identical before and after, apart from the refused vertical-line law above (`tests/refactor_check/`).
+
 ## Review, catalogues and visualisation — 2026-11-19
 
 Catalogues (Python):
