@@ -61,6 +61,31 @@ class TestRecalculation(GuiCase):
             self.assertTrue(0 <= tab.current_idx < n)
 
 
+class TestEmptyRecalculation(GuiCase):
+    def test_no_laws_clears_every_tab(self):
+        a = self.app
+        a.probe_panel.set_values({"probe_type": "Matrix", "num_elements": 8, "num_elements_y": 4,
+                                  "pitch_mm": 1.0, "pitch_y_mm": 1.0})
+        a.scan_panel.set_values({"start_angle": 40, "end_angle": 60, "step_angle": 10,
+                                 "focus_mode": "Constant Depth", "param_val": 30})
+        a.run_calculation()
+        self.assertGreater(len(a.last_results), 0)
+        # A vertical-line target behind the entry point: every law has Z < 0.
+        a.scan_panel.set_values({"focus_mode": "Vertical Line", "param_val": -200})
+        a.run_calculation()
+        self.assertEqual(a.last_results, [])
+        for tab in self.tabs():
+            name = type(tab).__name__
+            self.assertEqual((tab.focal_points, tab.results, tab.solver), ([], [], None), name)
+            tab.step_law(1)
+            tab.on_slider_change()
+            self.assertEqual(tab.focal_points, [], name)
+            self.assertFalse(any(ax.has_data() for ax in tab.figure.axes), name)
+        a.scene3d_tab.toggle_play()
+        a.scene3d_tab.animate()
+        self.assertEqual(a.scene3d_tab.focal_points, [])
+
+
 class TestCatalogueRoundTrip(GuiCase):
     def config_with_reference(self, match=True):
         a = self.app

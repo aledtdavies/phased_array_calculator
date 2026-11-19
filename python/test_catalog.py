@@ -198,6 +198,29 @@ class TestNdeKnowledgeFormat(CatalogFiles):
         self.assertAlmostEqual(p.pitch_y, 0.003)
         self.assertTrue(any("separation" in m for m in p.missing))
 
+    def test_invalid_element_counts_are_refused(self):
+        base = {"manufacturer": "M", "model": "m", "centreFrequency": 1e6, "nElements": 8,
+                "activeAperture": 0.008, "activeApertureSecondary": 0.004}
+        probes, bad = [], []
+        for k, (ptype, field, value) in enumerate(
+                [(t, "nElementsSecondary", v) for t in ("matrix-array", "dual-matrix-array")
+                 for v in (2.5, 0, -1, None, True)] +
+                [("linear-array", "nElements", v) for v in (2.5, 0, None, True)]):
+            e = dict(base, id=f"bad{k}", type=ptype)
+            e["nElementsSecondary"] = 4
+            e[field] = value
+            probes.append(e)
+            bad.append(e["id"])
+        probes.append(dict(base, id="good", type="matrix-array", nElementsSecondary=4))
+        c = Catalog(self.write("bad.json", {"catalogVersion": "1", "probes": probes}))
+        for id_ in bad:
+            with self.assertRaises(CatalogError, msg=id_):
+                c.probe(id_)
+        rows = {r[0]: r[4] for r in c.summary("probe")}
+        self.assertFalse(any(rows[i] for i in bad))
+        self.assertTrue(rows["good"])
+        self.assertEqual(c.probe("good").num_elements_y, 4)
+
     def test_inconsistency_is_reported_not_corrected(self):
         p = self.catalog().probe("odd")
         self.assertEqual(p.pitch, 0.00075)

@@ -337,14 +337,20 @@ class Catalog:
             raise CatalogError(f"probe '{id_}' is a {ptype}; the calculator handles "
                                f"{', '.join(PROBE_TYPES)} only")
         n = vals.get("nElements")
-        if not isinstance(n, (int, float)) or n < 1 or n != int(n):
+        if (not isinstance(n, (int, float)) or isinstance(n, bool) or not math.isfinite(n)
+                or n < 1 or n != int(n)):
             raise CatalogError(f"probe '{id_}' has no usable element count")
         n = int(n)
         notes, missing = [], []
         is_matrix = ptype in ("matrix-array", "dual-matrix-array")
-        ny = int(vals.get("nElementsSecondary", 1)) if is_matrix else 1
-        if is_matrix and ny < 2 and "nElementsSecondary" not in vals:
-            raise CatalogError(f"matrix probe '{id_}' has no secondary element count")
+        ny = 1
+        if is_matrix:
+            ny = vals.get("nElementsSecondary")
+            if (not isinstance(ny, (int, float)) or isinstance(ny, bool) or not math.isfinite(ny)
+                    or ny < 1 or ny != int(ny)):
+                raise CatalogError(f"matrix probe '{id_}' has no usable secondary element count "
+                                   f"(got {ny!r})")
+            ny = int(ny)
 
         pitch = _pitch(vals.get("pitch"), vals.get("activeAperture"), n, "pitch", notes)
         pitch_y = None
