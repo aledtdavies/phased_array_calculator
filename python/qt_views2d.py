@@ -435,22 +435,30 @@ class DelayTab(LawTab):
             self.highlight_element(self.selected_element)
         title = "Delay profile - dragged focus" if self.custom else f"Delay profile - law {self.nav.current + 1}"
         active = np.isfinite(delays)
+        # One scale across the sweep, widened while a dragged focus needs more; the sweep's
+        # scale returns with the sweep.
+        vmax = self._vmax(delays)
+        if self.custom and active.any():
+            vmax = max(vmax, float(np.nanmax(delays)))
         if "bars" in self.items:
             ids = np.arange(1, len(delays) + 1)
             self.items["bars"].setOpts(x=ids[active], height=delays[active], width=0.8)
             self.items["inactive"].setData(ids[~active], np.zeros((~active).sum()))
+            self.items["plot"].setYRange(0, vmax * 1.1, padding=0)
             self.items["plot"].setTitle(title)
-            return
-        nx, ny, per = self.items["shape"]
-        vmax = self.items["vmax"]
-        for b, (img, texts) in enumerate(zip(self.items["images"], self.items["texts"])):
-            grid = delays[b * per:(b + 1) * per].reshape(nx, ny)
-            img.setImage(grid, levels=(0, vmax), autoLevels=False)
-            img.setRect(QtCore.QRectF(0.5, 0.5, nx, ny))
-            for k, t in enumerate(texts):
-                v = grid.ravel()[k]
-                t.setColor("#475569" if not np.isfinite(v) else ("k" if v > 0.6 * vmax else "w"))
-        self.items["title"].setText(f"{title} (numbering: {probe.element_order})")
+        else:
+            nx, ny, per = self.items["shape"]
+            self.items["vmax"] = vmax
+            for b, (img, texts) in enumerate(zip(self.items["images"], self.items["texts"])):
+                grid = delays[b * per:(b + 1) * per].reshape(nx, ny)
+                img.setImage(grid, levels=(0, vmax), autoLevels=False)
+                img.setRect(QtCore.QRectF(0.5, 0.5, nx, ny))
+                for k, t in enumerate(texts):
+                    v = grid.ravel()[k]
+                    t.setColor("#475569" if not np.isfinite(v) else ("k" if v > 0.6 * vmax else "w"))
+            self.items["bar"].setLevels((0, vmax))
+            self.items["title"].setText(f"{title} (numbering: {probe.element_order})")
+        self.highlight_element(self.selected_element)     # the marker follows the law's delays
 
     def highlight_element(self, idx):
         super().highlight_element(idx)
