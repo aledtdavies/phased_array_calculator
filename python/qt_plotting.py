@@ -1,30 +1,33 @@
 """
-Qt plot tabs: ray tracing (X-Z / Y-Z) and delays (bar chart or aperture maps); the 3D tab is
-qt_view3d.py (PyVista).
-
-matplotlib canvases (FigureCanvasQTAgg) drawing with scene.py, the same renderer as the Tk
-tabs; navigation through navigation.LawNavigation. Plan step 2: same features as the Tk
-window; PyVista and pyqtgraph replace the canvases in steps 3-4.
+Qt tab base: law navigation (angle and skew sliders, step buttons, readout), Play, the dragged
+focus, and element selection shared across tabs. The views themselves are qt_views2d.py
+(pyqtgraph: ray tracing, delays) and qt_view3d.py (PyVista: 3D).
 """
 from __future__ import annotations
 
 import numpy as np
 from qtpy import QtCore, QtWidgets
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolbar2QT
 
 from navigation import LawNavigation
-from scene import COLOR_ELEMENT_INACTIVE, draw_aperture_maps, draw_projection
 
 
 class LawTab(QtWidgets.QWidget):
-    """A matplotlib canvas with law navigation: angle and skew sliders, step buttons, readout."""
+    """
+    A view with law navigation. Subclasses build the view (_make_view), blank it
+    (_blank_view) and draw the current law (refresh_plot).
 
-    def __init__(self, projection=None, toolbar=False):
+    The current law is a law of the sweep, or a "custom" law: one solved for a focus dragged
+    in the X-Z view (set_custom). A custom law is not in the sweep or the table; any slider,
+    step, table selection or new calculation returns to the sweep.
+    """
+
+    element_selected = QtCore.Signal(int)     # an element clicked in this view (internal index)
+
+    def __init__(self):
         super().__init__()
         lay = QtWidgets.QVBoxLayout(self)
         lay.setContentsMargins(4, 4, 4, 4)
-        self._make_view(lay, projection, toolbar)
+        self._make_view(lay)
 
         self.controls = QtWidgets.QGridLayout()
         lay.addLayout(self.controls)
@@ -58,24 +61,44 @@ class LawTab(QtWidgets.QWidget):
         self.wave_type = "longitudinal"
         self.is_matrix = False
         self.is_playing = False
+        self.custom = None
+        self.selected_element = None
+        self._stale = False
         self._set_skew_visible(False)
 
-    def _make_view(self, lay, projection, toolbar):
-        """The tab's drawing surface: a matplotlib canvas (the 3D tab overrides this)."""
-        self.figure = Figure(figsize=(6, 5), dpi=100)
-        self.ax = self.figure.add_subplot(111, projection=projection)
-        self.canvas = FigureCanvasQTAgg(self.figure)
-        if toolbar:
-            lay.addWidget(NavigationToolbar2QT(self.canvas, self))
-        lay.addWidget(self.canvas, 1)
+    # -- redraw scheduling ------------------------------------------------------------
+    def request_redraw(self):
+        """
+        Redraw now, or, while this tab is hidden behind another in a shown window, when it is
+        next shown: Play, steps and a dragged focus then cost only the visible tab.
+        """
+        if self.window().isVisible() and not self.isVisible():
+            self._stale = True
+        else:
+            self._stale = False
+            self.refresh_plot()
+
+    def showEvent(self, event):      # noqa: N802 - Qt's name
+        super().showEvent(event)
+        if self._stale:
+            self._stale = False
+            self.refresh_plot()
+
+    # -- view (subclasses) ----------------------------------------------------------
+    def _make_view(self, lay):
+        raise NotImplementedError
 
     def _blank_view(self):
-        projection = "3d" if self.ax.name == "3d" else None
-        self.figure.clear()
-        self.ax = self.figure.add_subplot(111, projection=projection)
-        self.canvas.draw_idle()
+        raise NotImplementedError
 
-    # -- law set ------------------------------------------------------------
+    def refresh_plot(self):
+        raise NotImplementedError
+
+    def highlight_element(self, idx):
+        """Show element idx as selected (driven by any tab; never re-emits element_selected)."""
+        self.selected_element = idx
+
+    # -- law set --------------------------------------------------------------------
     @property
     def results(self):
         return self.nav.results
@@ -84,11 +107,21 @@ class LawTab(QtWidgets.QWidget):
     def current_idx(self):
         return self.nav.current
 
+    def current_result(self):
+        """The current law's result dict (session.calculate's), or the custom law's."""
+        return self.custom["result"] if self.custom else self.results[self.nav.current]
+
+    def current_focal(self):
+        """The current law's focus (m)."""
+        return np.asarray(self.custom["focal"] if self.custom else self.focal_points[self.nav.current])
+
     def update_navigation(self, solver, focal_points, wave_type, results, is_matrix):
         self.solver = solver
         self.focal_points = list(focal_points)
         self.wave_type = wave_type
         self.is_matrix = is_matrix
+        self.custom = None
+        self.selected_element = None
         self.nav.set_laws(results, len(self.focal_points))
         self._set_sliders(len(self.nav.angle_values) or len(self.focal_points),
                           len(self.nav.skew_values), 0, 0)
@@ -96,14 +129,25 @@ class LawTab(QtWidgets.QWidget):
         self._sliders_moved()
 
     def clear_laws(self):
-        """Forget the law set (a calculation gave no laws) and blank the plot."""
+        """Forget the law set (a calculation gave no laws) and blank the view."""
         if self.is_playing:
             self.toggle_play()
         self.solver = None
         self.focal_points = []
+        self.custom = None
+        self.selected_element = None
         self.nav.clear()
         self.lbl_law.setText("")
         self._blank_view()
+
+    def set_custom(self, result, focal):
+        """Show a law solved for a dragged focus (result as session.calculate's; focal in m)."""
+        if not self.focal_points:
+            return
+        self.custom = {"result": result, "focal": tuple(focal)}
+        f = np.asarray(focal) * 1e3
+        self.lbl_law.setText(f"Dragged focus (not in the sweep): F = ({f[0]:.1f}, {f[1]:.1f}, {f[2]:.1f}) mm")
+        self.request_redraw()
 
     def _set_skew_visible(self, visible):
         self.lbl_skew.setVisible(visible)
@@ -119,15 +163,17 @@ class LawTab(QtWidgets.QWidget):
     def _sliders_moved(self, *_):
         if not self.focal_points:
             return
+        self.custom = None
         self.nav.from_sliders(self.slider.value(), self.slider_skew.value() if self.is_matrix else 0)
         self._labels()
         if not self.is_playing:
-            self.refresh_plot()
+            self.request_redraw()
 
     def show_law(self, idx, redraw=True):
         """Select law idx directly (table row, step buttons, animation)."""
         if not self.focal_points:
             return
+        self.custom = None
         i_az, i_sk = self.nav.select(idx)
         for s, v in ((self.slider, i_az), (self.slider_skew, i_sk)):
             s.blockSignals(True)
@@ -135,7 +181,7 @@ class LawTab(QtWidgets.QWidget):
             s.blockSignals(False)
         self._labels()
         if redraw:
-            self.refresh_plot()
+            self.request_redraw()
 
     def step_law(self, delta):
         if self.focal_points:
@@ -148,13 +194,12 @@ class LawTab(QtWidgets.QWidget):
         self.lbl_law.setText(law)
 
     def _get_law_data(self, idx):
-        """(interface_points_mm, target_mm) for law idx, reusing the calculated law."""
+        """(interface_points_mm, target_mm) for law idx, or for the custom law when shown."""
+        if self.custom and idx == self.nav.current:
+            return self.custom["result"]["interface_points"] * 1000, np.asarray(self.custom["focal"]) * 1000
         fp = self.focal_points[idx]
         r = self.results[idx]
         return r['interface_points'] * 1000, np.asarray(fp) * 1000
-
-    def refresh_plot(self):
-        raise NotImplementedError
 
 
 class PlayMixin:
@@ -182,101 +227,3 @@ class PlayMixin:
         if not self.is_playing or not self.focal_points:
             return
         self.show_law(self.nav.current + 1)
-
-
-class RayTab(PlayMixin, LawTab):
-    """X-Z projection, plus Y-Z for matrix and dual probes; Show All overlays every law."""
-
-    def __init__(self):
-        super().__init__(toolbar=True)
-        self._add_play(0, 2)
-        self.chk_all = QtWidgets.QCheckBox("Show All")
-        self.controls.addWidget(self.chk_all, 0, 3)
-        self.chk_all.toggled.connect(lambda _: self.refresh_plot())
-        self.component_thickness_mm = 0.0
-        self.outline_mm = None
-
-    def update_plot(self, solver, focal_points, wave_type, results=None, is_matrix=False,
-                    component_thickness_mm=0.0, outline_mm=None):
-        self.component_thickness_mm = component_thickness_mm
-        self.outline_mm = outline_mm
-        self.update_navigation(solver, focal_points, wave_type, results, is_matrix)
-
-    def refresh_plot(self):
-        if not self.solver or not self.focal_points:
-            return
-        self.figure.clear()
-        probe = self.solver.probe
-        linear = probe.num_elements_y == 1 and not hasattr(probe, "array_separation")
-        if linear:
-            self.ax = self.figure.add_subplot(111)
-            axes = [(self.ax, 0)]
-        else:
-            ax_x, ax_y = self.figure.add_subplot(121), self.figure.add_subplot(122)
-            axes = [(ax_x, 0), (ax_y, 1)]
-            self.ax = ax_x
-        show_all = self.chk_all.isChecked()
-        indices = list(range(len(self.focal_points))) if show_all else [self.nav.current]
-        for ax, dim in axes:
-            draw_projection(ax, self.solver, self._get_law_data, indices, dim, self.wave_type,
-                            show_all, component_thickness_mm=self.component_thickness_mm,
-                            outline_mm=self.outline_mm)
-        if show_all:
-            self.lbl_angle.setText(f"All {len(self.focal_points)} Laws")
-            if self.is_matrix:
-                self.lbl_skew.setText("")
-        self.figure.tight_layout()
-        self.canvas.draw_idle()
-
-
-class DelayTab(LawTab):
-    """Delay profile: bar chart for linear probes, per-array delay maps for matrix probes."""
-
-    def __init__(self):
-        super().__init__()
-        self.global_max_delay = None
-        self.ax.set_title("Delay Profile")
-        self.ax.set_xlabel("Element ID")
-        self.ax.set_ylabel("Delay (microseconds)")
-        self.ax.grid(True)
-
-    def update_plot(self, solver, focal_points, wave_type, global_max_delay=None, results=None,
-                    is_matrix=False):
-        self.global_max_delay = global_max_delay
-        self.update_navigation(solver, focal_points, wave_type, results, is_matrix)
-
-    def refresh_plot(self):
-        if not self.solver or not self.focal_points:
-            return
-        delays = np.asarray(self.results[self.nav.current]['delays_us'], dtype=float)
-        probe = self.solver.probe
-        vmax = self.global_max_delay
-        vmax = vmax if (vmax is not None and np.isfinite(vmax) and vmax > 0) else None
-        title = f"Delay Profile - Law {self.nav.current + 1}"
-        self.figure.clear()
-        if probe.num_elements_y > 1:
-            draw_aperture_maps(self.figure, probe, delays, vmax=vmax,
-                               title=f"{title} (numbering: {probe.element_order})")
-            self.ax = self.figure.axes[0]
-            self.canvas.draw_idle()
-            return
-        self.ax = self.figure.add_subplot(111)
-        n = len(delays)
-        ids = np.arange(1, n + 1)
-        active = np.isfinite(delays)
-        self.ax.bar(ids[active], delays[active], color='skyblue', edgecolor='black', label="Active")
-        if (~active).any():
-            self.ax.plot(ids[~active], np.zeros((~active).sum()), "x",
-                         color=COLOR_ELEMENT_INACTIVE, label="Inactive")
-            self.ax.legend(loc="upper right", fontsize=7)
-        if hasattr(probe, "array_separation"):
-            self.ax.axvline(n / 2 + 0.5, color="#64748b", linestyle=":", linewidth=1)
-        self.ax.set_title(title)
-        self.ax.set_xlabel("Element ID")
-        self.ax.set_ylabel("Delay (μs)")
-        self.ax.set_xlim(0.5, n + 0.5)
-        if vmax:
-            self.ax.set_ylim(0, vmax * 1.1)
-        self.ax.grid(True, axis='y', linestyle='--', alpha=0.7)
-        self.figure.tight_layout()
-        self.canvas.draw_idle()

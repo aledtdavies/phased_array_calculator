@@ -139,6 +139,12 @@ The renderer (`add_scene` in the prototype) draws from the scene model:
 
 ### 4. Live 2D on pyqtgraph
 
+**Status: done 2026-11-20** (`qt_views2d.py`). The finish criteria are met:
+- redraw per law medians are 17–33 ms on the dev laptop for the 64-element linear and the 16 × 4 dual matrix (`tests/benchmarks/redraw_timing.py`; maxima up to 80 ms on occasional frames);
+- the views stay in step, tested through linked selection, the dragged focus and item reuse.
+
+scaneval was checked for pyqtgraph parts (FBK-0019): its linked views are still a backlog task, so there was nothing to copy.
+
 - X-Z and Y-Z views, delay chart, and delay map as an `ImageItem`.
 - Artist reuse: update data, never rebuild per tick.
 - Linked selection across the views and the table.
