@@ -1,5 +1,6 @@
 """
-Qt plot tabs: ray tracing (X-Z / Y-Z), delays (bar chart or aperture maps) and the 3D view.
+Qt plot tabs: ray tracing (X-Z / Y-Z) and delays (bar chart or aperture maps); the 3D tab is
+qt_view3d.py (PyVista).
 
 matplotlib canvases (FigureCanvasQTAgg) drawing with scene.py, the same renderer as the Tk
 tabs; navigation through navigation.LawNavigation. Plan step 2: same features as the Tk
@@ -13,8 +14,7 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolbar2QT
 
 from navigation import LawNavigation
-from scene import (COLOR_ELEMENT_INACTIVE, VIEW_PRESETS, draw_aperture_maps, draw_projection,
-                   draw_scene_3d)
+from scene import COLOR_ELEMENT_INACTIVE, draw_aperture_maps, draw_projection
 
 
 class LawTab(QtWidgets.QWidget):
@@ -22,14 +22,9 @@ class LawTab(QtWidgets.QWidget):
 
     def __init__(self, projection=None, toolbar=False):
         super().__init__()
-        self.figure = Figure(figsize=(6, 5), dpi=100)
-        self.ax = self.figure.add_subplot(111, projection=projection)
-        self.canvas = FigureCanvasQTAgg(self.figure)
         lay = QtWidgets.QVBoxLayout(self)
         lay.setContentsMargins(4, 4, 4, 4)
-        if toolbar:
-            lay.addWidget(NavigationToolbar2QT(self.canvas, self))
-        lay.addWidget(self.canvas, 1)
+        self._make_view(lay, projection, toolbar)
 
         self.controls = QtWidgets.QGridLayout()
         lay.addLayout(self.controls)
@@ -65,6 +60,21 @@ class LawTab(QtWidgets.QWidget):
         self.is_playing = False
         self._set_skew_visible(False)
 
+    def _make_view(self, lay, projection, toolbar):
+        """The tab's drawing surface: a matplotlib canvas (the 3D tab overrides this)."""
+        self.figure = Figure(figsize=(6, 5), dpi=100)
+        self.ax = self.figure.add_subplot(111, projection=projection)
+        self.canvas = FigureCanvasQTAgg(self.figure)
+        if toolbar:
+            lay.addWidget(NavigationToolbar2QT(self.canvas, self))
+        lay.addWidget(self.canvas, 1)
+
+    def _blank_view(self):
+        projection = "3d" if self.ax.name == "3d" else None
+        self.figure.clear()
+        self.ax = self.figure.add_subplot(111, projection=projection)
+        self.canvas.draw_idle()
+
     # -- law set ------------------------------------------------------------
     @property
     def results(self):
@@ -93,10 +103,7 @@ class LawTab(QtWidgets.QWidget):
         self.focal_points = []
         self.nav.clear()
         self.lbl_law.setText("")
-        projection = "3d" if self.ax.name == "3d" else None
-        self.figure.clear()
-        self.ax = self.figure.add_subplot(111, projection=projection)
-        self.canvas.draw_idle()
+        self._blank_view()
 
     def _set_skew_visible(self, visible):
         self.lbl_skew.setVisible(visible)
@@ -219,59 +226,6 @@ class RayTab(PlayMixin, LawTab):
             if self.is_matrix:
                 self.lbl_skew.setText("")
         self.figure.tight_layout()
-        self.canvas.draw_idle()
-
-
-class Scene3DTab(PlayMixin, LawTab):
-    """3D view of the selected law: elements, wedge, interface, rays and the sweep's foci."""
-
-    MAX_RAYS = 48
-
-    def __init__(self):
-        super().__init__(projection="3d")
-        self._add_play(0, 2)
-        self.chk_locus = QtWidgets.QCheckBox("Sweep focal points")
-        self.chk_locus.setChecked(True)
-        self.controls.addWidget(self.chk_locus, 0, 3)
-        self.chk_locus.toggled.connect(lambda _: self.refresh_plot())
-        views = QtWidgets.QHBoxLayout()
-        self.view_buttons = {}
-        for name in VIEW_PRESETS:
-            b = QtWidgets.QPushButton(name)
-            b.setFixedWidth(48)
-            b.clicked.connect(lambda _=False, n=name: self.set_view(n))
-            views.addWidget(b)
-            self.view_buttons[name] = b
-        self.controls.addLayout(views, 1, 2, 1, 2)
-        self.component_thickness_mm = 0.0
-        self.outline_mm = None
-        self.view = VIEW_PRESETS["Iso"]
-        self.ax.set_title("3D ray scene: calculate laws to populate")
-
-    def update_plot(self, solver, focal_points, wave_type, results=None, is_matrix=False,
-                    component_thickness_mm=0.0, outline_mm=None):
-        self.component_thickness_mm = component_thickness_mm
-        self.outline_mm = outline_mm
-        self.update_navigation(solver, focal_points, wave_type, results, is_matrix)
-
-    def set_view(self, name):
-        self.view = VIEW_PRESETS[name]
-        self.ax.view_init(*self.view)
-        self.canvas.draw_idle()
-
-    def refresh_plot(self):
-        if not self.solver or not self.focal_points:
-            return
-        if self.ax.name == "3d":
-            self.view = (self.ax.elev, self.ax.azim)   # keep the user's camera
-        self.figure.clear()
-        self.ax = self.figure.add_subplot(111, projection="3d")
-        draw_scene_3d(self.ax, self.solver, self._get_law_data(self.nav.current),
-                      np.asarray(self.focal_points, dtype=float) * 1000, self.nav.current,
-                      self.wave_type, component_thickness_mm=self.component_thickness_mm,
-                      outline_mm=self.outline_mm, max_rays=self.MAX_RAYS,
-                      show_locus=self.chk_locus.isChecked())
-        self.ax.view_init(*self.view)
         self.canvas.draw_idle()
 
 
