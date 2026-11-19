@@ -12,6 +12,9 @@ and it can be tested without a GUI.
 
 Roles:
   element          points; meta array ('single', 'tx', 'rx'), active (bool), indices
+  element-face     quads (4 corners per element, in index order) of the element footprints on
+                   the probe face; meta array, active, indices, size_mm (width, length) and
+                   schematic (True when the size is not the probe's own, see element_size)
   wedge            polygon in the X-Z plane (Y = 0); meta source ('catalogue' | 'schematic'),
                    angle_deg, y0/y1 (the extrusion across Y used by 3D views)
   probe-body       polygon in the X-Z plane: a schematic housing on the element plane
@@ -123,6 +126,34 @@ def user_element_numbers(probe):
     return block * per + local_user + 1
 
 
+def element_size(probe, width_m=None, length_m=None):
+    """
+    Element footprint (width along the primary axis, length along the passive axis), metres,
+    and whether it is schematic (not the probe's own size).
+
+    Linear arrays: the given width (a catalogue's elementWidth) and length (its elevation);
+    a missing one is drawn as 0.9 x pitch or 10 mm. Matrix arrays: the given width, else
+    0.9 x pitch; the length is always 0.9 x passive pitch, since catalogues do not give a
+    matrix element's passive size. Schematic whenever a drawn size is not given.
+    """
+    w = width_m if width_m is not None else 0.9 * probe.pitch
+    if probe.num_elements_y > 1:
+        return float(w), float(0.9 * probe.pitch_y), True
+    l = length_m if length_m is not None else 0.010
+    return float(w), float(l), bool(width_m is None or length_m is None)
+
+
+def element_faces_mm(solver, width_m, length_m):
+    """(4N, 3) mm: the corners of every element's footprint, transformed like the centres."""
+    probe, wedge = solver.probe, solver.wedge
+    local = probe.get_element_positions(center_at_origin=False)
+    signs = wedge.roof_signs(probe)
+    offs = np.array([[-1, -1], [1, -1], [1, 1], [-1, 1]]) * 0.5 * np.array([width_m, length_m])
+    corners = np.repeat(local, 4, axis=0)
+    corners[:, :2] += np.tile(offs, (len(local), 1))
+    return wedge.transform_points(corners, np.repeat(signs, 4)) * 1000
+
+
 # ---------------------------------------------------------------------------
 # Wedge geometry
 # ---------------------------------------------------------------------------
@@ -166,7 +197,7 @@ def _xz(verts):
     return np.c_[v[:, 0], np.zeros(len(v)), v[:, 1]]
 
 
-def _setup_prims(solver, outline_mm):
+def _setup_prims(solver, outline_mm, element_size_m=None):
     probe, wedge = solver.probe, solver.wedge
     el = wedge.get_transformed_elements(probe) * 1000
     act = np.asarray(probe.get_active_element_indices())
@@ -181,6 +212,13 @@ def _setup_prims(solver, outline_mm):
                 prims.append(Prim("points", el[sel], "element",
                                   {"array": name, "active": active,
                                    "indices": np.flatnonzero(sel)}))
+    if element_size_m is not None:
+        w, l, schematic = element_size(probe, *element_size_m)
+        faces = element_faces_mm(solver, w, l).reshape(-1, 4, 3)
+        for p in [p for p in prims if p.role == "element"]:
+            idx = p.meta["indices"]
+            prims.append(Prim("quads", faces[idx].reshape(-1, 3), "element-face",
+                              dict(p.meta, size_mm=(w * 1e3, l * 1e3), schematic=schematic)))
 
     ez = el[:, 2]
     contact = float(np.max(np.abs(ez))) < CONTACT_TOL_MM
@@ -235,16 +273,18 @@ def _setup_prims(solver, outline_mm):
 # ---------------------------------------------------------------------------
 def build_scene(solver, get_law: Callable, indices: Sequence[int], *,
                 outline_mm=None, current: Optional[int] = None, max_rays: Optional[int] = None,
-                sweep_focal_mm=None) -> Scene:
+                sweep_focal_mm=None, element_size_m=None) -> Scene:
     """
     The scene for the laws in `indices`. get_law(i) returns (interface_points_mm (N, 3),
     target_mm (3,)) for law i. Every listed law gets its envelope rays and focus; the
     `current` law also gets its rays from every active element (decimated to max_rays)
     and interface points. sweep_focal_mm: (M, 3) foci of the whole sweep, drawn as the
     focus-sweep. outline_mm: a catalogue wedge outline [(x, z), ...] in the X-Z plane.
+    element_size_m: (width, length) in metres, either may be None, to add element-face
+    footprints (see element_size); None adds none.
     """
     probe = solver.probe
-    prims, contact, el = _setup_prims(solver, outline_mm)
+    prims, contact, el = _setup_prims(solver, outline_mm, element_size_m)
     arrays = array_of(probe)
     env = envelope_indices(probe)
     laws = {}

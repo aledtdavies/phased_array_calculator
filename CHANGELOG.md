@@ -1,5 +1,20 @@
 # Changelog
 
+## Migration step 3: the 3D view on PyVista — 2026-11-20
+
+Plan step 3 (`docs/plans/PLAN-2026-11-qt-vtk-migration.md`).
+
+- **The Qt window's 3D View** (`qt_view3d.py`, pyvistaqt) draws the scene model with a new VTK renderer (`scene_vtk.py`):
+  - the wedge (catalogue outline or schematic) and the component as translucent solids;
+  - element footprints at their catalogue width and elevation, or a labelled schematic size;
+  - the selected law's rays, interface points and focus, and the sweep's foci.
+
+  Camera presets keep depth downward; the axis views use parallel projection. A Section option cuts the solids at the active aperture's centre. Clicking near an element picks it, showing its number in the chosen numbering convention, its array, grid position, delay and time of flight, and drawing its ray bold.
+- **`wedge.transform_points`:** the element transform is applied to any points (element corners). `get_transformed_elements` uses it with unchanged arithmetic.
+- **Fix: roof angle and array separation now apply to dual probes only.** The panels hide them for single arrays, but a value left over from a dual setup was still applied, tilting a linear probe out of the X-Z plane unseen and switching off the catalogue wedge outline. This matches the MATLAB GUI, which only reads them for dual probes.
+- `session.py` results carry each element's time of flight (`tof_us`).
+- `requirements.txt` adds pyvista and pyvistaqt. The Qt tests now run on the native Qt platform with hidden windows, because VTK needs a real render window.
+
 ## Migration step 2: the Qt window — 2026-11-19
 
 Plan step 2 (`docs/plans/PLAN-2026-11-qt-vtk-migration.md`).

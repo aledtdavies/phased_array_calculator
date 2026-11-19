@@ -204,7 +204,14 @@ The **angle/skew sliders** below each plot navigate the computed law set without
 
 ### 3D View Tab
 
-A rotatable 3D scene of the selected law (mm, global frame, depth drawn downward): the wedge body (catalogue outline or schematic silhouette, extruded across the element footprint), the interface plane and optional backwall, active and inactive elements (Tx/Rx coloured for dual probes), rays element → interface → focus for the active elements (an even subset of at most 48 for large apertures, ends kept), the interface points, and the focal points of the whole sweep coloured by law index. Camera presets **Iso**, **X-Z**, **Y-Z** and **Top** give the projections from within the 3D view; drag to rotate. Roof angles tilt the drawn elements but not the wedge body.
+**Qt window (PyVista/VTK).** The scene shows:
+- the wedge and the component as translucent solids;
+- element footprints at the catalogue's element width and elevation, or a labelled schematic size;
+- the selected law's rays, interface points and focus, and the sweep's foci.
+
+Drag to rotate, scroll to zoom. **Iso**, **X-Z**, **Y-Z** and **Top** set the camera, with depth always downward; the axis views are drawn in parallel projection. **Section** cuts the wedge and component at the active aperture's centre (an X-Z plane). Click near an element to inspect it: the readout gives its number in the chosen numbering convention, its array (Tx/Rx), its X/Y grid position, its delay and its time of flight, and its ray is drawn in orange.
+
+**Tk window (matplotlib).** A rotatable 3D scene of the selected law (mm, global frame, depth drawn downward): the wedge body (catalogue outline or schematic silhouette, extruded across the element footprint), the interface plane and optional backwall, active and inactive elements (Tx/Rx coloured for dual probes), rays element → interface → focus for the active elements (an even subset of at most 48 for large apertures, ends kept), the interface points, and the focal points of the whole sweep coloured by law index. Camera presets **Iso**, **X-Z**, **Y-Z** and **Top** give the projections from within the 3D view; drag to rotate. Roof angles tilt the drawn elements but not the wedge body.
 
 ### Data Table Tab
 
@@ -541,6 +548,7 @@ Pitch (Y-axis rotation by θ):          Roll (X-axis rotation by φ):
 | **No diffraction or attenuation** | Geometric ray paths only. Beam spread, diffraction, frequency-dependent attenuation, and near-field effects are not modelled. |
 | **Isotropic materials** | Both wedge and component are treated as acoustically isotropic. Anisotropic or textured materials require stiffness-matrix methods. |
 | **Serial 3D solver** | The bracketed Snell solver evaluates elements sequentially. Large arrays and long angle sweeps may take several seconds. Parallelisation is not yet implemented. |
+| **Roof angle** | Applied to dual probes only. The Height @ El.1 is set before the roof tilt, so with a roof each array's element 1 sits slightly higher or lower than the value entered. |
 | **Catalogue wedges** | Wedge width, roof geometry and curvature are not read from catalogues; nde-knowledge 1 wedges carry no element-1 seat. |
 | **Critical angle handling** | Beam angles beyond the first critical angle are flagged as errors in the Data Table. Mode-converted or head-wave paths are not computed. |
 
@@ -576,6 +584,8 @@ Pitch (Y-axis rotation by θ):          Roll (X-axis rotation by φ):
 | `app.py` | Tkinter GUI (to be retired once the Qt window is accepted) |
 | `session.py` | Solver from panel values, sweep into laws and table rows, focal-law CSV, catalogue links (shared by both GUIs) |
 | `navigation.py` | Law navigation: angle/skew sliders, step buttons, table selection |
+| `qt_view3d.py` | Qt 3D tab (pyvistaqt): picking, section, camera presets |
+| `scene_vtk.py` | PyVista renderer of the scene model; off-screen rendering for tests and exports |
 | `panels.py` | Input panels (Probe, Wedge, Material, Scan, SubAperture) |
 | `plotting.py` | Ray tracing, 3D view and delay GUI panels |
 | `scene.py` | Toolkit-independent scene drawing (2D projections, 3D scene, aperture delay maps) shared by the GUI and scripts |

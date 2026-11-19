@@ -20,7 +20,8 @@ from qtpy import QtCore, QtGui, QtWidgets
 from catalog import Catalog, CatalogError, default_catalog_dir
 from qt_catalog_dialog import CatalogPicker
 from qt_panels import MaterialPanel, ProbePanel, ScanPanel, SubAperturePanel, WedgePanel
-from qt_plotting import DelayTab, RayTab, Scene3DTab
+from qt_plotting import DelayTab, RayTab
+from qt_view3d import Scene3DTab
 from session import (TABLE_HEADINGS, CatalogLinks, asset_message, build_solver, calculate,
                      write_laws_csv)
 
@@ -183,7 +184,8 @@ class MainWindow(QtWidgets.QMainWindow):
                                     "wedge": self.wedge_panel.get_values()})
 
     def wedge_outline_mm(self):
-        return self.catalog.wedge_outline_mm(self.wedge_panel.get_values())
+        return self.catalog.wedge_outline_mm(self.wedge_panel.get_values(),
+                                         self.probe_panel.get_values().get("probe_type", "Linear"))
 
     def load_from_catalog(self, kind, path=None):
         """Fill the probe or wedge panel from a buildFE or nde-knowledge catalogue entry."""
@@ -251,7 +253,8 @@ class MainWindow(QtWidgets.QMainWindow):
                                       outline_mm=outline_mm)
             self.scene3d_tab.update_plot(solver, calc.focal_points, calc.wave_type, results=calc.results,
                                          is_matrix=calc.is_matrix, component_thickness_mm=thickness_mm,
-                                         outline_mm=outline_mm)
+                                         outline_mm=outline_mm,
+                                         element_size_m=self.catalog.element_size_m(self.probe_panel.get_values()))
             self.hist_tab.update_plot(solver, calc.focal_points, calc.wave_type,
                                       global_max_delay=calc.global_max_delay, results=calc.results,
                                       is_matrix=calc.is_matrix)
@@ -316,6 +319,11 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         self.statusBar().showMessage(f"Element coordinates exported to {os.path.basename(path)}")
         self.info("Success", f"Exported element coordinates to {os.path.basename(path)}")
+
+
+    def closeEvent(self, event):      # noqa: N802 - Qt's name
+        self.scene3d_tab.plotter.close()     # release the VTK render window
+        super().closeEvent(event)
 
 
 def main():
