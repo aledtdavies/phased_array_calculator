@@ -126,6 +126,27 @@ class TestYModes(unittest.TestCase):
         self.assertEqual(len(ts), 6)
         self.assertEqual([t.reason for t in ts if isinstance(t, Refused)], ["Y out of reach"] * 2)
 
+    def test_sound_path_sweep_without_reach(self):
+        """At 0 deg the central ray has no horizontal reach: only the centre's Y is on it."""
+        s = solver()
+        _, cy, _ = s.aperture_centre()
+        ts = focal_targets(s, "sound-path", 0.04, [0], [0], y_mode="sweep", y_values=[cy, cy + 0.01])
+        self.assertIsInstance(ts[0], Target)
+        self.assertEqual(ts[1].reason, "Y out of reach")
+        TestInvariants().check_on_ray(s, ts[:1])
+        self.assertAlmostEqual(np.linalg.norm(np.array(ts[0].point) - entry_point(s, ts[0])), 0.04, places=12)
+
+    def test_numpy_y_values(self):
+        s = solver()
+        for mode, y_mode, ys in (("constant-depth", "fixed", [0.0]),
+                                 ("constant-depth", "sweep", [0.0, 0.001]),
+                                 ("sound-path", "sweep", [0.0, 0.001])):
+            a = focal_targets(s, mode, 0.03, [40], [0, 5], y_mode=y_mode, y_values=ys)
+            b = focal_targets(s, mode, 0.03, [40], [0, 5], y_mode=y_mode, y_values=np.array(ys))
+            self.assertEqual(a, b)
+        with self.assertRaises(ValueError):
+            focal_targets(s, "constant-depth", 0.03, [40], y_mode="sweep", y_values=np.array([]))
+
     def test_fixed_y_with_sound_path_is_refused(self):
         with self.assertRaises(ValueError):
             focal_targets(solver(), "sound-path", 0.04, [30], y_mode="fixed", y_values=[0.0])

@@ -27,6 +27,7 @@ classdef FocalRules
 
     properties (Constant)
         ParallelTol = 1e-9
+        ZeroReach = 1e-12   % m: horizontal reach treated as none (sound-path Y sweep)
     end
 
     methods (Static)
@@ -79,7 +80,12 @@ classdef FocalRules
                     if pathSweep
                         reach = entry + fPrimary;
                         for y = yValues(:)'
-                            if abs(reach) > 1e-9, v = (y - cy) / reach; else, v = 0; end
+                            if abs(reach) <= FocalRules.ZeroReach
+                                % No horizontal reach: only the aperture centre's Y is on the ray.
+                                if abs(y - cy) <= FocalRules.ZeroReach, v = 0; else, v = Inf; end
+                            else
+                                v = (y - cy) / reach;
+                            end
                             if abs(v) > 1
                                 T(end+1) = FocalRules.refused(ang, NaN, 'Y out of reach'); %#ok<AGROW>
                                 continue

@@ -33,7 +33,8 @@ Each target is a Target, or a Refused with a reason; nothing is silently replace
 - 'beam parallel to line':   vertical-line mode with the central ray parallel to the line
                              (beta = 0, or skew 90 degrees);
 - 'Y out of reach':          sound-path Y sweep with |Y offset| greater than the path's
-                             horizontal reach.
+                             horizontal reach (with no reach, any offset from the
+                             aperture centre's Y).
 """
 from __future__ import annotations
 
@@ -45,6 +46,7 @@ import numpy as np
 FOCUS_MODES = ("constant-depth", "vertical-line", "sound-path")
 Y_MODES = ("from-skew", "fixed", "sweep")
 _PARALLEL_TOL = 1e-9
+_ZERO_REACH = 1e-12     # m: horizontal reach treated as none (sound-path Y sweep)
 
 
 @dataclass(frozen=True)
@@ -160,7 +162,7 @@ def focal_targets(solver, mode: str, value: float, angles_deg: Sequence[float],
         raise ValueError(f"Y mode must be one of {Y_MODES}")
     if y_mode == "fixed" and mode == "sound-path":
         raise ValueError("a fixed Y over-constrains the sound-path focus")
-    if y_mode in ("fixed", "sweep") and not y_values:
+    if y_mode in ("fixed", "sweep") and (y_values is None or len(y_values) == 0):
         raise ValueError(f"Y mode {y_mode!r} needs Y values")
     if y_mode == "fixed" and len(y_values) != 1:
         raise ValueError("a fixed Y takes one value")
@@ -192,7 +194,12 @@ def focal_targets(solver, mode: str, value: float, angles_deg: Sequence[float],
                 # Skew solved per Y: the focus lies on the central ray at that Y.
                 reach = entry + f_primary
                 for y in y_list:
-                    val = (y - cy) / reach if abs(reach) > 1e-9 else 0.0
+                    if abs(reach) <= _ZERO_REACH:
+                        # No horizontal reach (a 0 degree beam from the centre): only the
+                        # aperture centre's Y lies on the central ray.
+                        val = 0.0 if abs(y - cy) <= _ZERO_REACH else np.inf
+                    else:
+                        val = (y - cy) / reach
                     if abs(val) > 1.0:
                         out.append(Refused(float(ang), None, "Y out of reach"))
                         continue

@@ -39,6 +39,7 @@ CASES = [
     ("depth matrix fixed y", MAT, WEDGE, STEEL, "constant-depth", 0.025, [45], [-10, 10], "longitudinal", "fixed", [0.003]),
     ("vertical matrix y sweep", MAT, WEDGE, STEEL, "vertical-line", 0.035, [40, 60], [0, 10], "longitudinal", "sweep", [-0.004, 0.0, 0.004]),
     ("path matrix y sweep", MAT, WEDGE, STEEL, "sound-path", 0.04, [30, 60], [-20, 0, 20], "longitudinal", "sweep", [0.0, 0.01, 0.2]),
+    ("path y sweep at 0 deg (no reach), centre Y = 0", LIN, WEDGE, STEEL, "sound-path", 0.04, [0, 30], [0], "longitudinal", "sweep", [0.0, 0.01]),
     ("depth dual matrix roof", DUAL, WEDGE_ROOF, STEEL, "constant-depth", 0.02, [45, 60], [-10, 10], "longitudinal", "from-skew", None),
 ]
 
