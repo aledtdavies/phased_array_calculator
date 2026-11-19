@@ -322,7 +322,8 @@ class App(tk.Tk):
 
     def wedge_outline_mm(self):
         """The catalogue wedge outline (global X-Z, mm) while the wedge panel still matches it."""
-        return self.catalog.wedge_outline_mm(self.wedge_panel.get_values())
+        return self.catalog.wedge_outline_mm(self.wedge_panel.get_values(),
+                                         self.probe_panel.get_values().get("probe_type", "Linear"))
 
     def get_solver(self):
         return build_solver(self.probe_panel.get_values(), self.wedge_panel.get_values(),

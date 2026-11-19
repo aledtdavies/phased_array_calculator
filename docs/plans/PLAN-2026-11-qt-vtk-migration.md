@@ -119,6 +119,12 @@ Each step states its finish criteria and what it is needed for. Steps 1–4 repl
 
 ### 3. 3D on pyvistaqt
 
+**Status: done 2026-11-20** (`qt_view3d.py`, `scene_vtk.py`). The finish criteria are met:
+- every probe type and sub-aperture renders off-screen, with and without the section (`test_view3d.py`);
+- picking returns the right element, number, array and grid position on a dual matrix in both numbering conventions.
+
+viewFE was checked for reusable parts (FBK-0019); its viewer is built around FE field cuts and time axes, so nothing was copied. Not done: a free-angle clipping-plane widget (the section is fixed at the aperture's centre).
+
 The renderer (`add_scene` in the prototype) draws from the scene model:
 - Wedge, plate and weld as meshes.
 - Element glyphs at their real width and elevation when the catalogue gives them.

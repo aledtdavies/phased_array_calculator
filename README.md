@@ -13,7 +13,7 @@ Computes element-level time delays (focal laws) for ultrasonic phased array insp
 - **Wave types**: Longitudinal and Shear
 - **3D beam steering** with azimuth and skew angles
 - **Sub-aperture selection**: choose start element and active element count; configurable element numbering convention (Column-first / Row-first) for matrix arrays
-- **Interactive GUI** with Ray Tracing (X-Z / Y-Z), 3D View, Data Table, and Delays tabs (bar chart, or per-array delay map for matrix probes)
+- **Interactive GUI** with Ray Tracing (X-Z / Y-Z), 3D View, Data Table, and Delays tabs (bar chart, or per-array delay map for matrix probes); in the Qt window the 3D View is PyVista/VTK, with element picking, section and camera presets
 - **Probe and wedge catalogues**: load entries from buildFE (`catalog/*.json`, content hash verified) or the nde-knowledge export; catalogue wedges are drawn from their true outline
 - **Export**: focal laws CSV, element coordinates (CSV / MAT / MATLAB script), configuration JSON
 - **Python** (Tkinter GUI + importable library) and **MATLAB** (legacy-style GUI + classdef library) implementations with identical physics
@@ -130,6 +130,8 @@ phased_array_calculator/
 │   ├── app.py          — Tk GUI (to be retired)
 │   ├── session.py      — Calculation, table rows, CSV and catalogue links shared by both GUIs
 │   ├── navigation.py   — Law navigation (sliders, step, table selection), toolkit-free
+│   ├── qt_view3d.py    — Qt 3D tab (pyvistaqt): picking, section, camera presets
+│   ├── scene_vtk.py    — PyVista renderer of the scene model
 │   ├── probe.py        — Probe, DualProbe, sub-aperture logic
 │   ├── delay_law.py    — Fermat solver, focal law calculation
 │   ├── focal_rules.py  — Focal targets: constant depth, vertical line, sound path, skew, Y modes

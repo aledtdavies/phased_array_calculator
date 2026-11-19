@@ -8,10 +8,18 @@ import os
 import tempfile
 import unittest
 
-os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+import sys
+
+# The native Qt platform: VTK (the 3D tab) needs a real OpenGL render window, which the
+# 'offscreen' platform cannot give. Windows are created but never shown. Without a display
+# (headless Linux) the Qt tests are skipped rather than letting Qt abort the process.
 os.environ.setdefault("QT_API", "pyside6")
+HEADLESS = sys.platform.startswith("linux") and not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
 try:
+    if HEADLESS:
+        raise ImportError("no display")
     from qtpy import QtCore, QtWidgets
+    import pyvistaqt  # noqa: F401
     HAVE_QT = True
 except Exception:          # qtpy raises its own error when no binding is installed
     HAVE_QT = False
@@ -43,7 +51,7 @@ SCAN_CASES = {
 }
 
 
-@unittest.skipUnless(HAVE_QT, "PySide6/qtpy not installed")
+@unittest.skipUnless(HAVE_QT, "PySide6/qtpy/pyvistaqt not installed, or no display")
 class QtCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -144,7 +152,6 @@ class TestQtWindow(QtCase):
 
     def test_visibility_follows_probe_type(self):
         w = self.win
-        w.show()
         for ptype, matrix, dual in (("Linear", False, False), ("Matrix", True, False),
                                     ("Dual Linear", False, True), ("Dual Matrix", True, True)):
             w.probe_panel.set_values({"probe_type": ptype})
@@ -224,7 +231,10 @@ class TestQtWindow(QtCase):
         for tab in self.tabs():
             self.assertEqual((tab.focal_points, tab.results, tab.solver), ([], [], None))
             tab.step_law(1)
-            self.assertFalse(any(ax.has_data() for ax in tab.figure.axes))
+            if hasattr(tab, "plotter"):
+                self.assertEqual(list(tab.plotter.renderer.actors), [])
+            else:
+                self.assertFalse(any(ax.has_data() for ax in tab.figure.axes))
 
     def test_exports(self):
         w = self.win
@@ -241,6 +251,25 @@ class TestQtWindow(QtCase):
             self.assertTrue(lines[0].startswith("LawID,Angle_Deg,Skew_Deg"))
             self.assertTrue(os.path.getsize(el_path) > 0)
         self.assertEqual(self.errors(), [])
+
+    def test_hidden_dual_fields_do_not_reach_a_single_array(self):
+        """Roof and separation hide for single arrays and are not applied (as in MATLAB)."""
+        w = self.win
+        w.probe_panel.set_values({"probe_type": "Dual Linear"})
+        w.wedge_panel.set_values({"roof_angle_deg": 3.0, "array_sep_mm": 12})
+        self.assertAlmostEqual(w.get_solver().wedge.roof_angle_degrees, 3.0)
+        w.probe_panel.set_values({"probe_type": "Linear"})
+        s = w.get_solver()
+        self.assertEqual(s.wedge.roof_angle_degrees, 0.0)
+        self.assertTrue((s.wedge.get_transformed_elements(s.probe)[:, 1] == 0).all())
+
+    def test_pick_readout_cleared_by_a_new_calculation(self):
+        w = self.win
+        w.run_calculation()
+        w.scene3d_tab.pick_element(3)
+        self.assertIn("Element 4", w.scene3d_tab.lbl_pick.text())
+        w.run_calculation()
+        self.assertNotIn("Element", w.scene3d_tab.lbl_pick.text())
 
     def test_catalogue_values_match_round_trip(self):
         w = self.win
