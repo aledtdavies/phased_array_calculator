@@ -305,6 +305,40 @@ class ReviewFixes(_WindowCase):
                 self.assertEqual(w.plot_tab.xz.pick.getData()[0].size, 0)
                 w.scene3d_tab._stale = False
 
+    def test_one_play_for_the_window(self):
+        """Review of PR #27: one timer steps the shared law; Pause anywhere stops it."""
+        w = self.calc(LINEAR)
+        n = len(w.last_results)
+        timers = lambda: [t.timer.isActive() for t in (w.plot_tab, w.scene3d_tab)] + [w.play.timer.isActive()]
+        w.plot_tab.toggle_play()                                # Play in Ray Tracing
+        self.assertTrue(w.play.playing)
+        self.assertEqual(timers(), [False, False, True])        # the window's timer only
+        self.assertEqual(w.scene3d_tab.play_btn.text(), "Pause")
+        w.scene3d_tab.toggle_play()                             # the 3D button now pauses it
+        self.assertFalse(w.play.playing)
+        self.assertEqual(timers(), [False, False, False])
+        self.assertEqual(w.plot_tab.play_btn.text(), "Play")
+        start = w.plot_tab.current_idx
+        w.scene3d_tab.toggle_play()
+        for _ in range(3):
+            w.play.tick()                                       # three timeouts: three laws, not six
+        w.plot_tab.toggle_play()
+        for t in w.law_tabs():
+            self.assertEqual(t.current_idx, (start + 3) % n)
+        w.play.tick()                                           # paused: nothing moves
+        self.assertEqual(w.plot_tab.current_idx, (start + 3) % n)
+
+    def test_scrubbing_during_play_redraws_the_source(self):
+        w = self.calc(LINEAR)
+        w.plot_tab.toggle_play()
+        w.plot_tab.slider.setValue(w.plot_tab.slider.value() + 2)    # before any timeout
+        f = w.plot_tab.current_focal() * 1e3
+        self.assertAlmostEqual(w.plot_tab.xz.focus.pos().x(), f[0], places=9)
+        self.assertAlmostEqual(w.plot_tab.xz.focus.pos().y(), f[2], places=9)
+        for t in w.law_tabs():
+            self.assertEqual(t.current_idx, w.plot_tab.current_idx)
+        w.plot_tab.toggle_play()
+
     def test_one_delay_click_handler_through_rebuilds(self):
         w = self.calc(LINEAR)
         selected = []

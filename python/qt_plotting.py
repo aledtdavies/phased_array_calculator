@@ -132,7 +132,10 @@ class LawTab(QtWidgets.QWidget):
     def clear_laws(self):
         """Forget the law set (a calculation gave no laws) and blank the view."""
         if self.is_playing:
-            self.toggle_play()
+            if getattr(self, "play_controller", None) is not None:
+                self.play_controller.stop()
+            else:
+                self.toggle_play()
         self.solver = None
         self.focal_points = []
         self.custom = None
@@ -167,8 +170,7 @@ class LawTab(QtWidgets.QWidget):
         self.custom = None
         self.nav.from_sliders(self.slider.value(), self.slider_skew.value() if self.is_matrix else 0)
         self._labels()
-        if not self.is_playing:
-            self.request_redraw()
+        self.request_redraw()
         self.law_changed.emit(self.nav.current)
 
     def show_law(self, idx, redraw=True, notify=True):
@@ -210,8 +212,58 @@ class LawTab(QtWidgets.QWidget):
         return r['interface_points'] * 1000, np.asarray(fp) * 1000
 
 
+class PlayController(QtCore.QObject):
+    """
+    One Play for a window: a single timer steps the shared current law (the visible tab steps
+    and the window relays it), and every Play button shows the same state. Tabs attached to a
+    controller delegate Play to it, so two tabs can never play at once.
+    """
+
+    def __init__(self, tabs, interval_ms=100):
+        super().__init__()
+        self.tabs = list(tabs)
+        self.playing = False
+        self.timer = QtCore.QTimer(self)
+        self.timer.setInterval(interval_ms)
+        self.timer.timeout.connect(self.tick)
+        for t in self.tabs:
+            t.play_controller = self
+
+    def source(self):
+        """The tab that steps: the visible one with laws, else the first with laws."""
+        with_laws = [t for t in self.tabs if t.focal_points]
+        visible = [t for t in with_laws if t.isVisible()]
+        return (visible or with_laws or [None])[0]
+
+    def toggle(self):
+        if self.playing:
+            self.stop()
+        elif self.source() is not None:     # nothing to play before laws are calculated
+            self._set(True)
+            self.timer.start()
+
+    def stop(self):
+        self.timer.stop()
+        self._set(False)
+
+    def tick(self):
+        src = self.source()
+        if not self.playing or src is None:
+            return
+        src.show_law(src.nav.current + 1)
+
+    def _set(self, playing):
+        self.playing = playing
+        for t in self.tabs:
+            t.is_playing = playing
+            if hasattr(t, "play_btn"):
+                t.play_btn.setText("Pause" if playing else "Play")
+
+
 class PlayMixin:
-    """Play/Pause animation over every law in order."""
+    """Play/Pause over every law in order: the window's PlayController, or this tab alone."""
+
+    play_controller = None
 
     def _add_play(self, row, column):
         self.play_btn = QtWidgets.QPushButton("Play")
@@ -222,6 +274,9 @@ class PlayMixin:
         self.timer.timeout.connect(self.animate)
 
     def toggle_play(self):
+        if self.play_controller is not None:
+            self.play_controller.toggle()
+            return
         if self.is_playing:
             self.is_playing = False
             self.play_btn.setText("Play")
@@ -232,6 +287,9 @@ class PlayMixin:
             self.timer.start()
 
     def animate(self):
+        if self.play_controller is not None:
+            self.play_controller.tick()
+            return
         if not self.is_playing or not self.focal_points:
             return
         self.show_law(self.nav.current + 1)

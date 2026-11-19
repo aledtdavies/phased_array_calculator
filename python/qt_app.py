@@ -20,6 +20,7 @@ from qtpy import QtCore, QtGui, QtWidgets
 from catalog import Catalog, CatalogError, default_catalog_dir
 from qt_catalog_dialog import CatalogPicker
 from qt_panels import MaterialPanel, ProbePanel, ScanPanel, SubAperturePanel, WedgePanel
+from qt_plotting import PlayController
 from qt_view3d import Scene3DTab
 from qt_views2d import DelayTab, RayTab
 from session import (TABLE_HEADINGS, CatalogLinks, asset_message, build_solver, calculate,
@@ -88,6 +89,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # tabs to that law (for instance from a dragged focus).
         self.tree.cellClicked.connect(lambda *_: self.on_table_select())
         self.probe_panel.probe_type_changed.connect(self.on_probe_type_changed)
+        self.play = PlayController(self.law_tabs())     # one Play for the window
         for tab in self.law_tabs():
             tab.element_selected.connect(self.select_element)
             tab.law_changed.connect(self.on_law_changed)

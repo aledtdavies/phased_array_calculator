@@ -16,10 +16,11 @@ Plan step 4 (`docs/plans/PLAN-2026-11-qt-vtk-migration.md`).
 
   | | Ray Tracing | Delays | 3D View | Dragged focus (solve + visible tab) |
   |---|---|---|---|---|
-  | 64-element linear | 19 ms | 17 ms | 28 ms | 36 ms |
+  | 64-element linear | 19 ms | 17 ms | 25 ms | 35 ms |
   | 16 × 4 dual matrix | 33 ms | 29 ms | 30 ms | 66 ms |
 
-  The dual-matrix drag includes solving 128 elements with the 3D solver. Hidden tabs redraw when shown: a drag followed by showing every tab in turn takes 120 and 160 ms, tab switching included.
+  Steady-state maxima are at most 50 ms. The first redraw after a tab is first shown (a one-off cache warm-up) reached 67 ms for the dual-matrix Delays maps. The dual-matrix drag includes solving 128 elements with the 3D solver. Hidden tabs redraw when shown: a drag followed by showing every tab in turn takes 126 and 160 ms, tab switching included.
+- **One Play for the window:** a single timer steps the shared law, and every Play button shows the same state.
 - `scene_model.wedge_yz_rect` (the Y-Z wedge silhouette) is shared by both renderers; the Tk images are unchanged. `session.law_result` holds one law's fields.
 - `requirements.txt` adds pyqtgraph. The Qt window no longer uses matplotlib; the Tk window and static exports still do.
 

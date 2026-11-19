@@ -8,7 +8,8 @@ Steps through every law of a sweep, as Play does, and times each tab's redraw (t
 shown, so the time includes painting). Then times a dragged focus: the solve plus the visible
 Ray Tracing tab (hidden tabs defer their redraw), and the solve plus every tab, each shown in
 turn so its deferred redraw is counted.
-Prints medians and maxima in milliseconds. A measurement, not a test.
+Prints medians and maxima in milliseconds; for each view, the first redraw after the tab is
+first shown (a one-off cache warm-up) is listed apart. A measurement, not a test.
 """
 import os
 import sys
@@ -63,7 +64,10 @@ def main():
                 tab.show_law(k)          # refresh_plot renders (the 3D tab once, as in use)
                 app.processEvents()
                 times.append((time.perf_counter() - t0) * 1e3)
-            rows.append((name, type(tab).__name__, n, np.median(times), np.max(times)))
+            # The first redraw after a tab is first shown warms caches (glyphs, textures) once;
+            # it is reported apart from the steady state.
+            rows.append((name, type(tab).__name__, n, np.median(times[1:]), np.max(times[1:]),
+                         times[0]))
         # dragged focus: the solve plus the visible Ray Tracing tab (hidden tabs redraw when shown)
         w.tabs.setCurrentIndex(0)
         app.processEvents()
@@ -73,7 +77,7 @@ def main():
             w.on_focus_dragged(0.03 + 0.0005 * k, 0.018)
             app.processEvents()
             times.append((time.perf_counter() - t0) * 1e3)
-        rows.append((name, "drag: solve + Ray Tracing", 20, np.median(times), np.max(times)))
+        rows.append((name, "drag: solve + Ray Tracing", 20, np.median(times), np.max(times), None))
         # and every tab: each shown in turn after the drag, so its deferred redraw is included
         times = []
         for k in range(10):
@@ -83,11 +87,12 @@ def main():
                 w.tabs.setCurrentIndex(i)
                 app.processEvents()
             times.append((time.perf_counter() - t0) * 1e3)
-        rows.append((name, "drag: solve + all 3 tabs", 10, np.median(times), np.max(times)))
+        rows.append((name, "drag: solve + all 3 tabs", 10, np.median(times), np.max(times), None))
     w.close()
-    print(f"{'setup':22s} {'view':26s} {'laws':>5s} {'median ms':>10s} {'max ms':>8s}")
-    for name, view, n, med, mx in rows:
-        print(f"{name:22s} {view:26s} {n:5d} {med:10.1f} {mx:8.1f}")
+    print(f"{'setup':22s} {'view':26s} {'laws':>5s} {'median ms':>10s} {'max ms':>8s} {'first ms':>9s}")
+    for name, view, n, med, mx, first in rows:
+        f = f"{first:9.1f}" if first is not None else f"{'-':>9s}"
+        print(f"{name:22s} {view:26s} {n:5d} {med:10.1f} {mx:8.1f} {f}")
 
 
 if __name__ == "__main__":
