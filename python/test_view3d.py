@@ -185,6 +185,46 @@ class TestPicking(unittest.TestCase):
             tab.deleteLater()
 
 
+    def test_recalculation_keeps_the_angle_and_frames_the_new_setup(self):
+        """Review of PR #26: a moved setup stays in view; the user's viewing direction is kept."""
+        from qt_view3d import Scene3DTab
+        from scene_vtk import display_positions
+        pv_, wv, sav = SETUPS["linear sub-aperture"]
+        tab = Scene3DTab()
+        tab.resize(600, 450)
+        tab.plotter.window_size = (600, 450)
+        s, c = calc_for(pv_, wv, sav)
+        tab.update_plot(s, c.focal_points, c.wave_type, results=c.results, component_thickness_mm=20)
+        tab.plotter.camera.azimuth += 25          # the user turns the view
+        tab.plotter.render()
+        cam = tab.plotter.camera
+        before = np.subtract(cam.position, cam.focal_point)
+        s2, c2 = calc_for(pv_, dict(wv, offset_mm=1000), sav)
+        tab.update_plot(s2, c2.focal_points, c2.wave_type, results=c2.results, component_thickness_mm=20)
+        tab.plotter.render()
+        after = np.subtract(cam.position, cam.focal_point)
+        np.testing.assert_allclose(after / np.linalg.norm(after), before / np.linalg.norm(before), atol=1e-9)
+        disp = display_positions(tab.plotter.renderer, s2.wedge.get_transformed_elements(s2.probe) * 1e3)
+        w, h = tab.plotter.render_window.GetSize()
+        self.assertTrue(((disp[:, 0] >= 0) & (disp[:, 0] <= w) & (disp[:, 1] >= 0) & (disp[:, 1] <= h)).all())
+        tab.plotter.close()
+        tab.deleteLater()
+
+    def test_millimetre_axes(self):
+        """Review of PR #26: labelled coordinate axes in mm."""
+        from qt_view3d import Scene3DTab
+        pv_, wv, sav = SETUPS["matrix row-first"]
+        tab = Scene3DTab()
+        tab.plotter.window_size = (500, 400)
+        s, c = calc_for(pv_, wv, sav)
+        tab.update_plot(s, c.focal_points, c.wave_type, results=c.results, is_matrix=True)
+        axes = tab.plotter.renderer.cube_axes_actor
+        self.assertIsNotNone(axes)
+        self.assertEqual((axes.GetXTitle(), axes.GetYTitle(), axes.GetZTitle()),
+                         ("X (mm)", "Y (mm)", "Z depth (mm)"))
+        tab.plotter.close()
+        tab.deleteLater()
+
     def test_real_qt_mouse_clicks(self):
         """A mouse click through Qt (QTest) on the shown view picks the element under it."""
         from qtpy import QtCore
