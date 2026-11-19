@@ -190,3 +190,18 @@ feature needs rendered beam fields rather than rays.
 Phase 1 is low-risk and mostly transcription from pogopy — do it first and in both
 editions in the same change set. Phase 2 is the substantive new work and the main
 answer to the "particularly 3D" brief. Phases 3–4 are independent and can trail.
+
+---
+
+## 6. Status (2026-11-19)
+
+| Phase | Python | MATLAB |
+|---|---|---|
+| 1 — 2D scene quality and correctness | done (PR #20) | done (PR #20) |
+| 2 — 3D view tab | done: `scene.draw_scene_3d`, `plotting.Scene3DPanel` | not started |
+| 3 — Aperture delay map | done: `scene.draw_aperture_maps` (per array, numbered in the chosen convention) | not started |
+| 4 — Performance (artist reuse, blitting) | not started | not started |
+
+Also added in Python: catalogue wedge outlines (buildFE `simple` / `polygon`) drawn in the X-Z and 3D
+views, law step buttons, table-to-law selection, a zoom/pan toolbar. The MATLAB edition has no
+catalogue reader, 3D view or delay map yet; porting them is the next parity step.

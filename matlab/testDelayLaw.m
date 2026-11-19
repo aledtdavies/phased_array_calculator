@@ -36,3 +36,20 @@ verifyEqual(test,a.Delays,b.Delays);
 verifyError(test,@()s.calculateLaw(.03,0,-.04),'DelayLaw:domain');
 verifyError(test,@()s.calculateLaw(.03,0,.04,'banana'),'DelayLaw:mode');
 end
+
+function testDualRowFirstStaysInEachArray(test)
+% Row-first numbering is applied within each array of a dual probe.
+p=DualProbe(4,1e-3,5e6,2,1e-3,10e-3,9,8,'row-first');
+verifyEqual(test,p.getActiveElementIndices(),9:16);
+p=DualProbe(4,1e-3,5e6,2,1e-3,10e-3,7,4,'row-first');
+pos=p.getElementPositions();
+verifyEqual(test,sort(pos(p.getActiveElementIndices(),2)>0).',[false false true true]);
+end
+
+function testLegacyTwoCoordinateCallWithMode(test)
+s=DelayLaw(Probe(8,.0006),Wedge(20,.01,1480),Material(5900,3240));
+a=s.calculateLaw(.03,.04,'shear'); b=s.calculateLaw(.03,0,.04,'shear');
+verifyEqual(test,a.FocalPoint,[.03,0,.04]);
+verifyEqual(test,a.Delays,b.Delays);
+verifyEqual(test,a.VelocityUsed,3240);
+end

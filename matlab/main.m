@@ -58,7 +58,7 @@ function results = generate_sector_scan(solver, depth, startAngle, endAngle, ste
         
         elements = solver.Wedge.getTransformedElements(solver.Probe);
         centerX = mean(elements(:, 1));
-        centerZ = mean(elements(:, 2));
+        centerZ = mean(elements(:, 3));   % column 3 is z (height above the interface)
         
         hWedge = abs(centerZ);
         xInt = centerX + hWedge * tan(alphaRad);
@@ -66,7 +66,7 @@ function results = generate_sector_scan(solver, depth, startAngle, endAngle, ste
         fz = depth;
         fx = xInt + fz * tan(angRad);
         
-        law = solver.calculateLaw(fx, fz, 'longitudinal');
+        law = solver.calculateLaw(fx, 0.0, fz, 'longitudinal');
         
         results(i).Angle = angDeg;
         results(i).FocalPoint = [fx, fz];

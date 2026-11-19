@@ -58,11 +58,16 @@ class Probe:
             # fastest within each fixed-X "column".
             # User numbering is row-first: Y varies slowest, so
             # user_idx -> ix = user_idx % Nx, iy = user_idx // Nx.
+            # Dual probes number the second array after the first
+            # (block = 1), so the mapping is applied within each array.
             Nx = self.num_elements
             Ny = self.num_elements_y
-            iy = user_indices // Nx
-            ix = user_indices % Nx
-            internal_indices = ix * Ny + iy
+            per_array = Nx * Ny
+            block = user_indices // per_array
+            local = user_indices % per_array
+            iy = local // Nx
+            ix = local % Nx
+            internal_indices = block * per_array + ix * Ny + iy
             return np.sort(internal_indices)
         else:
             # column-first: user numbering matches internal storage order

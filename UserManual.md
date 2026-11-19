@@ -17,6 +17,7 @@
 4. [Step-by-Step Workflow](#4-step-by-step-workflow)
 5. [Results & Visualisation](#5-results--visualisation)
 6. [Export Formats](#6-export-formats)
+   - [6a. Probe and Wedge Catalogues](#6a-probe-and-wedge-catalogues)
 7. [Python API Reference](#7-python-api-reference)
 8. [MATLAB API Reference](#8-matlab-api-reference)
 9. [Physics & Mathematics](#9-physics--mathematics)
@@ -155,10 +156,12 @@ For a matrix array with **Nx** elements in X and **Ny** elements in Y the elemen
 
 | Convention | Description | Mapping of element 1, 2, 3 … |
 |---|---|---|
-| **Column-first** *(default)* | X increments fastest; elements are numbered along each row from left to right, then the next row | (X=1,Y=1), (X=2,Y=1), (X=3,Y=1) … |
-| **Row-first** | Y increments fastest; elements are numbered up each column from bottom to top, then the next column | (X=1,Y=1), (X=1,Y=2), (X=1,Y=3) … |
+| **Column-first** *(default)* | Y increments fastest; elements are numbered up each column (fixed X) from Y=1, then the next column | (X=1,Y=1), (X=1,Y=2), (X=1,Y=3) … |
+| **Row-first** | X increments fastest; elements are numbered along each row (fixed Y) from X=1, then the next row | (X=1,Y=1), (X=2,Y=1), (X=3,Y=1) … |
 
-> **Note:** Element order only controls which elements are *selected* — it does not affect element positions or physics. With Active Elements = 0, all elements fire regardless of the convention setting.
+Dual matrix probes number the second array after the first (elements Nx·Ny+1 … 2·Nx·Ny), with the same convention inside each array.
+
+> **Note:** Element order only controls which elements are *selected* — it does not affect element positions or physics. With Active Elements = 0, all elements fire regardless of the convention setting. Exported delays (`El_k_us`) and element coordinates are always listed in **column-first** order, whatever the setting; the Delays tab's aperture map shows each element's number in the chosen convention.
 
 Inactive elements produce `NaN` entries in delay and time-of-flight arrays.
 
@@ -167,7 +170,7 @@ Inactive elements produce `NaN` entries in delay and time-of-flight arrays.
 ## 4. Step-by-Step Workflow
 
 1. Select **Probe Type** — Y-axis and dual-array fields appear as needed.
-2. Enter element counts, pitches, and frequency.
+2. Enter element counts, pitches, and frequency — or use **File → Load Probe from Catalogue…** (and **Load Wedge from Catalogue…** for step 3), see §6a.
 3. Configure the **Wedge**: angle, height at Element 1, material velocity, and X offset. For dual probes set the array separation and roof angle.
 4. Select or enter the **Component** material velocities.
 5. Set **Focus Type**, **Wave Type**, and the angle sweep range. For matrix probes configure the skew range and Y focus mode.
@@ -194,8 +197,13 @@ interface to focal point, and the focal-point marker. Wedge dimensions
 - **Linear probes:** single X-Z projection.
 - **Matrix / Dual probes:** side-by-side X-Z and Y-Z projections.
 - **Show All:** overlays every law in the sweep, coloured by law index.
+- **Catalogue wedge:** when the wedge was loaded from a buildFE catalogue entry and its panel values are unchanged, the X-Z view draws the catalogue's wedge outline instead of the schematic silhouette.
 
-The **angle/skew sliders** at the top of the tab allow interactive navigation through the computed law set without re-running the calculation.
+The **angle/skew sliders** below each plot navigate the computed law set without re-running the calculation. They pick the first law with that angle and skew; the **◀ ▶** buttons step through every law in order (needed for Y-sweep laws, which share an angle and skew), and the readout shows the law number and focal point. **Play** animates through all laws. Selecting a row in the Data Table shows that exact law in every tab.
+
+### 3D View Tab
+
+A rotatable 3D scene of the selected law (mm, global frame, depth drawn downward): the wedge body (catalogue outline or schematic silhouette, extruded across the element footprint), the interface plane and optional backwall, active and inactive elements (Tx/Rx coloured for dual probes), rays element → interface → focus for the active elements (an even subset of at most 48 for large apertures, ends kept), the interface points, and the focal points of the whole sweep coloured by law index. Camera presets **Iso**, **X-Z**, **Y-Z** and **Top** give the projections from within the 3D view; drag to rotate. Roof angles tilt the drawn elements but not the wedge body.
 
 ### Data Table Tab
 
@@ -208,11 +216,14 @@ The **angle/skew sliders** at the top of the tab allow interactive navigation th
 | Min Delay (µs) | Smallest element delay in the law |
 | Max Delay (µs) | Largest element delay in the law |
 
-Error conditions (critical angle exceeded, Z < 0, Y out of reach) are shown inline as text rows.
+Error conditions (critical angle exceeded, Z < 0, Y out of reach) are shown inline as text rows. Min/Max Delay are taken over the active elements.
 
 ### Delays Tab
 
-Bar chart of per-element delay values for the currently selected focal law, with all other laws overlaid in light grey. Useful for verifying delay profile shape and identifying outlier elements.
+- **Linear / Dual Linear probes:** bar chart of per-element delay for the selected law; inactive elements are marked with grey crosses, and a dotted line separates the two arrays of a dual probe.
+- **Matrix / Dual Matrix probes:** a delay map over the element grid (X across, Y up), one per array, inactive elements grey, each cell labelled with its element number in the chosen numbering convention — a direct check of the sub-aperture and convention settings.
+
+The colour or y scale is fixed to the largest delay in the sweep, so laws can be compared while stepping.
 
 ---
 
@@ -239,7 +250,26 @@ Bar chart of per-element delay values for the currently selected focal law, with
 
 ### Configuration JSON (File → Save / Load Configuration)
 
-Stores all panel values — probe type, element counts, pitches, wedge geometry, material velocities, scan settings, and **sub-aperture settings** — as a structured JSON file for reproducible setups.
+Stores all panel values — probe type, element counts, pitches, wedge geometry, material velocities, scan settings, and **sub-aperture settings** — as a structured JSON file for reproducible setups. When a probe or wedge came from a catalogue, a `catalog` block records, per asset, its id, manufacturer, model, the catalogue file and its SHA-256, the format, the buildFE content hash (`sha256`) with its stamp status, and `values_match` (false once a catalogue value has been edited in the panel).
+
+---
+
+## 6a. Probe and Wedge Catalogues
+
+**File → Load Probe from Catalogue…** and **File → Load Wedge from Catalogue…** fill the Probe or Wedge panel from a catalogue entry, so the calculator uses the same probe and wedge values as buildFE. The file dialog opens in `$PAC_CATALOG_DIR`, or a sibling `buildFE/catalog` (then `nde-knowledge/exports/catalog`) checkout when one exists. A filterable list shows the entries; entries the calculator cannot use (single elements, curved arrays, …) are hidden unless *Usable only* is cleared, and the reason is shown.
+
+| Format | Files | What is read |
+|---|---|---|
+| buildFE 0.1 | `buildFE/catalog/probes.json`, `wedges.json` | `{value, source}` values (an unsourced value is refused); the entry's content hash is recomputed exactly as `buildfe.asset.digest` does and compared with its stamp: **ok**, **changed** (a different asset to buildFE) or **unstamped** |
+| nde-knowledge 1 | `nde-knowledge/exports/catalog/probes.json`, `wedges.json` | plain SI values; the file's SHA-256 identifies the copy read |
+
+**Probes.** Linear, matrix, dual linear and dual matrix arrays map to the four probe types. A pitch the catalogue does not print is derived as active aperture ÷ elements (reported); a printed pitch that disagrees with the aperture, and the catalogue's own inconsistency notes, are reported, never corrected. Array separation is not in either catalogue and stays as entered.
+
+**Wedges (buildFE).** buildFE's wedge frame has x along the contact face from the low end of the probe face, y up, elements ascending up the face, beam towards +x. It maps onto this calculator's frame with X = x and Z = −y, so element 1's catalogue centre (x₁, y₁) gives **Probe Offset X = x₁** and **Height @ El.1 = y₁** (the phased-array convention: height to element 1), the face angle gives the **Wedge Angle**, and the longitudinal speed the **Velocity**. `simple` and `polygon` outlines are read; a probe face that descends towards +x is refused. The outline is drawn in the X-Z and 3D views while the panel values still match it (and no roof angle is set).
+
+**Wedges (nde-knowledge 1).** The export carries no element-1 seat or wave speed: only the wedge angle (where printed) is filled, and the message lists what to enter by hand. Curved wedges are flagged; the calculator models a flat interface.
+
+The loaded values remain ordinary panel values: edit them freely; the configuration's `catalog` block then records `values_match: false`.
 
 ---
 
@@ -494,6 +524,7 @@ Pitch (Y-axis rotation by θ):          Roll (X-axis rotation by φ):
 | **No diffraction or attenuation** | Geometric ray paths only. Beam spread, diffraction, frequency-dependent attenuation, and near-field effects are not modelled. |
 | **Isotropic materials** | Both wedge and component are treated as acoustically isotropic. Anisotropic or textured materials require stiffness-matrix methods. |
 | **Serial 3D solver** | The bracketed Snell solver evaluates elements sequentially. Large arrays and long angle sweeps may take several seconds. Parallelisation is not yet implemented. |
+| **Catalogue wedges** | Wedge width, roof geometry and curvature are not read from catalogues; nde-knowledge 1 wedges carry no element-1 seat. |
 | **Critical angle handling** | Beam angles beyond the first critical angle are flagged as errors in the Data Table. Mode-converted or head-wave paths are not computed. |
 
 ---
@@ -523,8 +554,10 @@ Pitch (Y-axis rotation by θ):          Roll (X-axis rotation by φ):
 | `material.py` | `Material` class storing longitudinal and shear velocities |
 | `app.py` | Tkinter GUI application, scan engine, CSV export |
 | `panels.py` | Input panels (Probe, Wedge, Material, Scan, SubAperture) |
-| `plotting.py` | Ray tracing and delay histogram GUI panels |
-| `scene.py` | Toolkit-independent scene drawing shared by the GUI and scripts |
+| `plotting.py` | Ray tracing, 3D view and delay GUI panels |
+| `scene.py` | Toolkit-independent scene drawing (2D projections, 3D scene, aperture delay maps) shared by the GUI and scripts |
+| `catalog.py` | buildFE / nde-knowledge catalogue reader, buildFE content hash, frame mapping |
+| `catalog_dialog.py` | Catalogue entry picker |
 | `materials.json` | Built-in material velocity database |
 | `verify_delays.py` | Standalone verification script |
 
