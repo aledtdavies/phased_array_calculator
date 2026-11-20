@@ -151,7 +151,9 @@ def coefficient_table(upper: Solid, lower: Solid, key, incident="P"):
     (where the coefficient has a square-root kink), to rounding elsewhere (test_beam_field).
     """
     c = upper.cl if incident.upper() == "P" else upper.cs
-    grid = np.linspace(0.0, 1.0 / c, TABLE_SIZE)
+    # stop just short of grazing (p = 1/c), where incident and reflected waves coincide and the
+    # boundary conditions are singular; slownesses beyond the last entry take its value
+    grid = np.linspace(0.0, (1.0 - 1e-9) / c, TABLE_SIZE)
     vals = interface_coefficients(grid, upper, lower, incident)[key]
 
     def f(p):
@@ -225,7 +227,8 @@ def element_sources(solver, delays, element_width, elevation=None, dim=2, f_max=
     Sources of the active elements of a DelayLaw solver, with firing delays (s, one per element,
     NaN where inactive). dim 2: one strip per element, which needs every element and normal in
     the X-Z plane (a single linear array without roof). dim 3: each element split into point
-    sources no more than half a wedge L wavelength at f_max apart across its width and elevation.
+    sources no more than half a wedge L wavelength at f_max apart across its width and elevation
+    (the element's own size across the array; for matrix arrays at most the secondary pitch).
     """
     probe, wedge = solver.probe, solver.wedge
     elements, _, active = solver._geometry()
@@ -256,7 +259,10 @@ def element_sources(solver, delays, element_width, elevation=None, dim=2, f_max=
         if not (elevation and elevation > 0):
             raise ValueError("3D field needs the element elevation (> 0)")
         lam = wedge.velocity / (f_max or probe.frequency)
-        el_len = elevation if probe.num_elements_y == 1 else max(probe.pitch_y, 1e-12)
+        el_len = elevation                    # the element's own Y size, also for matrix arrays
+        if probe.num_elements_y > 1 and el_len > probe.pitch_y * (1 + 1e-9):
+            raise ValueError(f"the element elevation ({el_len * 1e3:g} mm) exceeds the secondary pitch "
+                             f"({probe.pitch_y * 1e3:g} mm): set the element's own Y size")
         nw = max(1, math.ceil(element_width / (lam / 2)))
         ne = max(1, math.ceil(el_len / (lam / 2)))
         uw = (np.arange(nw) + 0.5) / nw - 0.5

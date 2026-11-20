@@ -76,6 +76,18 @@ class TestCoefficientTable(unittest.TestCase):
             self.assertLess(np.median(err), 1e-6, key)
 
 
+class TestIdenticalMediaTable(unittest.TestCase):
+    def test_identical_media_tables_and_field(self):
+        """Review of PR #30: the grazing end of the table made identical media singular."""
+        from beam_field import coefficient_table
+        p = np.sin(np.radians([0, 20, 45, 70])) / REXOLITE.cl
+        np.testing.assert_allclose(coefficient_table(REXOLITE, REXOLITE, "TP")(p), 1, atol=1e-9)
+        np.testing.assert_allclose(coefficient_table(REXOLITE, REXOLITE, "TS")(p), 0, atol=1e-9)
+        amp = beam_field(_single([0.0, 0.0, -0.01]), [[0.005, 0.0, 0.02]], REXOLITE, REXOLITE,
+                         "longitudinal", 2.25e6, pulsed=False).amplitude
+        self.assertTrue(np.all(np.isfinite(amp)) and amp[0] > 0)
+
+
 class TestRays(unittest.TestCase):
     def test_fermat_entry_obeys_snell_and_is_the_minimum_time(self):
         rng = np.random.default_rng(1)
@@ -207,6 +219,33 @@ class TestSynthesis(unittest.TestCase):
         law = s.calculate_law(0.03, 0.0, 0.02, "shear")
         with self.assertRaises(ValueError):
             element_sources(s, law["delays"], 0.9e-3, dim=2)        # matrix: not a 2D section
+
+
+class TestMatrixElements(unittest.TestCase):
+    def test_matrix_patches_follow_the_element_elevation(self):
+        """Review of PR #30: matrix elements filled the whole Y pitch whatever the elevation."""
+        for ptype in ("Matrix", "Dual Matrix"):
+            kw = dict(num_elements_y=2, pitch_y=1e-3)
+            if ptype == "Dual Matrix":
+                kw["array_separation"] = 0.01
+            p = create_probe_assembly(ptype, 2, 1e-3, 2.25e6, **kw)
+            s = DelayLaw(p, Wedge(20.0, 0.008, 2337.0, 0.004), Material(5900.0, 3230.0))
+            d = s.calculate_law(0.02, 0.0, 0.02, "longitudinal")["delays"]
+            areas, spans, fields = [], [], []
+            for elev in (0.3e-3, 0.9e-3):
+                src = element_sources(s, d, 0.8e-3, elevation=elev, dim=3)
+                n_el = np.isfinite(d).sum()
+                areas.append(src.weights.sum() / n_el)
+                y = src.positions[:, 1]
+                spans.append(np.ptp(y[:len(y) // n_el]))
+                fields.append(beam_field(src, [[0.02, 0.004, 0.02]], REXOLITE, STEEL, "longitudinal",
+                                         2.25e6, pulsed=False).amplitude[0])
+            with self.subTest(ptype):
+                np.testing.assert_allclose(areas, [0.8e-3 * 0.3e-3, 0.8e-3 * 0.9e-3], rtol=1e-9)
+                self.assertGreater(spans[1], spans[0])
+                self.assertNotAlmostEqual(fields[0] / areas[0], fields[1] / areas[1], places=6)
+                with self.assertRaises(ValueError):
+                    element_sources(s, d, 0.8e-3, elevation=1.5e-3, dim=3)   # wider than the Y pitch
 
 
 class TestSpectrum(unittest.TestCase):
