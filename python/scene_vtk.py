@@ -13,11 +13,16 @@ from __future__ import annotations
 import numpy as np
 import pyvista as pv
 
+from weld import split_lobes
+
 from scene import (COLOR_BACKWALL, COLOR_ELEMENT_ACTIVE, COLOR_ELEMENT_INACTIVE, COLOR_ELEMENT_TX,
                    COLOR_MATERIAL, COLOR_WEDGE_EDGE, COLOR_WEDGE_FACE, LAW_CMAP)
 
 ELEMENT_COLOUR = {"single": COLOR_ELEMENT_ACTIVE, "tx": COLOR_ELEMENT_TX, "rx": COLOR_ELEMENT_ACTIVE}
 COVERAGE_COLOUR = {1: "#2563eb", 2: "#7c3aed", 3: "#db2777"}
+WELD_FACE, WELD_EDGE = "#fcd34d", "#92400e"
+FUSION_STYLE = {"fusion-face": ("#92400e", "Fusion faces"), "fusion-covered": ("#16a34a", "Fusion face, covered"),
+                "fusion-gap": ("#dc2626", "Fusion face, gap")}
 RAY_COLOUR = {"single": "#2563eb", "tx": "#1d4ed8", "rx": "#dc2626"}
 
 # Camera presets: (azimuth, elevation) in degrees of the view direction; see set_camera.
@@ -102,6 +107,31 @@ def add_setup(pl, scene, component_thickness_mm=0.0, section=False):
             pl.add_points(p.coords, color=ELEMENT_COLOUR[p.meta["array"]] if p.meta["active"] else COLOR_ELEMENT_INACTIVE,
                           point_size=8, render_points_as_spheres=True,
                           name=f"setup:elements-{p.meta['array']}-{int(p.meta['active'])}")
+    for p in scene.find("weld"):
+        # The weld runs along Y through the component: its outline extruded across the view.
+        # A pinched outline (two lobes touching) is drawn lobe by lobe: VTK triangulates only
+        # simple polygons.
+        lobes = []
+        for xz in split_lobes(p.coords[:, [0, 2]]):
+            pts = np.c_[xz[:, 0], np.full(len(xz), lo[1]), xz[:, 1]]
+            lobes.append(pv.PolyData(pts, np.r_[len(pts), np.arange(len(pts))]).triangulate())
+        face = pv.merge(lobes) if len(lobes) > 1 else lobes[0]
+        if face.n_cells == 0:
+            raise ValueError("the weld outline could not be triangulated for 3D")
+        body = face.extrude((0, hi[1] - lo[1], 0), capping=True)
+        pl.add_mesh(clip(body), color=WELD_FACE, opacity=0.30, name="setup:weld", label="Weld")
+        pl.add_mesh(body.extract_feature_edges(30), color=WELD_EDGE, line_width=1, name="setup:weld-edges")
+    for role, (col, label) in FUSION_STYLE.items():
+        runs = scene.find(role)
+        if not runs:
+            continue
+        strips = []
+        for p in runs:      # each run of a face as a strip along Y, lifted to the weld's ends
+            c = p.coords
+            for a, b in zip(c[:-1], c[1:]):
+                strips.append([[a[0], lo[1], a[2]], [b[0], lo[1], b[2]], [b[0], hi[1], b[2]], [a[0], hi[1], a[2]]])
+        pl.add_mesh(clip(_quads(np.asarray(strips, dtype=float).reshape(-1, 3))), color=col, opacity=0.85,
+                    name=f"setup:{role}", label=label)
     for p in scene.find("coverage"):
         n = len(p.coords) // 4
         faces = np.c_[np.full(n, 4), np.arange(4 * n).reshape(n, 4)].ravel()

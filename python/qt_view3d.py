@@ -116,6 +116,7 @@ class Scene3DTab(PlayMixin, LawTab):
                            element_size_m=self.element_size_m)
         if self.coverage is not None:
             scene.prims += coverage_prims(self.coverage, self.coverage_path_mm())
+        scene.prims += self.weld_prims
         return scene
 
     def _coverage_changed(self):

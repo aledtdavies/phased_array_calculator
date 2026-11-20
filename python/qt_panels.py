@@ -263,3 +263,132 @@ class SubAperturePanel(Panel):
             if v not in ("column-first", "row-first"):
                 raise ValueError(f"element order '{values['element_order']}' is not column-first or row-first")
             self.order.setCurrentText("Column-first" if v == "column-first" else "Row-first")
+
+
+WELD_TYPES = {"None": None, "Single-V": "single-V", "Double-V": "double-V", "Single-J": "single-J",
+              "DXF file": "dxf"}
+WELD_FIELDS = {"bevel_deg": ("single-V", "double-V", "single-J"), "bevel2_deg": ("double-V",),
+               "root_gap_mm": ("single-V", "double-V", "single-J"),
+               "root_face_mm": ("single-V", "double-V", "single-J"), "root_depth_mm": ("double-V",),
+               "root_radius_mm": ("single-J",)}
+
+
+class WeldPanel(Panel):
+    """
+    The weld cross-section (plan step 5b): a preparation template or a DXF outline, at a centre
+    X in the global frame, through the component Thickness. Read when the laws are calculated.
+    """
+
+    def __init__(self):
+        super().__init__("Weld")
+        self.type_combo = self.add_combo("Weld:", list(WELD_TYPES), "None")
+        self.add_number("centre_x_mm", 40.0, "Weld Centre X (mm):")
+        self.add_number("bevel_deg", 30.0, "Bevel Angle (deg):")
+        self.add_number("bevel2_deg", 30.0, "Lower Bevel (deg):")
+        self.add_number("root_gap_mm", 2.0, "Root Gap (mm):")
+        self.add_number("root_face_mm", 1.5, "Root Face (mm):")
+        self.add_number("root_depth_mm", 0.0, "Root Depth (mm, 0=mid):")
+        self.add_number("root_radius_mm", 6.0, "J Radius (mm):")
+        self.side = self.add_combo("J Side:", ["Near (-X plate)", "Far (+X plate)"], "Near (-X plate)")
+        row = QtWidgets.QWidget()
+        lay = QtWidgets.QHBoxLayout(row)
+        lay.setContentsMargins(0, 0, 0, 0)
+        self.dxf_path = QtWidgets.QLineEdit()
+        self.dxf_path.setPlaceholderText("cross-section .dxf")
+        self.browse = QtWidgets.QPushButton("...")
+        self.browse.setMaximumWidth(30)
+        lay.addWidget(self.dxf_path)
+        lay.addWidget(self.browse)
+        self.form.addRow("DXF File:", row)
+        self.dxf_row = row
+        self.datum = self.add_combo("DXF y = 0 at:", ["Surface (part below)", "Backwall (part above)"],
+                                    "Surface (part below)")
+        self.datum.setToolTip("DXF x = 0 is the weld centreline; y is up in the drawing")
+        self.units = self.add_combo("DXF Units:", ["From file", "mm", "inch", "m"], "From file")
+        self.units.setToolTip("Override the units the file is stamped with ($INSUNITS)")
+        self.layer = QtWidgets.QLineEdit()
+        self.layer.setPlaceholderText("all layers")
+        self.form.addRow("DXF Layer:", self.layer)
+        self.browse.clicked.connect(self._browse)
+        self.type_combo.currentTextChanged.connect(lambda _: self._type_changed())
+        self._type_changed()
+
+    def kind(self):
+        return WELD_TYPES[self.type_combo.currentText()]
+
+    def _browse(self):
+        path = QtWidgets.QFileDialog.getOpenFileName(self, "Weld cross-section", "",
+                                                     "DXF (*.dxf);;All Files (*)")[0]
+        if path:
+            self.dxf_path.setText(path)
+
+    def _type_changed(self):
+        k = self.kind()
+        self.set_row_visible(self.entries["centre_x_mm"], k is not None)
+        for key, kinds in WELD_FIELDS.items():
+            self.set_row_visible(self.entries[key], k in kinds)
+        self.set_row_visible(self.side, k == "single-J")
+        for w in (self.dxf_row, self.datum, self.units, self.layer):
+            self.set_row_visible(w, k == "dxf")
+
+    def get_values(self):
+        """
+        The fields of the selected weld type are read strictly; hidden fields of other types are
+        kept when they are numbers and left out when not, so they never block the weld chosen.
+        """
+        k = self.kind()
+        vals = {}
+        for key, f in self.entries.items():
+            if key == "centre_x_mm" or k in WELD_FIELDS.get(key, ()):
+                vals[key] = f.value()
+            else:
+                try:
+                    vals[key] = f.value()
+                except ValueError:
+                    pass
+        vals.update(type=self.type_combo.currentText(),
+                    j_side="far" if self.side.currentIndex() else "near",
+                    dxf_path=self.dxf_path.text().strip(),
+                    dxf_datum="backwall" if self.datum.currentIndex() else "surface",
+                    dxf_layer=self.layer.text().strip(),
+                    dxf_units="" if self.units.currentIndex() == 0 else self.units.currentText())
+        return vals
+
+    def set_values(self, values):
+        super().set_values(values)
+        if "type" in values:
+            if values["type"] not in WELD_TYPES:
+                raise ValueError(f"weld type '{values['type']}' is not one of {', '.join(WELD_TYPES)}")
+            self.type_combo.setCurrentText(values["type"])
+        if "j_side" in values:
+            self.side.setCurrentIndex(1 if values["j_side"] == "far" else 0)
+        if "dxf_path" in values:
+            self.dxf_path.setText(values["dxf_path"])
+        if "dxf_datum" in values:
+            self.datum.setCurrentIndex(1 if values["dxf_datum"] == "backwall" else 0)
+        if "dxf_layer" in values:
+            self.layer.setText(values["dxf_layer"])
+        if "dxf_units" in values:
+            u = values["dxf_units"] or "From file"
+            if self.units.findText(u) < 0:
+                raise ValueError(f"DXF units '{u}' are not one of mm, inch, m")
+            self.units.setCurrentText(u)
+
+    def profile(self, thickness_mm):
+        """The weld as a weld.WeldProfile, or None with no weld; ValueError says what is wrong."""
+        import weld
+        k = self.kind()
+        if k is None:
+            return None
+        v = self.get_values()
+        if not thickness_mm > 0:
+            raise ValueError("set the component Thickness to place a weld")
+        if k == "dxf":
+            if not v["dxf_path"]:
+                raise ValueError("choose the DXF file of the weld cross-section")
+            return weld.dxf_profile(v["dxf_path"], thickness_mm, v["centre_x_mm"], v["dxf_datum"],
+                                    v["dxf_layer"] or None, v["dxf_units"] or None)
+        params = {key: v[key] for key, kinds in WELD_FIELDS.items() if k in kinds}
+        if k == "single-J":
+            params["side"] = v["j_side"]
+        return weld.template_profile(k, thickness_mm, v["centre_x_mm"], **params)
