@@ -26,6 +26,10 @@ pg.setConfigOptions(antialias=True, background="w", foreground="k")
 ELEMENT_COLOUR = {"single": COLOR_ELEMENT_ACTIVE, "tx": COLOR_ELEMENT_TX, "rx": COLOR_ELEMENT_ACTIVE}
 RAY_COLOUR = {"single": "#2563eb", "tx": "#1f77b4", "rx": "#d62728"}     # tab:blue / tab:red
 PICK_COLOUR = "#f59e0b"
+WELD_FACE, WELD_EDGE = "#fcd34d", "#92400e"
+FUSION_STYLE = {"fusion-face": ("#92400e", 2.5, "Fusion faces"),
+                "fusion-covered": ("#16a34a", 4, "Fusion face, covered"),
+                "fusion-gap": ("#dc2626", 4, "Fusion face, gap")}
 COVERAGE_COLOUR = {1: "#2563eb", 2: "#7c3aed", 3: "#db2777"}
 COVERAGE_NAME = {1: "Coverage, direct", 2: "Coverage, 1st skip", 3: "Coverage, 2nd skip"}
 
@@ -102,8 +106,20 @@ class ProjectionPlot(pg.PlotWidget):
 
         pts = [p.coords[:, [d, 2]] for p in scene.prims if p.kind != "text"]
         pts += [np.asarray(e)[:, [d, 2]] for e in extra_points_mm if len(e)]
+        named = set()
         for p in coverage:
-            if p.role == "coverage":
+            if p.role == "weld" and d == 0:     # the weld runs along Y: drawn in X-Z only
+                pts.append(p.coords[:, [0, 2]])
+                add(_polygon(p.coords[:, [0, 2]], WELD_FACE, WELD_EDGE, 0.35), 0.8)
+                self.legend.addItem(pg.PlotDataItem(pen=pg.mkPen(WELD_EDGE), fillLevel=0,
+                                                    brush=pg.mkBrush(_rgba(WELD_FACE, 0.5))), "Weld")
+            elif p.role in FUSION_STYLE and d == 0:
+                col, width, name = FUSION_STYLE[p.role]
+                item = add(pg.PlotDataItem(p.coords[:, 0], p.coords[:, 2], pen=pg.mkPen(col, width=width)), 3.5)
+                if name not in named:
+                    named.add(name)
+                    self.legend.addItem(item, name)
+            elif p.role == "coverage":
                 pts.append(p.coords[:, [d, 2]])
                 quads = p.coords[:, [d, 2]].reshape(-1, 4, 2)
                 col = COVERAGE_COLOUR.get(p.meta["leg"], "#64748b")
@@ -341,6 +357,7 @@ class RayTab(PlayMixin, LawTab):
             if self.coverage is not None:
                 cov = coverage_prims(self.coverage)
                 extra += [np.asarray(p) * 1e3 for p in self.coverage.paths]   # frame every skip path
+            cov = cov + self.weld_prims
             for p in (self.xz, self.yz):
                 p.set_setup(scene, self.component_thickness_mm, extra, cov, central=self.coverage is not None)
             self._setup_drawn = True

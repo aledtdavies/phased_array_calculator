@@ -65,6 +65,7 @@ class LawTab(QtWidgets.QWidget):
         self.custom = None
         self.selected_element = None
         self.coverage = None          # coverage.SweepCoverage, or None (off)
+        self.weld_prims = []          # scene_model.weld_prims of the calculation's weld
         self._stale = False
         self._set_skew_visible(False)
 
@@ -146,9 +147,14 @@ class LawTab(QtWidgets.QWidget):
         self.lbl_law.setText("")
         self._blank_view()
 
-    def set_coverage(self, cov):
-        """Show (or, with None, hide) the sweep's coverage and the central ray with its skips."""
+    def set_coverage(self, cov, weld=None):
+        """
+        Show (or, with None, hide) the sweep's coverage and the central ray with its skips, and
+        the weld: (weld.WeldProfile, weld.FusionCoverage or None), or None for no weld.
+        """
+        from scene_model import weld_prims
         self.coverage = cov
+        self.weld_prims = weld_prims(*weld) if weld is not None else []
         self._coverage_changed()
         self.request_redraw()
 

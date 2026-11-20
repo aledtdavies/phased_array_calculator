@@ -1,5 +1,20 @@
 # Changelog
 
+## Step 5b: weld geometry and fusion-face gaps — 2026-11-20
+
+Plan step 5b (approved by the owner on 2026-11-20).
+
+- **`weld.py`:**
+  - Preparation templates: single-V, double-V (separate upper and lower bevels, root face at any depth) and single-J (ISO 9692-1 shape, J on either plate). Cap and root are flush.
+  - DXF cross-sections read with ezdxf: LINE, ARC, LWPOLYLINE (with bulges), POLYLINE, SPLINE, ELLIPSE and CIRCLE, joined into one closed outline. Its datum is the surface or the backwall, and x = 0 is the weld centreline. Units follow `$INSUNITS` or are set by hand. A file with several outlines must name its weld layer. Open, ambiguous or out-of-part outlines are refused with the reason.
+  - Fusion faces are taken from the outline the same way for templates and DXF. They are split into covered runs and gaps by the coverage fans, leg by leg.
+- **Qt window:**
+  - A **Weld** panel (type, centre X, preparation, or DXF file, datum, units and layer), read when the laws are calculated and saved in configurations.
+  - The weld is drawn in X-Z and as a prism in 3D. Fusion faces are green where covered and red at gaps.
+  - The toolbar gives the covered share and the gap length.
+- **Finish criterion met:** template and DXF of one weld agree to 0.01 mm (stated before the test was written).
+- **New dependency:** `ezdxf` (MIT).
+
 ## Step 5a: coverage fans and skips — 2026-11-20
 
 Plan step 5a (approved by the owner on 2026-11-20).

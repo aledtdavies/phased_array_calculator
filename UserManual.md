@@ -223,6 +223,11 @@ In the Qt window the Ray Tracing and Delays tabs are pyqtgraph views:
   - The sweep's central rays sweep out fans, drawn per leg (blue direct, purple 1st skip, pink 2nd skip), one fan per skew.
   - The current law's central ray is drawn dashed, and it follows a dragged focus.
   - Assumption: each reflection keeps the wave mode (no mode conversion), and only central rays are shown, not the beam's spread.
+- **Weld (Setup panel):** None, Single-V, Double-V, Single-J or DXF file, placed at **Weld Centre X** (global X) through the component **Thickness**, which must be set.
+  - Templates: bevel angle from the vertical, root gap and root face. Double-V also takes a lower bevel and the root depth (0 = mid-thickness). Single-J takes the J radius and the plate the J is cut in (near = −X, far = +X). Cap and root are flush.
+  - DXF: the closed outline of the weld region, with x = 0 at the weld centreline and y up. **DXF y = 0 at** says whether y = 0 is the surface (part drawn below) or the backwall (part drawn above). **DXF Units** overrides the file's stated units. Name the **DXF Layer** when the file holds more than one closed outline, for example a plate as well as the weld.
+  - The weld is read when the laws are calculated. It is drawn in X-Z and in 3D.
+  - With Coverage on, each fusion face is green where a fan of the selected legs reaches it and red at gaps, and the toolbar gives the covered share and the gap length. "Covered" means a central-ray fan reaches the face; the incidence angle on the face is not judged.
 - **Select an element:** click an element marker (X-Z or Y-Z), a delay bar, a delay-map cell or an element in the 3D view. It is selected in every tab: orange in the projections and the 3D view, outlined in the delay map, and reported in the 3D readout.
 
 ### Data Table Tab

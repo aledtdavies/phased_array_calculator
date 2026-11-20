@@ -35,6 +35,11 @@ Roles:
   central-ray      polyline, the current law's (or dragged focus's) central ray with its skips;
                    meta legs
   coverage-extent  points, every law's central-ray path: for framing only, never drawn
+  weld             polygon in the X-Z plane, the weld region's outline (weld.py; extruded
+                   along Y by 3D views); meta source
+  fusion-face      polyline, a fusion face when no coverage is shown; meta name
+  fusion-covered   polyline, a run of a fusion face reached by the coverage fans; meta name
+  fusion-gap       polyline, a run of a fusion face no fan reaches; meta name
 """
 from __future__ import annotations
 
@@ -361,4 +366,21 @@ def coverage_prims(cov, path_mm=None):
         prims.append(Prim("polyline", np.asarray(path_mm, dtype=float), "central-ray", {"legs": cov.legs}))
     # Not drawn: every law's path, so views frame all skips (a sweep with no fans included).
     prims.append(Prim("points", np.vstack(cov.paths) * 1000, "coverage-extent", {}))
+    return prims
+
+
+def weld_prims(profile, fusion=None):
+    """
+    Weld primitives (mm) from a weld.WeldProfile: its outline, and its fusion faces, split into
+    covered and gap runs when fusion (a weld.FusionCoverage) is given.
+    """
+    prims = [Prim("polygon", _xz(profile.polygon), "weld", {"source": profile.source})]
+    if fusion is None:
+        for name, face in profile.faces:
+            prims.append(Prim("polyline", _xz(face), "fusion-face", {"name": name}))
+    else:
+        for f in fusion.faces:
+            for run, covered in f.runs():
+                prims.append(Prim("polyline", _xz(run), "fusion-covered" if covered else "fusion-gap",
+                                  {"name": f.name}))
     return prims
