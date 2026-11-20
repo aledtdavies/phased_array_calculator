@@ -126,6 +126,14 @@ def refused_row(refused):
     return ("-", f"{refused.angle_deg:.1f}", skew, fx_t, fy_t, fz_t, "-", "-")
 
 
+def law_result(solver, point, wave_type, angle=None, skew=None):
+    """One law for focus point (m) as a result dict (the fields calculate() gives each law)."""
+    law = solver.calculate_law(point[0], point[1], point[2], wave_type=wave_type)
+    return {'angle': angle, 'skew': skew, 'fx': point[0], 'fy': point[1], 'fz': point[2],
+            'delays_us': law['delays'] * 1e6, 'tof_us': law['tof'] * 1e6,
+            'velocity_used': law['velocity_used'], 'interface_points': law['interface_points']}
+
+
 def calculate(solver, sv, probe_type) -> Calculation:
     """Every law of the scan, in sweep order, with its table row."""
     wave_type = sv["wave_type"]
@@ -134,12 +142,8 @@ def calculate(solver, sv, probe_type) -> Calculation:
         if not isinstance(t, Target):
             rows.append((refused_row(t), None))
             continue
-        law = solver.calculate_law(t.x, t.y, t.z, wave_type=wave_type)
-        delays_us = law['delays'] * 1e6
-        results.append({'angle': t.angle_deg, 'skew': t.skew_deg, 'fx': t.x, 'fy': t.y, 'fz': t.z,
-                        'delays_us': delays_us, 'tof_us': law['tof'] * 1e6,
-                        'velocity_used': law['velocity_used'],
-                        'interface_points': law['interface_points']})
+        results.append(law_result(solver, t.point, wave_type, t.angle_deg, t.skew_deg))
+        delays_us = results[-1]['delays_us']
         idx = len(results) - 1
         focal_points.append(t.point)
         # Inactive elements are NaN

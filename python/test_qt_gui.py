@@ -189,13 +189,15 @@ class TestQtWindow(QtCase):
         w.tree.selectRow(2)        # third Y target: shares its angle and skew with laws 1-2
         for tab in self.tabs():
             self.assertEqual(tab.current_idx, 2)
-        w.scene3d_tab.step_law(1)
-        self.assertEqual(w.scene3d_tab.current_idx, 3)
+        w.scene3d_tab.step_law(1)                      # navigation is shared by every tab
+        for tab in self.tabs():
+            self.assertEqual(tab.current_idx, 3)
         w.plot_tab.toggle_play()
         for _ in range(4):
             w.plot_tab.animate()
         w.plot_tab.toggle_play()
-        self.assertEqual(w.plot_tab.current_idx, (2 + 4) % len(w.last_results))   # wraps
+        for tab in self.tabs():
+            self.assertEqual(tab.current_idx, (3 + 4) % len(w.last_results))   # wraps
         self.assertEqual(self.errors(), [])
 
     def test_shorter_sparse_sweep_after_a_late_law(self):
@@ -233,8 +235,12 @@ class TestQtWindow(QtCase):
             tab.step_law(1)
             if hasattr(tab, "plotter"):
                 self.assertEqual(list(tab.plotter.renderer.actors), [])
+            elif hasattr(tab, "xz"):
+                for plot in (tab.xz, tab.yz):
+                    self.assertEqual(plot.setup_items, [])
+                    self.assertTrue(all(len(it.getData()[0] or []) == 0 for it in plot.env_items.values()))
             else:
-                self.assertFalse(any(ax.has_data() for ax in tab.figure.axes))
+                self.assertEqual(tab.items, {})
 
     def test_exports(self):
         w = self.win
