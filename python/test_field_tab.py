@@ -163,6 +163,21 @@ class TestFieldTab(QtCase):
                 self.assertIs(ft.job, old)
                 self.assertIn("Calculate Laws", ft.status.text())
 
+    def test_setup_edits_while_computing_leave_the_result_stale(self):
+        """Review of PR #30: a field finishing after a setup edit was marked fresh."""
+        from qt_field import run_job
+        self.setup_linear()
+        ft = self.win.field_tab
+        ft.compute(sync=True)                             # a fresh field in 3D first
+        self.assertIsNotNone(self.field3d[-1])
+        job = run_job(ft.make_job())                      # a computation that started ...
+        self.win.wedge_panel.set_values({"height_mm": 7})  # ... then the setup changed ...
+        ft._done(job)                                     # ... and it finished
+        self.assertFalse(ft.job["fresh"])
+        self.assertIn("Stale", ft.status.text())
+        self.assertIsNone(self.field3d[-1])
+        self.assertIsNone(self.win.scene3d_tab.field_slices)
+
     def test_no_laws_no_field(self):
         self.win.field_tab.compute(sync=True)
         self.assertIn("calculate laws first", self.win.field_tab.status.text())

@@ -140,6 +140,7 @@ class FieldTab(QtWidgets.QWidget):
 
         self.context = None          # the law the window shows: see set_context
         self.setup_dirty = False     # a setup panel edited since the laws were calculated
+        self.setup_rev = 0           # counts setup edits; a job records the count it started at
         self.job = None              # the computed (or running) field
         self.worker = None
         self.compute_btn.clicked.connect(lambda: self.compute())
@@ -200,6 +201,7 @@ class FieldTab(QtWidgets.QWidget):
         """A setup panel (probe, wedge, component, aperture) changed: the laws shown no longer
         match it, so the field goes stale and cannot be computed until the laws are recalculated."""
         self.setup_dirty = True
+        self.setup_rev += 1
         self._stale("the setup changed")
 
     def _stale(self, why):
@@ -246,7 +248,8 @@ class FieldTab(QtWidgets.QWidget):
         return dict(solver=solver, delays=delays, width=v["element_width_mm"] * 1e-3,
                     elevation=v["elevation_mm"] * 1e-3, dim=dim, f0=solver.probe.frequency,
                     cycles=v["cycles"], pulsed=v["pulsed"], mode=mode, wedge=wedge, part=part,
-                    sections=sections, step_mm=used * 1e3, context=c, values=v)
+                    sections=sections, step_mm=used * 1e3, context=c, values=v,
+                    setup_rev=self.setup_rev)
 
     def compute(self, sync=False):
         """Start the field for the current law (in a worker thread unless sync)."""
@@ -282,7 +285,9 @@ class FieldTab(QtWidgets.QWidget):
     def _done(self, job):
         self.compute_btn.setEnabled(True)
         self.bar.setVisible(False)
-        job["fresh"] = job["context"] is self.context and job["values"] == self.get_values()
+        # fresh only if nothing it depends on changed while it ran: law, field inputs, setup
+        job["fresh"] = (job["context"] is self.context and job["values"] == self.get_values()
+                        and job["setup_rev"] == self.setup_rev and not self.setup_dirty)
         self.job = job
         self.draw()
         v = job["values"]
@@ -292,7 +297,7 @@ class FieldTab(QtWidgets.QWidget):
         if m is not None:
             text += f"; beam axis {m.angle_deg:.1f}° from vertical"
         if not job["fresh"]:
-            text = "Stale (the law or inputs changed while computing): " + text
+            text = "Stale (the law, setup or inputs changed while computing): " + text
         self.status.setText(text)
         self._emit()
 
