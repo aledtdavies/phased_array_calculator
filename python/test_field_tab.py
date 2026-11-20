@@ -224,6 +224,18 @@ class TestFieldTab(QtCase):
         self.qapp.processEvents()
         self.assertEqual(actors(), [])
 
+    def test_an_unchanged_context_keeps_a_running_field_fresh(self):
+        """Review of PR #30: re-selecting the same law during a computation made it stale."""
+        from qt_field import run_job
+        self.setup_linear()
+        ft = self.win.field_tab
+        job = run_job(ft.make_job())
+        self.win.update_field_context()                   # the same law again
+        self.win.update_field_context()
+        ft._done(job)
+        self.assertTrue(ft.job["fresh"], ft.status.text())
+        self.assertIsNotNone(self.field3d[-1])
+
     def test_no_laws_no_field(self):
         self.win.field_tab.compute(sync=True)
         self.assertIn("calculate laws first", self.win.field_tab.status.text())

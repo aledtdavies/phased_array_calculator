@@ -193,9 +193,10 @@ class FieldTab(QtWidgets.QWidget):
                 and np.array_equal(np.nan_to_num(result["delays_us"]),
                                    np.nan_to_num(self.context["result"]["delays_us"]))
                 and thickness_mm == self.context["thickness_mm"])
+        if same:
+            return          # unchanged: keep the context object a running job is checked against
         self.context = new
-        if not same:
-            self._stale("the law changed" if new else "no law")
+        self._stale("the law changed" if new else "no law")
 
     def setup_edited(self):
         """A setup panel (probe, wedge, component, aperture) changed: the laws shown no longer

@@ -54,6 +54,7 @@ SPECTRUM_FLOOR = 1e-2   # band edges: where the pulse spectrum falls below this 
 # ---------------------------------------------------------------------------------------------
 # Element directivity: copied from arim (MIT licence, (c) 2016-2025 arim contributors),
 # src/arim/model.py, functions _f0 and directivity_2d_rectangular_on_solid_l, commit 0cee9de.
+# arim's copyright and MIT permission notice: THIRD_PARTY_NOTICES.md at the repository root.
 # References: Miller G F and Pursey H 1954, Proc R Soc A 223, 521-541, eqs (74), (93);
 # Drinkwater B W and Wilcox P D 2006, NDT&E Int 39, 525-541.
 # ---------------------------------------------------------------------------------------------
