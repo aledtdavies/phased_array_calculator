@@ -536,6 +536,124 @@ class Coverage(_WindowCase):
 
 
 @unittest.skipUnless(HAVE_QT, "PySide6/pyqtgraph/pyvistaqt not installed, or no display")
+class Weld(_WindowCase):
+    """Plan step 5b: the weld drawn in X-Z and 3D, fusion faces split into covered runs and gaps."""
+    SCAN = {"wave_type": "Shear", "focus_mode": "Constant Sound Path", "param_val": 40,
+            "start_angle": 40, "end_angle": 70, "step_angle": 2}
+    WELD = {"type": "Single-V", "centre_x_mm": 45, "bevel_deg": 30, "root_gap_mm": 2, "root_face_mm": 1.5}
+
+    def setUp(self):
+        super().setUp()
+        self.warnings = []
+        self.win.warn = lambda *a: self.warnings.append(a)
+        self.win.mat_panel.set_values({"thickness_mm": 25})
+
+    def roles(self, plot):
+        """The legend names the 2D plot shows."""
+        return [label.text for _, label in plot.legend.items]
+
+    def test_no_weld_by_default(self):
+        w = self.calc(LINEAR, scan=self.SCAN)
+        self.assertEqual(w.plot_tab.weld_prims, [])
+        self.assertNotIn("Weld", self.roles(w.plot_tab.xz))
+        self.assertEqual(w.weld_note.text(), "")
+        self.assertNotIn("weld", w.config_dict())
+
+    def test_template_weld_faces_and_gaps(self):
+        from weld import template_profile
+        w = self.win
+        w.weld_panel.set_values(self.WELD)
+        self.calc(LINEAR, scan=self.SCAN)
+        tab = w.plot_tab
+        roles = [p.role for p in tab.weld_prims]
+        self.assertEqual(roles.count("weld"), 1)
+        self.assertEqual(roles.count("fusion-face"), 2)          # no coverage yet: plain faces
+        self.assertIn("Weld", self.roles(tab.xz))
+        self.assertNotIn("Weld", self.roles(tab.yz))            # the weld runs along Y: X-Z only
+        self.assertIn("turn Coverage on", w.weld_note.text())
+        want = template_profile("single-V", 25, 45, bevel_deg=30, root_gap_mm=2, root_face_mm=1.5)
+        np.testing.assert_allclose(w.calc_weld.polygon, want.polygon)
+        w.coverage_combo.setCurrentIndex(1)                     # direct only
+        direct = w.fusion.covered_mm()
+        roles = {p.role for p in tab.weld_prims}
+        self.assertTrue({"fusion-covered", "fusion-gap"} <= roles, roles)
+        self.assertIn("% covered", w.weld_note.text())
+        self.assertIn("Fusion face, gap", self.roles(tab.xz))
+        w.coverage_combo.setCurrentIndex(2)                     # + 1st skip reaches more
+        self.assertGreater(w.fusion.covered_mm(), direct)
+        # the runs drawn are the coverage's runs, end to end along each face
+        for f in w.fusion.faces:
+            runs = [p for p in tab.weld_prims if p.role.startswith("fusion-") and p.meta["name"] == f.name]
+            self.assertEqual(len(runs), len(f.runs()))
+        w.scene3d_tab.refresh_plot()
+        actors = w.scene3d_tab.plotter.renderer.actors
+        for name in ("setup:weld", "setup:fusion-covered", "setup:fusion-gap"):
+            self.assertIn(name, actors)
+
+    def test_the_drawn_weld_is_the_calculations(self):
+        w = self.win
+        w.weld_panel.set_values(self.WELD)
+        self.calc(LINEAR, scan=self.SCAN)
+        before = w.calc_weld.polygon.copy()
+        w.weld_panel.set_values({"bevel_deg": 45})              # edited, not recalculated
+        w.coverage_combo.setCurrentIndex(2)
+        np.testing.assert_allclose(w.calc_weld.polygon, before)
+        self.calc(LINEAR, scan=self.SCAN)
+        self.assertGreater(np.ptp(w.calc_weld.polygon[:, 0]), np.ptp(before[:, 0]))
+
+    def test_refused_weld_warns_and_draws_nothing(self):
+        w = self.win
+        w.weld_panel.set_values(dict(self.WELD, root_face_mm=30))
+        self.calc(LINEAR, scan=self.SCAN)
+        self.assertIsNone(w.calc_weld)
+        self.assertEqual(w.plot_tab.weld_prims, [])
+        self.assertIn("Weld not drawn", w.weld_note.text())
+        self.assertEqual(len(self.warnings), 1)
+        w.mat_panel.set_values({"thickness_mm": 0})
+        w.weld_panel.set_values(self.WELD)
+        self.calc(LINEAR, scan=self.SCAN)
+        self.assertIn("Thickness", w.weld_note.text())
+
+    def test_dxf_weld_matches_the_template(self):
+        import tempfile
+        import ezdxf
+        from weld import template_outline
+        w = self.win
+        w.weld_panel.set_values(self.WELD)
+        self.calc(LINEAR, scan=self.SCAN)
+        w.coverage_combo.setCurrentIndex(2)
+        template = w.fusion.covered_mm()
+        pts = template_outline("single-V", 25, bevel_deg=30, root_gap_mm=2, root_face_mm=1.5)
+        doc = ezdxf.new()
+        doc.modelspace().add_lwpolyline([(x, -z) for x, z in pts], close=True)
+        path = os.path.join(tempfile.mkdtemp(), "weld.dxf")
+        doc.saveas(path)
+        w.weld_panel.set_values({"type": "DXF file", "dxf_path": path, "dxf_datum": "surface"})
+        self.calc(LINEAR, scan=self.SCAN)
+        # ezdxf stamps a new file as metres: read so, the outline is 1000x too deep and refused
+        self.assertIsNone(w.calc_weld)
+        self.assertIn("set them if the file's are wrong", w.weld_note.text())
+        w.weld_panel.set_values({"dxf_units": "mm"})
+        self.calc(LINEAR, scan=self.SCAN)
+        self.assertTrue(w.calc_weld.source.startswith("DXF weld.dxf"))
+        self.assertAlmostEqual(w.fusion.covered_mm(), template, delta=0.1)
+
+    def test_configuration_round_trip(self):
+        w = self.win
+        w.weld_panel.set_values(dict(self.WELD, type="Single-J", j_side="far", root_radius_mm=5))
+        config = w.config_dict()
+        self.assertEqual(config["weld"]["type"], "Single-J")
+        import qt_app
+        w2 = qt_app.MainWindow()
+        try:
+            w2.apply_config(config)
+            self.assertEqual(w2.weld_panel.get_values(), config["weld"])
+        finally:
+            w2.close()
+            w2.deleteLater()
+
+
+@unittest.skipUnless(HAVE_QT, "PySide6/pyqtgraph/pyvistaqt not installed, or no display")
 class ShownWindow(unittest.TestCase):
     """The window shown and painted: what a hidden window cannot catch (paint-time errors)."""
 
