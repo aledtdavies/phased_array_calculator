@@ -212,6 +212,9 @@ class TestSynthesis(unittest.TestCase):
             beam_field(src, [[0.0, 0.0, 0.0]], REXOLITE, STEEL, "shear", self.f0, 3)
         with self.assertRaises(ValueError):
             beam_field(src, [[0.0, 0.0, 0.01]], REXOLITE, STEEL, "shear", self.f0, None)
+        for bad in (0.5, 1, 2.5):           # review of PR #30: short and fractional bursts
+            with self.assertRaises(ValueError):
+                beam_field(src, [[0.0, 0.0, 0.01]], REXOLITE, STEEL, "shear", self.f0, bad)
         with self.assertRaises(ValueError):
             Solid(1000.0, 2000.0, 1500.0)
         p = create_probe_assembly("Matrix", 8, 1e-3, 2.25e6, num_elements_y=4, pitch_y=1.2e-3)
@@ -256,6 +259,27 @@ class TestSourcesOnTheSurface(unittest.TestCase):
         law = s.calculate_law(0.02, 0.0, 0.02, "shear")
         with self.assertRaises(ValueError):
             element_sources(s, law["delays"], 0.5e-3, dim=2)
+
+
+class TestShortestPulse(unittest.TestCase):
+    def test_two_cycles_are_independent_of_the_window(self):
+        a = _single([0.0, 0.0, -0.01])
+        zero = _single([0.0, 0.0, -0.01], delay=20e-6, weight=0.0)
+        pt = [[0.005, 0.0, 0.02]]
+        one = beam_field(a, pt, REXOLITE, STEEL, "shear", 2.25e6, 2).amplitude
+        padded = beam_field(_merge(a, zero), pt, REXOLITE, STEEL, "shear", 2.25e6, 2).amplitude
+        np.testing.assert_allclose(padded, one, rtol=1e-3)
+
+
+class TestRoofedElementEdges(unittest.TestCase):
+    def test_an_element_reaching_the_surface_is_refused(self):
+        """Review of PR #30: only element centres were checked against the interface."""
+        p = create_probe_assembly("Linear", 1, 1e-3, 2.25e6)
+        s = DelayLaw(p, Wedge(0.0, 0.5e-3, 2337.0, 0.0, roof_angle_degrees=10.0), Material(5900.0, 3230.0))
+        d = s.calculate_law(0.02, 0.0, 0.02, "longitudinal")["delays"]
+        with self.assertRaises(ValueError):
+            element_sources(s, d, 0.5e-3, elevation=10e-3, dim=3)
+        element_sources(s, d, 0.5e-3, elevation=2e-3, dim=3)     # a short element stays above
 
 
 class TestSpectrum(unittest.TestCase):

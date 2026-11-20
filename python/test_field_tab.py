@@ -115,7 +115,7 @@ class TestFieldTab(QtCase):
 
     def test_inputs_travel_with_the_configuration(self):
         ft = self.win.field_tab
-        vals = {"model": "3D", "pulsed": False, "cycles": 4.5, "grid_mm": 0.8, "element_width_mm": 0.55,
+        vals = {"model": "3D", "pulsed": False, "cycles": 4.0, "grid_mm": 0.8, "element_width_mm": 0.55,
                 "elevation_mm": 12.0, "wedge_shear_ms": 1157.0, "wedge_density": 1049.0,
                 "component_density": 7900.0}
         ft.set_values(vals)

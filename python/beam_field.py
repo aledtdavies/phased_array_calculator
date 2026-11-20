@@ -239,9 +239,6 @@ def element_sources(solver, delays, element_width, elevation=None, dim=2, f_max=
     active = np.asarray([i for i in active if np.isfinite(delays[i])], dtype=int)
     if active.size == 0:
         raise ValueError("no active element with a delay")
-    if np.any(elements[active, 2] >= -1e-9):
-        raise ValueError("the elements must lie above the interface (wedge height > 0): a source on "
-                         "the surface is not modelled")
     if not element_width > 0:
         raise ValueError("the element width must be positive")
     signs = wedge.roof_signs(probe)
@@ -255,6 +252,13 @@ def element_sources(solver, delays, element_width, elevation=None, dim=2, f_max=
         ax_w, ax_e, n = axis([1, 0, 0], s), axis([0, 1, 0], s), axis([0, 0, 1], s)
         if n[2] < 0:
             n = -n
+        # the whole element (its corners, not only its centre) must lie above the interface
+        half_e = (elevation or 0.0) / 2 if dim == 3 else 0.0
+        corners = [elements[i] + a * element_width / 2 * ax_w + b * half_e * ax_e
+                   for a in (-1, 1) for b in (-1, 1)]
+        if max(c[2] for c in corners) >= -1e-9:
+            raise ValueError("the elements must lie wholly above the interface (wedge height > 0): "
+                             "a source on or below the surface is not modelled")
         if dim == 2:
             if abs(elements[i, 1]) > 1e-9 or abs(n[1]) > 1e-9 or abs(ax_w[1]) > 1e-9:
                 raise ValueError("2D field needs a single linear array in the X-Z plane (no Y offset or roof)")
@@ -405,8 +409,10 @@ def beam_field(src: Sources, points, wedge: Solid, part: Solid, mode="shear", f0
         raise ValueError("field points must lie in the component (Z > 0)")
     if not (f0 and f0 > 0):
         raise ValueError("the centre frequency must be positive")
-    if pulsed and not (cycles and cycles > 0):
-        raise ValueError("a pulsed field needs the number of cycles")
+    if pulsed and not (cycles and cycles >= 2 and float(cycles).is_integer()):
+        # whole cycles have no DC part and a compact band (below 4 f0 at the -40 dB cut), which
+        # the synthesis window relies on; shorter or fractional bursts are not supported
+        raise ValueError("a pulsed field needs a whole number of cycles, at least 2")
     if pulsed:
         fb = np.linspace(0, 4 * f0, 4097)[1:]
         Sb = np.abs(hann_toneburst_spectrum(fb, f0, cycles))
