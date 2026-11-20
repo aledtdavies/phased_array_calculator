@@ -30,6 +30,11 @@ Roles:
   interface-point-all  points where every active element's ray of the current law crosses
                    the interface (for framing views); meta law
   focus-sweep      points, the focus of every law; meta law (array of indices)
+  coverage         quads (4 corners each) of the sweep's coverage fan for one leg (see
+                   coverage.py); meta leg (1 = direct, 2 = first skip, ...)
+  central-ray      polyline, the current law's (or dragged focus's) central ray with its skips;
+                   meta legs
+  coverage-extent  points, every law's central-ray path: for framing only, never drawn
 """
 from __future__ import annotations
 
@@ -341,3 +346,19 @@ def build_scene(solver, get_law: Callable, indices: Sequence[int], *,
         fp = np.asarray(sweep_focal_mm, dtype=float)
         prims.append(Prim("points", fp, "focus-sweep", {"law": np.arange(len(fp))}))
     return Scene(prims, contact)
+
+
+def coverage_prims(cov, path_mm=None):
+    """
+    Coverage primitives from a coverage.SweepCoverage (metres) in mm: one 'coverage' prim per
+    leg holding that leg's fan quads, and, given path_mm (legs + 1, 3), the 'central-ray'.
+    """
+    prims = []
+    for leg, quads in sorted(cov.fans.items()):
+        if quads:
+            prims.append(Prim("quads", np.vstack(quads) * 1000, "coverage", {"leg": leg}))
+    if path_mm is not None:
+        prims.append(Prim("polyline", np.asarray(path_mm, dtype=float), "central-ray", {"legs": cov.legs}))
+    # Not drawn: every law's path, so views frame all skips (a sweep with no fans included).
+    prims.append(Prim("points", np.vstack(cov.paths) * 1000, "coverage-extent", {}))
+    return prims

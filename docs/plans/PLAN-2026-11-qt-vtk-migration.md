@@ -139,7 +139,7 @@ The renderer (`add_scene` in the prototype) draws from the scene model:
 
 ### 4. Live 2D on pyqtgraph
 
-**Status: built 2026-11-20** (`qt_views2d.py`). The performance criterion is for the owner to accept, against these measurements (`tests/benchmarks/redraw_timing.py`, dev laptop, 64-element linear and 16 × 4 dual matrix, two runs):
+**Status: done 2026-11-20** (`qt_views2d.py`). **Owner decision (2026-11-20):** the criterion is every steady-state redraw ≤ 50 ms, one-off first redraws excluded (PR #27). The measurements it was accepted against, against these measurements (`tests/benchmarks/redraw_timing.py`, dev laptop, 64-element linear and 16 × 4 dual matrix, two runs):
 
 | | Ray Tracing | Delays | 3D View |
 |---|---|---|---|
@@ -147,7 +147,7 @@ The renderer (`add_scene` in the prototype) draws from the scene model:
 | Steady-state maximum | 21 / 35–50 ms | 21 / 32–35 ms | 40 / 39–40 ms |
 | First redraw after the tab is first shown (one-off cache warm-up) | 18–20 / 33 ms | 19 / 49–67 ms | 25–26 / 25–26 ms |
 
-Values are linear / dual matrix. Every steady-state maximum is at most 50 ms (one run at 49.5 ms). The first redraw of the dual-matrix Delays maps exceeds 50 ms once. Accepting the criterion as "every steady-state redraw ≤ 50 ms; one-off first redraws excluded" is the owner's call.
+Values are linear / dual matrix. Every steady-state maximum is at most 50 ms (one run at 49.5 ms). The first redraw of the dual-matrix Delays maps exceeds 50 ms once.
 
 The views stay in step, tested through shared navigation and a single Play, linked selection, the dragged focus and item reuse.
 
@@ -166,7 +166,7 @@ scaneval was checked for pyqtgraph parts (FBK-0019): its linked views are still 
 
 ### 5. New content: coverage, skips, part and weld geometry (new physics; approval needed)
 
-**5a. Coverage and skips.**
+**5a. Coverage and skips.** **Status: done 2026-11-20** (`coverage.py`; Coverage selector in the Qt window). Steps 5–7 approved by the owner on 2026-11-20.
 - Draw coverage fans for the sweep's central rays, plus skip legs off a flat backwall.
 - Specular reflection, no mode conversion at first (ASSUMPTION, shown on the view). Mode-converted legs come later.
 

@@ -134,15 +134,32 @@ def law_result(solver, point, wave_type, angle=None, skew=None):
             'velocity_used': law['velocity_used'], 'interface_points': law['interface_points']}
 
 
+def fan_key(t, focus_mode, y_mode):
+    """
+    Which coverage fan a law belongs to (laws of one fan differ only in refracted angle):
+    a normal or fixed-Y sweep, by skew; a constant-depth or vertical-line Y sweep, by skew and
+    Y target; a sound-path Y sweep (skew solved per Y), by Y target.
+    """
+    if y_mode == "sweep" and focus_mode == "sound-path":
+        return ("y", round(t.y, 12))
+    if y_mode == "sweep":
+        return ("skew-y", round(t.skew_deg, 9), round(t.y, 12))
+    return ("skew", round(t.skew_deg, 9))
+
+
 def calculate(solver, sv, probe_type) -> Calculation:
     """Every law of the scan, in sweep order, with its table row."""
     wave_type = sv["wave_type"]
+    focus_mode = FOCUS_MODE_NAMES[sv["focus_mode"]]
+    y_mode = (Y_MODE_NAMES[sv.get("y_focus_mode", Y_MODE_DERIVED_FROM_SKEW)]
+              if probe_type in MATRIX_PROBE_TYPES else "from-skew")
     results, rows, focal_points = [], [], []
     for t in scan_targets(solver, sv, probe_type):
         if not isinstance(t, Target):
             rows.append((refused_row(t), None))
             continue
         results.append(law_result(solver, t.point, wave_type, t.angle_deg, t.skew_deg))
+        results[-1]['fan'] = fan_key(t, focus_mode, y_mode)
         delays_us = results[-1]['delays_us']
         idx = len(results) - 1
         focal_points.append(t.point)
