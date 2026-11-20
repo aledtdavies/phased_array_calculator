@@ -1,5 +1,22 @@
 # Changelog
 
+## Step 6: beam field view — 2026-11-20
+
+Plan step 6 (approved by the owner on 2026-11-20).
+
+- **Survey first:** no suite component holds an analytic beam model (buildFE solves FE fields; imageFE builds travel-time tables; nde-knowledge none), so the calculator has its own.
+- **`beam_field.py`:** ray model of a law's beam in the component.
+  - Element directivity: Miller–Pursey normal strip load on the wedge (copied from arim, MIT, with attribution).
+  - Fermat entry point for every element–point pair at once (bisection, then Newton).
+  - Plane-wave displacement coefficients of a welded solid–solid interface (4 × 4 boundary conditions), tabulated against slowness.
+  - Geometric spreading through the interface, 2D (line sources) and 3D (point sources).
+  - Pulsed (Hann burst, broadband sum, envelope peak) or continuous wave; displacement summed as a vector.
+- **`beam_metrics.py`:** buildFE's beam-axis and width rule (`make_field_figures.m`), ported so both maps are measured alike. On the FE frames it reproduces buildFE's `beam_metrics.csv` (angle 45.27°, widths to 0.01 mm).
+- **Finish criterion met:** against buildFE Task 125's FE solve (2.25L64-A2 on SA2-N55S, 64 elements, 45° shear steer, 2D, bonded), with tolerances committed before the comparison ran (fb37a6a): axis angle −0.37° (≤ 1°), exit point +0.01 mm (≤ 2 mm), −6 dB widths within 0.6 % (≤ 10 %), axis levels within 0.44 dB (≤ 1.5 dB). `validation/beam_field/compare_buildfe.py`; image `docs/plans/images/step6_beam_vs_buildfe.png`.
+- **Qt window:** a **Beam Field** tab (2D or 3D model, pulsed or CW, inputs filled from the catalogue, computed in a worker thread) and the sections in the 3D view.
+- **Not modelled (stated in the tab):** reflections, mode conversion, attenuation, fluid couplant. The 3D mode is not separately validated.
+- **Catalogue:** the wedge's material density is now read (`WedgeAsset.density`).
+
 ## Step 5b: weld geometry and fusion-face gaps — 2026-11-20
 
 Plan step 5b (approved by the owner on 2026-11-20).

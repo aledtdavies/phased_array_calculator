@@ -187,6 +187,17 @@ scaneval was checked for pyqtgraph parts (FBK-0019): its linked views are still 
 
 ### 6. Beam field view (optional; approval needed)
 
+**Status: done 2026-11-20** (`beam_field.py`, `beam_metrics.py`, `qt_field.py`; `validation/beam_field/`). The finish criterion is met: every metric is within the tolerance below, which was committed (fb37a6a) before the comparison was run.
+
+| Metric | buildFE FE | Calculator | Difference | Tolerance |
+|---|---|---|---|---|
+| Axis angle (deg) | 45.27 | 44.90 | −0.37 | ≤ 1.0 |
+| Exit X (mm, plate frame) | 44.59 | 44.59 | +0.01 | ≤ 2.0 |
+| −6 dB width at Z 10 / 20 / 30 / 40 mm | 37.89 / 37.67 / 37.45 / 37.02 | 37.91 / 37.69 / 37.26 / 37.04 | +0.07 / +0.07 / −0.52 / +0.06 % | ≤ 10 % |
+| Axis level at Z 10 / 20 / 30 / 40 mm (dB) | −0.49 / −0.61 / −0.55 / −0.40 | −0.46 / −0.23 / −0.10 / −0.04 | +0.03 / +0.38 / +0.44 / +0.36 | ≤ 1.5 |
+
+What this case does and does not test: a steered, unfocused 64-element beam checks the geometry, delays, refraction and the beam's width and direction closely. It checks the amplitude physics (directivity, transmission across angles) only weakly, because those vary slowly across a 45° beam. Beyond −12 dB on the beam's far side the maps differ. The model shows a broad −15 to −25 dB skirt; the FE map blanks most of that region (its first-arrival gate removes up-going arrivals) and also holds head and surface waves the model does not. Not checked: focused laws, longitudinal mode, 3D mode.
+
 - Check first whether buildFE, imageFE or nde-knowledge already provide a validated field or beam model. If one exists, call it; never re-implement it here.
 - Show the field over the X-Z section and on 3D slices.
 

@@ -197,6 +197,7 @@ class WedgeAsset:
     probe_offset_x: Optional[float]       # m, element 1 x in the wedge frame
     shear_velocity: Optional[float] = None
     material: Optional[str] = None
+    density: Optional[float] = None       # kg/m^3, wedge material
     outline: Optional[list] = None        # [(x, y), ...] wedge frame, m, anticlockwise
     nominal_angle_deg: Optional[float] = None
     nominal_mode: Optional[str] = None
@@ -403,6 +404,7 @@ class Catalog:
                           velocity=mat.get("longitudinalSpeed"),
                           probe_offset_x=geom["first_element"][0],
                           shear_velocity=mat.get("shearSpeed"), material=mat.get("name"),
+                          density=mat.get("density"),
                           outline=geom["vertices"],
                           nominal_angle_deg=nominal.get("refractedAngleDeg"),
                           nominal_mode=nominal.get("mode"), sources=status, notes=notes,
