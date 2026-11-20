@@ -157,7 +157,9 @@ class TestFieldTab(QtCase):
                  lambda w: w.mat_panel.set_values({"vel_shear_ms": 3100}),
                  lambda w: w.probe_panel.set_values({"pitch_mm": 0.7}),
                  lambda w: w.wedge_panel.set_values({"height_mm": 7}),
-                 lambda w: w.sub_aperture_panel.set_values({"start_element": 3})]
+                 lambda w: w.sub_aperture_panel.set_values({"start_element": 3}),
+                 lambda w: w.scan_panel.set_values({"wave_type": "Longitudinal"}),
+                 lambda w: w.scan_panel.set_values({"param_val": 24})]
         self.setup_linear()
         ft = self.win.field_tab
         for k, change in enumerate(edits):
