@@ -283,6 +283,34 @@ def hann_toneburst_spectrum(f, f0, cycles):
 
 
 # ---------------------------------------------------------------------------------------------
+# Field sections (grids for the views)
+# ---------------------------------------------------------------------------------------------
+def section_grid(lo, hi, step, max_points):
+    """Two 1D grids spanning lo..hi (each a 2-tuple, m) at step (m), coarsened (and the step
+    returned) so their product stays within max_points."""
+    n = [max(2, int(math.floor((h - l) / step)) + 1) for l, h in zip(lo, hi)]
+    while n[0] * n[1] > max_points:
+        step *= 1.25
+        n = [max(2, int(math.floor((h - l) / step)) + 1) for l, h in zip(lo, hi)]
+    return [l + np.arange(k) * step for l, k in zip(lo, n)], step
+
+
+def field_region(result, thickness_m, active_x):
+    """
+    X and Z extents (m) of the X-Z section for a law: the active interface points and the
+    focus, with 20 mm beyond them on both sides (so a beam steered either way keeps its focus
+    and focal region); from the surface to the component thickness, or 1.3 x the focus depth
+    when no thickness is set.
+    """
+    ip = np.asarray(result["interface_points"])[active_x]
+    fx, fz = result["fx"], result["fz"]
+    x_lo = min(fx, float(np.min(ip[:, 0]))) - 0.020
+    x_hi = max(fx, float(np.max(ip[:, 0]))) + 0.020
+    z_hi = thickness_m if thickness_m > 0 else max(1.3 * fz, 0.010)
+    return (x_lo, x_hi), (0.0, z_hi)
+
+
+# ---------------------------------------------------------------------------------------------
 # The field
 # ---------------------------------------------------------------------------------------------
 @dataclass

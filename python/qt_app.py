@@ -86,6 +86,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self.field_tab = FieldTab()
         self.tabs.addTab(self.field_tab, "Beam Field")
         self.field_tab.field_changed.connect(self.scene3d_tab.set_field)
+        # Edits to the setup the laws were solved for make a computed field stale.
+        for panel in (self.probe_panel, self.wedge_panel, self.mat_panel, self.sub_aperture_panel):
+            for w in panel.findChildren(QtWidgets.QLineEdit):
+                w.textChanged.connect(lambda *_: self.field_tab.setup_edited())
+            for w in panel.findChildren(QtWidgets.QComboBox):
+                w.currentIndexChanged.connect(lambda *_: self.field_tab.setup_edited())
+            for w in panel.findChildren(QtWidgets.QAbstractButton):
+                w.toggled.connect(lambda *_: self.field_tab.setup_edited())
         self.setCentralWidget(self.tabs)
         self.statusBar().showMessage("Ready.")
 
@@ -311,6 +319,7 @@ class MainWindow(QtWidgets.QMainWindow):
                                       global_max_delay=calc.global_max_delay, results=calc.results,
                                       is_matrix=calc.is_matrix)
             self.update_coverage()
+            self.field_tab.setup_dirty = False       # the laws now match the setup
             self.update_field_context()
             if weld_error:
                 self.weld_note.setText(f"Weld not drawn: {weld_error}")
