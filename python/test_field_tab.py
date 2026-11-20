@@ -200,6 +200,30 @@ class TestFieldTab(QtCase):
         self.assertGreaterEqual(z.size, 2)
         self.assertTrue(np.all((z > 0) & (z <= 0.005 + 1e-15)), z)
 
+    def test_the_hidden_3d_tab_shows_and_drops_the_field_when_shown(self):
+        """Review of PR #30: field slices sent while the 3D tab was hidden never reached its scene."""
+        w = self.win
+        self.setup_linear()
+        w.show()
+        w.tabs.setCurrentWidget(w.scene3d_tab)
+        self.qapp.processEvents()
+        actors = lambda: [k for k in w.scene3d_tab.plotter.renderer.actors if str(k).startswith("beam-field")]
+        self.assertEqual(actors(), [])
+        w.tabs.setCurrentWidget(w.field_tab)
+        self.qapp.processEvents()
+        w.field_tab.compute(sync=True)
+        self.qapp.processEvents()
+        w.tabs.setCurrentWidget(w.scene3d_tab)
+        self.qapp.processEvents()
+        self.assertEqual(actors(), ["beam-field-0"])
+        w.tabs.setCurrentWidget(w.field_tab)
+        self.qapp.processEvents()
+        w.field_tab.set_values({"cycles": 5})            # stale: taken out of 3D
+        self.qapp.processEvents()
+        w.tabs.setCurrentWidget(w.scene3d_tab)
+        self.qapp.processEvents()
+        self.assertEqual(actors(), [])
+
     def test_no_laws_no_field(self):
         self.win.field_tab.compute(sync=True)
         self.assertIn("calculate laws first", self.win.field_tab.status.text())
