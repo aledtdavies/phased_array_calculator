@@ -77,20 +77,21 @@ def sweep_paths(solver, foci, thickness, legs, wave="longitudinal"):
 def fans(results, paths):
     """
     Coverage fans: for each leg, the quads between neighbouring laws' central rays. Laws are
-    grouped into fans that share a skew (rounded to 1e-6 degrees) and ordered by refracted angle,
-    so a skew sweep gives one fan per skew, never quads across skews. Returns
-    {leg: [(4, 3) quad, ...]} with legs numbered from 1.
+    grouped into fans by their 'fan' key (session.fan_key: skew, skew and Y target, or Y
+    target), else by skew, and ordered by refracted angle within a fan, so quads never join
+    different skews or different Y targets. Returns {leg: [(4, 3) quad, ...]}, legs from 1.
     """
     groups = {}
     for i, r in enumerate(results):
-        groups.setdefault(round(float(r.get("skew") or 0.0), 6), []).append(i)
+        key = r.get("fan") or ("skew", round(float(r.get("skew") or 0.0), 9))
+        groups.setdefault(key, []).append(i)
     legs = len(paths[0]) - 1 if paths else 0
     out = {leg: [] for leg in range(1, legs + 1)}
     for members in groups.values():
-        members = sorted(members, key=lambda i: (results[i]["angle"], results[i].get("fy", 0.0)))
+        members = sorted(members, key=lambda i: results[i]["angle"])
         for a, b in zip(members[:-1], members[1:]):
             if results[a]["angle"] == results[b]["angle"]:
-                continue        # Y-sweep targets at one angle: no fan between them
+                continue        # laws of one fan differ in angle; equal angles would be a key fault
             pa, pb = paths[a], paths[b]
             for leg in range(1, legs + 1):
                 out[leg].append(np.array([pa[leg - 1], pa[leg], pb[leg], pb[leg - 1]]))

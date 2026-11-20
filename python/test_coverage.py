@@ -86,6 +86,31 @@ class TestFans(unittest.TestCase):
             ys = q[:, 1] - s.aperture_centre()[1]
             self.assertTrue(np.all(ys[1:3] > 0) or np.all(ys[1:3] < 0))  # one skew side per quad
 
+    def test_y_sweeps_keep_each_y_target_in_its_own_fan(self):
+        """Review of PR #28: quads join laws of one Y target across angles, never across Y."""
+        from session import build_solver, calculate
+        pv = {"probe_type": "Matrix", "num_elements": 8, "num_elements_y": 4, "pitch_mm": 1.0,
+              "pitch_y_mm": 1.2, "freq_mhz": 5}
+        wv = {"angle_deg": 36, "height_mm": 10, "velocity_ms": VW, "offset_mm": 4}
+        mv = {"vel_long_ms": VL, "vel_shear_ms": VS}
+        base = {"wave_type": "Longitudinal", "start_angle": 40, "end_angle": 60, "step_angle": 10,
+                "start_skew": 0, "end_skew": 0, "step_skew": 1, "y_focus_mode": "Y Sweep",
+                "y_start_mm": -5, "y_end_mm": 5, "y_step_mm": 5, "target_y_mm": 0}
+        for mode, value in (("Constant Depth", 20), ("Constant Sound Path", 30)):
+            with self.subTest(mode):
+                s = build_solver(pv, wv, mv, {"start_element": 1, "num_active_elements": 0})
+                c = calculate(s, dict(base, focus_mode=mode, param_val=value), "Matrix")
+                paths = sweep_paths(s, c.focal_points, 0.03, 1)
+                f = fans(c.results, paths)
+                self.assertEqual(len(f[1]), 3 * 2)                    # 3 Y targets x (3 angles - 1)
+                # every quad's two rays belong to laws with one Y target and neighbouring angles
+                for q in f[1]:
+                    ends = [q[1], q[2]]                               # the rays' backwall ends
+                    owners = [min(range(len(paths)), key=lambda i: np.linalg.norm(paths[i][1] - e)) for e in ends]
+                    ys = {round(c.results[i]["fy"], 9) for i in owners}
+                    self.assertEqual(len(ys), 1, owners)
+                    self.assertEqual(abs(c.results[owners[0]]["angle"] - c.results[owners[1]]["angle"]), 10)
+
     def test_y_sweep_targets_at_one_angle_make_no_fan(self):
         results = [{"angle": 40.0, "skew": 0.0, "fy": y} for y in (-0.002, 0.0, 0.002)]
         paths = [np.zeros((2, 3))] * 3

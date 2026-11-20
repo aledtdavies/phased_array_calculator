@@ -451,6 +451,7 @@ class Coverage(_WindowCase):
         w = self.calc(LINEAR)
         self.assertIsNone(w.plot_tab.coverage)
         w.mat_panel.set_values({"thickness_mm": 0})
+        self.calc(LINEAR)                                   # a calculation without a thickness
         w.coverage_combo.setCurrentIndex(2)
         self.assertIsNone(w.plot_tab.coverage)
         self.assertIn("Thickness", w.coverage_note.text())
@@ -487,6 +488,28 @@ class Coverage(_WindowCase):
         self.assertIsNone(tab.coverage)
         x, _ = tab.xz.central.getData()
         self.assertTrue(x is None or len(x) == 0)
+
+    def test_coverage_uses_the_calculations_thickness(self):
+        """Review of PR #28: an edit after the calculation does not move the skips off the drawn backwall."""
+        w = self.calc(LINEAR)                                   # 25 mm plate
+        w.mat_panel.set_values({"thickness_mm": 50})            # edited, not recalculated
+        w.coverage_combo.setCurrentIndex(2)
+        self.assertEqual(w.plot_tab.coverage.thickness, 0.025)
+        self.assertEqual(w.plot_tab.component_thickness_mm, 25)
+        self.assertEqual(w.scene3d_tab.component_thickness_mm, 25)
+        np.testing.assert_allclose(w.plot_tab.coverage.paths[0][1, 2], 0.025)
+
+    def test_single_law_skips_are_framed(self):
+        """Review of PR #28: a single law (no fans) still frames its whole skip path."""
+        w = self.calc(LINEAR, scan={"start_angle": 60, "end_angle": 60, "step_angle": 1, "param_val": 5})
+        w.coverage_combo.setCurrentIndex(3)
+        self.assertEqual(len(w.last_results), 1)
+        x, z = w.plot_tab.xz.central.getData()
+        (x0, x1), (z0, z1) = w.plot_tab.xz.getPlotItem().vb.viewRange()
+        self.assertTrue(np.all((x >= x0) & (x <= x1)), (x, x0, x1))
+        self.assertTrue(np.all((z >= min(z0, z1)) & (z <= max(z0, z1))))
+        names = [label.text for _, label in w.plot_tab.xz.legend.items]
+        self.assertIn("Central ray (skips)", names)
 
     def test_matrix_skew_sweep_one_fan_per_skew(self):
         w = self.calc(dict(DUAL, probe_type="Matrix"), scan={"start_skew": -10, "end_skew": 10, "step_skew": 20,
