@@ -332,7 +332,20 @@ class WeldPanel(Panel):
             self.set_row_visible(w, k == "dxf")
 
     def get_values(self):
-        vals = super().get_values()
+        """
+        The fields of the selected weld type are read strictly; hidden fields of other types are
+        kept when they are numbers and left out when not, so they never block the weld chosen.
+        """
+        k = self.kind()
+        vals = {}
+        for key, f in self.entries.items():
+            if key == "centre_x_mm" or k in WELD_FIELDS.get(key, ()):
+                vals[key] = f.value()
+            else:
+                try:
+                    vals[key] = f.value()
+                except ValueError:
+                    pass
         vals.update(type=self.type_combo.currentText(),
                     j_side="far" if self.side.currentIndex() else "near",
                     dxf_path=self.dxf_path.text().strip(),
@@ -364,10 +377,10 @@ class WeldPanel(Panel):
     def profile(self, thickness_mm):
         """The weld as a weld.WeldProfile, or None with no weld; ValueError says what is wrong."""
         import weld
-        v = self.get_values()
         k = self.kind()
         if k is None:
             return None
+        v = self.get_values()
         if not thickness_mm > 0:
             raise ValueError("set the component Thickness to place a weld")
         if k == "dxf":
