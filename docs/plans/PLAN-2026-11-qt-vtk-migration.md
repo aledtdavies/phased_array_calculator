@@ -192,6 +192,19 @@ scaneval was checked for pyqtgraph parts (FBK-0019): its linked views are still 
 
 **Finish:** compared with a reference (CIVA or a buildFE solve) on one case, with the tolerance stated in advance.
 
+**Survey (2026-11-20).** No suite component holds an analytic or semi-analytic beam model: buildFE makes full-wave FE field maps (Tasks 125, 128, 129), imageFE builds travel-time tables in MATLAB, and nde-knowledge has no beam model. The calculator therefore gets its own ray-based model (a delayed sum of element contributions with Miller-Pursey strip directivity, wedge-to-part transmission and beam spread), with arim (MIT) functions copied with attribution where they fit.
+
+**Reference case, fixed before the model was run.** buildFE Task 125's defect-free wedge beam (case `f74b8bab65`, returned 2026-10-07): 2.25L64-A2 on SA2-N55S, all 64 elements, `steer` law at 45 degrees shear, 3-cycle Hann toneburst at 2.25 MHz, 2D plane strain, wedge bonded to the steel (shared nodes), steel 5900/3230 m/s, Rexolite 2337 m/s. The FE map is the time-flattened peak envelope of the first arrival (buildFE `make_field_figures`, gate `first`). The calculator runs the same case in its 2D (line-element) mode with the same delays.
+
+**Tolerance, stated in advance (2026-11-20, before any comparison was run).** Both maps are measured with one Python port of `make_field_figures`' beam metrics (axis through the midpoints of each row's -6 dB band, widths across the axis). The port is checked first: on the FE frames it must reproduce buildFE's `beam_metrics.csv` to within one grid cell (0.31 mm) and 0.1 degree. Then the calculator's map passes if:
+
+| Metric | Tolerance |
+|---|---|
+| Beam axis angle from vertical | within 1.0 degree of the FE value |
+| Axis exit point on the surface | within 2.0 mm |
+| -6 dB width across the beam at Z = 10, 20, 30, 40 mm | within 10 % of the FE width at each depth |
+| Axis level re the beam maximum at those depths | within 1.5 dB |
+
 ## Packaging
 
 - `pyproject.toml` with a `gui` extra (PySide6, qtpy, pyvista, pyvistaqt, pyqtgraph). The library stays usable with numpy and scipy only.
