@@ -60,17 +60,39 @@ class WeldProfile:
 
 # ---------------------------------------------------------------------------
 # Outline handling shared by templates and DXF
-def _clean(poly):
-    """Drop repeated consecutive vertices and a repeated closing vertex."""
-    p = np.asarray(poly, dtype=float)
-    keep = [0]
-    for i in range(1, len(p)):
-        if np.hypot(*(p[i] - p[keep[-1]])) > 1e-9:
-            keep.append(i)
-    p = p[keep]
-    if len(p) > 1 and np.hypot(*(p[0] - p[-1])) <= 1e-9:
-        p = p[:-1]
-    return p
+GEOM_TOL_MM = 1e-7        # outline vertices and edges closer than this coincide
+
+
+def _clean(poly, tol=GEOM_TOL_MM):
+    """
+    The outline without degenerate vertices, repeated until none is left: repeats, vertices on
+    the straight line through their neighbours (a straight run split in two, or a zero-width
+    spike that doubles back, as a closed root leaves), and a repeated closing vertex.
+    """
+    p = [tuple(v) for v in np.asarray(poly, dtype=float)]
+    changed = True
+    while changed and len(p) >= 3:
+        changed = False
+        n = len(p)
+        for k in range(n):
+            a, m, c = np.array(p[k - 1]), np.array(p[k]), np.array(p[(k + 1) % n])
+            ac = c - a
+            L = float(np.hypot(*ac))
+            if np.hypot(*(m - a)) <= tol:
+                drop = True
+            elif L <= tol:                      # neighbours coincide: m is a spike's tip
+                drop = True
+            else:
+                drop = abs(_cross2(ac, m - a)) / L <= tol
+            if drop:
+                del p[k]
+                changed = True
+                break
+    return np.array(p, dtype=float)
+
+
+def _cross2(u, v):
+    return float(u[0] * v[1] - u[1] * v[0])
 
 
 def polygon_area(poly):
@@ -125,26 +147,67 @@ def fusion_faces(poly, thickness_mm, centre_x_mm=0.0):
     return out
 
 
-def _orient(a, b, c):
-    return (b[..., 0] - a[..., 0]) * (c[..., 1] - a[..., 1]) - (b[..., 1] - a[..., 1]) * (c[..., 0] - a[..., 0])
+def _angle_of(v):
+    return math.atan2(v[1], v[0]) % (2 * math.pi)
 
 
-def self_crossing(poly):
-    """The first pair of edges (i, j) of a closed outline that cross properly, or None."""
+def _passes_cross(p, a1, a2, b1, b2):
+    """Two boundary passes through point p (each from a neighbour to a neighbour) cross there."""
+    t1, t2 = _angle_of(a1 - p), _angle_of(a2 - p)
+    sweep = (t2 - t1) % (2 * math.pi)
+    inside = [0 < (_angle_of(q - p) - t1) % (2 * math.pi) < sweep for q in (b1, b2)]
+    return inside[0] != inside[1]
+
+
+def outline_fault(poly, tol=GEOM_TOL_MM):
+    """
+    Why a closed outline (cleaned, see _clean) is not a simple polygon, or None: two edges
+    crossing, a crossing through a vertex, or edges overlapping. Two lobes touching at one point
+    without crossing (a pinch) are allowed.
+    """
     n = len(poly)
-    a, b = poly, np.roll(poly, -1, axis=0)
-    scale = max(1.0, float(np.ptp(poly)))
-    eps = 1e-12 * scale * scale
-    for i in range(n - 2):
-        j = np.arange(i + 2, n if i > 0 else n - 1)        # not neighbours of edge i
-        if not j.size:
-            continue
-        c, d = a[j], b[j]
-        o1, o2 = _orient(a[i], b[i], c), _orient(a[i], b[i], d)
-        o3, o4 = _orient(c, d, a[i]), _orient(c, d, b[i])
-        hit = (o1 * o2 < -eps * eps) & (o3 * o4 < -eps * eps)
-        if hit.any():
-            return i, int(j[np.argmax(hit)])
+    nxt = lambda k: poly[(k + 1) % n]
+    prv = lambda k: poly[k - 1]
+    for i in range(n):
+        a, b = poly[i], nxt(i)
+        ab = b - a
+        Li = float(np.hypot(*ab))
+        for j in range(i + 1, n):
+            if j == i + 1 or (i == 0 and j == n - 1):
+                continue                              # neighbouring edges share a vertex
+            c, d = poly[j], nxt(j)
+            cd = d - c
+            Lj = float(np.hypot(*cd))
+            sc, sd = _cross2(ab, c - a) / Li, _cross2(ab, d - a) / Li     # distances from line i
+            sa, sb = _cross2(cd, a - c) / Lj, _cross2(cd, b - c) / Lj     # distances from line j
+            where = f"near X {a[0]:.3f}, Z {a[1]:.3f} mm"
+            if (sc * sd < 0 and abs(sc) > tol and abs(sd) > tol and
+                    sa * sb < 0 and abs(sa) > tol and abs(sb) > tol):
+                return f"two edges cross ({where})"
+            if abs(sc) <= tol and abs(sd) <= tol:     # collinear: overlap of positive length?
+                t = sorted([float(np.dot(c - a, ab)) / Li, float(np.dot(d - a, ab)) / Li])
+                if min(t[1], Li) - max(t[0], 0.0) > tol:
+                    return f"two edges overlap ({where})"
+                continue
+            # a vertex of one edge on the other edge (or on its vertex): a touch; crossing?
+            for k, q, (e0, e1), s_q in ((j, c, (a, b), sc), ((j + 1) % n, d, (a, b), sd),
+                                        (i, a, (c, d), sa), ((i + 1) % n, b, (c, d), sb)):
+                if abs(s_q) > tol:
+                    continue
+                L = float(np.hypot(*(e1 - e0)))
+                t = float(np.dot(q - e0, e1 - e0)) / L
+                if t < -tol or t > L + tol:
+                    continue
+                if t <= tol or t >= L - tol:          # on a vertex of the other edge
+                    m = i if (e0 is a) else j
+                    m = m if t <= tol else (m + 1) % n
+                    if m == k:
+                        continue
+                    b1, b2 = prv(m), nxt(m)
+                else:                                 # inside the other edge
+                    b1, b2 = e0, e1
+                if _passes_cross(q, prv(k), nxt(k), b1, b2):
+                    return f"the outline crosses itself at a vertex (X {q[0]:.3f}, Z {q[1]:.3f} mm)"
     return None
 
 
@@ -152,12 +215,9 @@ def _profile(poly, thickness_mm, centre_x_mm, source, notes=()):
     poly = _clean(poly)
     if len(poly) < 3 or abs(polygon_area(poly)) < 1e-9:
         raise ValueError("the weld outline encloses no area")
-    cross = self_crossing(poly)
-    if cross is not None:
-        i, j = cross
-        raise ValueError(f"the weld outline crosses itself (the edge from X {poly[i, 0]:.3f}, "
-                         f"Z {poly[i, 1]:.3f} mm crosses the one from X {poly[j, 0]:.3f}, "
-                         f"Z {poly[j, 1]:.3f} mm)")
+    fault = outline_fault(poly)
+    if fault is not None:
+        raise ValueError(f"the weld outline crosses itself: {fault}")
     if polygon_area(poly) < 0:                   # one orientation for every profile
         poly = poly[::-1]
     return WeldProfile(poly, fusion_faces(poly, thickness_mm, centre_x_mm), source,
@@ -207,6 +267,9 @@ def template_outline(kind, thickness_mm, *, bevel_deg=30.0, root_gap_mm=0.0, roo
         z1, z2 = d - r / 2, d + r / 2
         if z1 < 0 or z2 > T:
             raise ValueError(f"the root face ({r:g} mm at depth {d:g} mm) must lie within the thickness ({T:g} mm)")
+        if g == 0 and r > 0:
+            raise ValueError("a double-V with no root gap and a root face is two separate weld regions; "
+                             "set a root gap, or a root face of 0")
         wt, wb = g / 2 + z1 * math.tan(a), g / 2 + (T - z2) * math.tan(a2)
         return np.array([(-wt, 0.0), (wt, 0.0), (g / 2, z1), (g / 2, z2), (wb, T), (-wb, T),
                          (-g / 2, z2), (-g / 2, z1)])

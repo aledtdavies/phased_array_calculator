@@ -180,6 +180,33 @@ class TemplateMatchesDXF(unittest.TestCase):
         d = dxf_profile(p, T)
         self.assertLessEqual(boundary_distance(d.polygon, template_profile("single-V", T, bevel_deg=30).polygon), TOL_MM)
 
+    def test_crossing_at_a_vertex_is_refused(self):
+        """Review of PR #29: a crossing through an existing vertex, either order, with or without it."""
+        base = [(0, 0), (12, -12), (20, -20), (0, -20), (30, 0)]
+        for name, pts in (("with", base), ("without", [v for v in base if v != (12, -12)]),
+                          ("reversed", base[::-1])):
+            with self.subTest(name):
+                doc = ezdxf.new()
+                doc.header["$INSUNITS"] = 4
+                doc.modelspace().add_lwpolyline(pts, close=True)
+                p = os.path.join(self.dir, f"vx_{name}.dxf")
+                doc.saveas(p)
+                with self.assertRaisesRegex(ValueError, "crosses itself"):
+                    dxf_profile(p, T)
+
+    def test_zero_gap_j_matches_a_dxf_drawn_without_the_root_face(self):
+        """A closed root (no gap): the root face is not part of the weld region in either source."""
+        r, R, b = 1.5, 6.0, 10.0
+        prof = template_profile("single-J", T, 0.0, bevel_deg=b, root_gap_mm=0, root_face_mm=r, root_radius_mm=R)
+        te = math.radians(90 - b)
+        cz = T - r - R
+        ex, ez = -R * math.sin(te), cz + R * math.cos(te)
+        tx = ex - ez * math.tan(math.radians(b))
+        p = os.path.join(self.dir, "j0.dxf")
+        _write_dxf(p, [(0, 0, 0, -(T - r)), (ex, -ez, tx, 0), (tx, 0, 0, 0)],
+                   [(0, -cz, R, 270 - math.degrees(te), 270.0)])
+        self.check(prof, p)
+
     def test_hand_written_r12_file(self):
         """An ASCII DXF written without ezdxf: LINE entities only, no header, mm assumed."""
         pts = _corners("single-V", 2.0, 1.5, 30.0)
@@ -243,6 +270,44 @@ class Templates(unittest.TestCase):
         self.assertEqual(len(faces["Fusion face, +X side"]), 2)
         np.testing.assert_allclose(faces["Fusion face, +X side"][:, 0], 11.0)
         self.assertGreater(len(faces["Fusion face, -X side"]), 10)
+
+    def test_zero_gap_templates_anywhere(self):
+        """Review of PR #29: closed-root templates build at any centre X, the same shape."""
+        for kind, kw in (("single-J", dict(bevel_deg=10, root_face_mm=1.5, root_radius_mm=6)),
+                         ("single-V", dict(bevel_deg=30, root_face_mm=1.5)),
+                         ("double-V", dict(bevel_deg=30, root_face_mm=0))):
+            for side in (("near", "far") if kind == "single-J" else (None,)):
+                ref = None
+                for cx in (0.0, 0.1, 1.0, 40.0):
+                    with self.subTest(kind=kind, side=side, cx=cx):
+                        extra = {"side": side} if side else {}
+                        p = template_profile(kind, T, cx, root_gap_mm=0, **kw, **extra)
+                        local = p.polygon - [cx, 0.0]
+                        if ref is None:
+                            ref = local
+                        np.testing.assert_allclose(local, ref, atol=1e-9)
+        # the closed root's root face is not drawn as a zero-width spike
+        v = template_profile("single-V", T, 0.0, bevel_deg=30, root_gap_mm=0, root_face_mm=1.5)
+        self.assertEqual(len(v.polygon), 3)
+        self.assertAlmostEqual(v.polygon[:, 1].max(), T - 1.5)
+        # a closed-root double-V with a root face would be two separate regions: refused
+        with self.assertRaisesRegex(ValueError, "two separate weld regions"):
+            template_profile("double-V", T, root_gap_mm=0, root_face_mm=2)
+        # with no root face its two Vs meet at a point (a pinch), which is allowed
+        dv = template_profile("double-V", T, 0.0, bevel_deg=30, root_gap_mm=0, root_face_mm=0)
+        self.assertEqual([n for n, _ in dv.faces], ["Fusion face, -X side", "Fusion face, +X side"])  # one per plate
+
+    def test_outline_faults(self):
+        sq = np.array([[0, 0], [4, 0], [4, 4], [0, 4]], float)
+        self.assertIsNone(weld.outline_fault(sq))
+        bow = np.array([[0, 0], [4, 4], [4, 0], [0, 4]], float)
+        self.assertIn("cross", weld.outline_fault(bow))
+        # two triangles meeting at a point without crossing: a pinch
+        pinch = np.array([[-2, 0], [2, 0], [0, 2], [2, 4], [-2, 4], [0, 2]], float)
+        self.assertIsNone(weld.outline_fault(pinch))
+        # a doubled edge (two lobes joined along a segment)
+        overlap = np.array([[-2, 0], [2, 0], [0, 1], [0, 3], [2, 4], [-2, 4], [0, 3], [0, 1]], float)
+        self.assertIsNotNone(weld.outline_fault(overlap))
 
     def test_bevel_angle_is_from_the_vertical(self):
         p = template_profile("single-V", T, 0.0, bevel_deg=30)
