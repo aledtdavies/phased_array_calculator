@@ -18,8 +18,8 @@ from qtpy import QtWidgets
 
 from qt_plotting import LawTab, PlayMixin
 from scene_model import build_scene, coverage_prims, user_element_numbers
-from scene_vtk import (VIEWS, add_axes, add_law, add_setup, element_at_display, refit_camera,
-                       set_camera)
+from scene_vtk import (VIEWS, add_axes, add_field, add_law, add_setup, element_at_display,
+                       refit_camera, set_camera)
 
 
 class Scene3DTab(PlayMixin, LawTab):
@@ -55,7 +55,15 @@ class Scene3DTab(PlayMixin, LawTab):
         self.bounds = None
         self.scene = None
         self.picked = None
+        self.field_slices = None      # beam field sections from the Beam Field tab (or None)
         self._setup_drawn = False
+
+    def set_field(self, slices):
+        """Beam field sections to draw (qt_field.FieldTab.field_changed), or None."""
+        self.field_slices = slices
+        self._setup_drawn = False
+        if self.isVisible():
+            self.refresh_plot()
 
     # -- view ------------------------------------------------------------------------
     def _make_view(self, lay):
@@ -137,6 +145,8 @@ class Scene3DTab(PlayMixin, LawTab):
             self.bounds = add_setup(pl, self.scene, self.component_thickness_mm,
                                     section=self.chk_section.isChecked())
             add_law(pl, self.scene)
+            if self.field_slices:
+                add_field(pl, self.field_slices)
             pl.add_legend(bcolor="white", face="rectangle", size=(0.2, 0.26), loc="lower right")
             add_axes(pl, *self.bounds)
             if keep_camera:

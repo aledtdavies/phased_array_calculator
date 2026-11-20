@@ -230,6 +230,19 @@ In the Qt window the Ray Tracing and Delays tabs are pyqtgraph views:
   - With Coverage on, each fusion face is green where a fan of the selected legs reaches it and red at gaps, and the toolbar gives the covered share and the gap length. "Covered" means a central-ray fan reaches the face; the incidence angle on the face is not judged.
 - **Select an element:** click an element marker (X-Z or Y-Z), a delay bar, a delay-map cell or an element in the 3D view. It is selected in every tab: orange in the projections and the 3D view, outlined in the delay map, and reported in the 3D readout.
 
+### Beam Field Tab (Qt window)
+
+The beam of the law shown in the other tabs, in the component, as a map in dB re its maximum (turbo, 0 to −30 dB) with the −6 dB contour (white), the focus (+) and the fitted beam axis (dotted). Press **Compute field**: it takes a few seconds (2D) to about a minute (3D), with a progress bar.
+
+- **Model:** **2D** treats each element as an infinitely long strip and maps the X-Z section; it needs a single linear array without a roof. **3D** splits each element into point sources over its width and **Elevation** and maps the X-Z section through the aperture centre and the Y-Z section through the focus.
+- **Pulse:** a Hann-windowed burst of **Cycles** at the probe frequency (the map is the peak of the displacement envelope over time), or a **continuous wave** at the probe frequency (faster).
+- **Inputs:** **Element width**, **Elevation**, the wedge's **S-wave** speed and **density** and the **component density**. They are filled from the catalogue when the probe or wedge comes from one, and saved in configurations.
+- **Grid:** the map's spacing. It is coarsened automatically for large areas; the status line gives the spacing used.
+- **Show in 3D view:** draws the computed sections in the 3D View as coloured planes.
+- A field belongs to its law: when the law, the setup or an input changes, it is marked stale and taken out of the 3D view until it is computed again.
+- **The model:** each element radiates into the wedge as a normal strip load (Miller–Pursey directivity); each ray refracts at the surface by Snell's law, with the plane-wave transmission coefficient of a bonded (welded) wedge and geometric beam spread; the elements' pulses are added with their delays. Not modelled: back-wall and surface reflections, mode conversion, attenuation, and a fluid couplant layer.
+- **Validation:** the 2D pulsed mode was compared with buildFE's FE solve of the 2.25L64-A2 on the SA2-N55S wedge (64 elements, 45° shear) against tolerances fixed beforehand: beam angle within 0.4°, exit point within 0.01 mm, −6 dB widths within 0.6 % and axis levels within 0.5 dB (`validation/beam_field/`). The 3D mode is not separately validated.
+
 ### Data Table Tab
 
 | Column | Description |
