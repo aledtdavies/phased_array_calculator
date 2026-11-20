@@ -114,7 +114,7 @@ class FieldTab(QtWidgets.QWidget):
         self.model.addItems(MODELS)
         self.pulse = QtWidgets.QComboBox()
         self.pulse.addItems(PULSES)
-        self.cycles = spin(0.5, 50, 3, 1)
+        self.cycles = spin(2, 50, 3, 0)          # whole cycles, at least 2 (beam_field)
         self.step = spin(0.05, 5, 0.5, 2, " mm")
         self.width = spin(0.01, 100, 0.5, 3, " mm")
         self.elevation = spin(0.1, 200, 10, 2, " mm")
