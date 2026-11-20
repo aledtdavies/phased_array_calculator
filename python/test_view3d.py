@@ -264,3 +264,37 @@ class TestPicking(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@unittest.skipUnless(HAVE_PV, "pyvista not installed, or no display")
+class WeldRendering(unittest.TestCase):
+    """Review of PR #29: every accepted weld outline renders in 3D with its full cross-section."""
+
+    def test_templates_including_a_pinched_double_v(self):
+        from scene_model import Prim, Scene, weld_prims
+        from scene_vtk import add_setup
+        from weld import polygon_area, template_profile
+        cases = [("single-V", dict(bevel_deg=30, root_gap_mm=2, root_face_mm=1.5)),
+                 ("double-V", dict(bevel_deg=30, root_gap_mm=0, root_face_mm=0)),     # two lobes at a point
+                 ("double-V", dict(bevel_deg=30, root_gap_mm=2, root_face_mm=2)),
+                 ("single-J", dict(bevel_deg=10, root_gap_mm=0, root_face_mm=1.5, root_radius_mm=6))]
+        for kind, kw in cases:
+            with self.subTest(kind=kind, **kw):
+                prof = template_profile(kind, 25, 40, **kw)
+                el = Prim("points", np.array([[0.0, 0.0, -10.0]]), "element",
+                          {"array": "single", "active": True, "indices": np.array([0])})
+                scene = Scene([el] + weld_prims(prof), contact=False)
+                pl = pv.Plotter(off_screen=True, window_size=(200, 150))
+                try:
+                    lo, hi = add_setup(pl, scene, 25.0)
+                    body = pl.actors["setup:weld"].mapper.dataset
+                    self.assertGreater(body.n_cells, 0)
+                    # the body's end cap (cells lying in the plane Y = lo) is the outline's area
+                    tri = body.triangulate()
+                    y = tri.points[:, 1]
+                    cap = [c for c in range(tri.n_cells) if np.all(np.abs(y[tri.get_cell(c).point_ids] - lo[1]) < 1e-6)]
+                    area = tri.extract_cells(cap).extract_surface(algorithm="dataset_surface").area
+                    self.assertAlmostEqual(area, abs(polygon_area(prof.polygon)),
+                                           delta=1e-6 * abs(polygon_area(prof.polygon)))
+                finally:
+                    pl.close()

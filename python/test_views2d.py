@@ -590,6 +590,15 @@ class Weld(_WindowCase):
         for name in ("setup:weld", "setup:fusion-covered", "setup:fusion-gap"):
             self.assertIn(name, actors)
 
+    def test_closed_root_double_v_in_3d(self):
+        """Review of PR #29: a double-V whose two Vs touch at the root opens in the 3D tab."""
+        w = self.win
+        w.weld_panel.set_values(dict(self.WELD, type="Double-V", root_gap_mm=0, root_face_mm=0))
+        self.calc(LINEAR, scan=self.SCAN)
+        w.coverage_combo.setCurrentIndex(2)
+        w.scene3d_tab.refresh_plot()
+        self.assertGreater(w.scene3d_tab.plotter.renderer.actors["setup:weld"].mapper.dataset.n_cells, 0)
+
     def test_the_drawn_weld_is_the_calculations(self):
         w = self.win
         w.weld_panel.set_values(self.WELD)
