@@ -248,6 +248,16 @@ class TestMatrixElements(unittest.TestCase):
                     element_sources(s, d, 0.8e-3, elevation=1.5e-3, dim=3)   # wider than the Y pitch
 
 
+class TestSourcesOnTheSurface(unittest.TestCase):
+    def test_elements_on_the_interface_are_refused(self):
+        """Review of PR #30: a zero-height wedge gave an all-NaN field."""
+        p = create_probe_assembly("Linear", 8, 0.6e-3, 5e6)
+        s = DelayLaw(p, Wedge(0.0, 0.0, 2337.0, 0.0), Material(5900.0, 3230.0))
+        law = s.calculate_law(0.02, 0.0, 0.02, "shear")
+        with self.assertRaises(ValueError):
+            element_sources(s, law["delays"], 0.5e-3, dim=2)
+
+
 class TestSpectrum(unittest.TestCase):
     def test_peak_near_the_centre_frequency(self):
         f = np.linspace(0.5e6, 4e6, 701)

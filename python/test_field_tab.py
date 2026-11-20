@@ -238,6 +238,40 @@ class TestFieldTab(QtCase):
         self.assertTrue(ft.job["fresh"], ft.status.text())
         self.assertIsNotNone(self.field3d[-1])
 
+    def test_closing_during_a_computation_exits_cleanly(self):
+        """Review of PR #30: closing the window while the field worker ran left it running."""
+        import os
+        import subprocess
+        import sys
+        import textwrap
+        script = textwrap.dedent("""
+            import os
+            os.environ.setdefault('QT_API', 'pyside6')
+            from qtpy import QtCore, QtWidgets
+            import qt_app
+            app = QtWidgets.QApplication([])
+            w = qt_app.MainWindow()
+            w.info = w.warn = w.error = lambda *a: None
+            w.probe_panel.set_values({'probe_type': 'Linear', 'num_elements': 64, 'pitch_mm': 0.6})
+            w.mat_panel.set_values({'thickness_mm': 60})
+            w.scan_panel.set_values({'focus_mode': 'Constant Depth', 'param_val': 40, 'wave_type': 'Shear',
+                                     'start_angle': 45, 'end_angle': 45, 'step_angle': 5})
+            w.field_tab.set_values({'element_width_mm': 0.5, 'grid_mm': 0.1})
+            w.show()
+            w.run_calculation()
+            w.field_tab.compute()
+            assert w.field_tab.worker.isRunning()
+            QtCore.QTimer.singleShot(300, w.close)
+            QtCore.QTimer.singleShot(400, app.quit)
+            rc = app.exec()
+            assert not w.field_tab.worker.isRunning(), 'worker still running'
+            print('CLEAN', rc)
+            """)
+        here = os.path.dirname(os.path.abspath(__file__))
+        r = subprocess.run([sys.executable, "-c", script], cwd=here, capture_output=True, text=True, timeout=300)
+        self.assertEqual(r.returncode, 0, r.stderr[-2000:])
+        self.assertIn("CLEAN 0", r.stdout)
+
     def test_no_laws_no_field(self):
         self.win.field_tab.compute(sync=True)
         self.assertIn("calculate laws first", self.win.field_tab.status.text())

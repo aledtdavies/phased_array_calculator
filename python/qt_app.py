@@ -470,6 +470,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
 
     def closeEvent(self, event):      # noqa: N802 - Qt's name
+        self.field_tab.shutdown()            # stop and join a running field computation
         self.scene3d_tab.plotter.close()     # release the VTK render window
         super().closeEvent(event)
 
