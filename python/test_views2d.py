@@ -511,6 +511,22 @@ class Coverage(_WindowCase):
         names = [label.text for _, label in w.plot_tab.xz.legend.items]
         self.assertIn("Central ray (skips)", names)
 
+    def test_3d_frames_every_skip_path(self):
+        """Review of PR #28: a single-angle, multi-Y sweep (no fans) frames all skips in 3D."""
+        from scene_vtk import scene_bounds
+        w = self.calc(dict(DUAL, probe_type="Matrix"),
+                      scan={"start_angle": 40, "end_angle": 40, "step_angle": 1, "param_val": 5,
+                            "y_focus_mode": "Y Sweep", "y_start_mm": -5, "y_end_mm": 5, "y_step_mm": 5})
+        w.coverage_combo.setCurrentIndex(3)
+        tab = w.scene3d_tab
+        tab.chk_locus.setChecked(False)
+        self.assertEqual(sum(len(q) for q in tab.coverage.fans.values()), 0)
+        for law in range(len(w.last_results)):
+            tab.show_law(law)
+            lo, hi = tab.bounds
+            pts = np.vstack(tab.coverage.paths) * 1e3
+            self.assertTrue(np.all((pts >= lo - 1e-9) & (pts <= hi + 1e-9)), law)
+
     def test_matrix_skew_sweep_one_fan_per_skew(self):
         w = self.calc(dict(DUAL, probe_type="Matrix"), scan={"start_skew": -10, "end_skew": 10, "step_skew": 20,
                                                              "start_angle": 40, "end_angle": 60, "step_angle": 10})
