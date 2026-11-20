@@ -31,6 +31,10 @@ MODELS = ["2D: line elements (X-Z section)", "3D: rectangular elements (X-Z and 
 PULSES = ["Pulsed (Hann burst)", "Continuous wave"]
 
 
+class FieldCancelled(Exception):
+    """A field computation stopped on request (the window closing)."""
+
+
 class FieldWorker(QtCore.QThread):
     progress = QtCore.Signal(float)
     done = QtCore.Signal(object)
@@ -39,10 +43,22 @@ class FieldWorker(QtCore.QThread):
     def __init__(self, job):
         super().__init__()
         self.job = job
+        self.cancelled = False
+
+    def cancel(self):
+        """Stop at the next block of field points (beam_field reports after each block)."""
+        self.cancelled = True
+
+    def _progress(self, f):
+        if self.cancelled:
+            raise FieldCancelled()
+        self.progress.emit(f)
 
     def run(self):
         try:
-            self.done.emit(run_job(self.job, self.progress.emit))
+            self.done.emit(run_job(self.job, self._progress))
+        except FieldCancelled:
+            pass
         except (ValueError, ArithmeticError, np.linalg.LinAlgError) as e:
             self.failed.emit(str(e))
 
@@ -64,7 +80,9 @@ def run_job(job, progress=None):
                          job["cycles"], job["pulsed"], progress=prog).amplitude
         s["amp"] = amp.reshape(s["shape"])
         done += n
-    peak = max(np.nanmax(s["amp"]) for s in secs)
+    peak = max(np.nanmax(s["amp"]) if np.isfinite(s["amp"]).any() else np.nan for s in secs)
+    if not (np.isfinite(peak) and peak > 0):
+        raise ValueError("the field has no finite amplitude anywhere in the section")
     for s in secs:
         with np.errstate(divide="ignore"):
             s["db"] = np.maximum(20 * np.log10(s["amp"] / peak), FLOOR_DB)
@@ -252,6 +270,12 @@ class FieldTab(QtWidgets.QWidget):
                     cycles=v["cycles"], pulsed=v["pulsed"], mode=mode, wedge=wedge, part=part,
                     sections=sections, step_mm=used * 1e3, context=c, values=v,
                     setup_rev=self.setup_rev)
+
+    def shutdown(self):
+        """Cancel a running computation and wait for its thread (the window is closing)."""
+        if self.worker is not None and self.worker.isRunning():
+            self.worker.cancel()
+            self.worker.wait()
 
     def compute(self, sync=False):
         """Start the field for the current law (in a worker thread unless sync)."""

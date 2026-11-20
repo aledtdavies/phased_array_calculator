@@ -239,6 +239,9 @@ def element_sources(solver, delays, element_width, elevation=None, dim=2, f_max=
     active = np.asarray([i for i in active if np.isfinite(delays[i])], dtype=int)
     if active.size == 0:
         raise ValueError("no active element with a delay")
+    if np.any(elements[active, 2] >= -1e-9):
+        raise ValueError("the elements must lie above the interface (wedge height > 0): a source on "
+                         "the surface is not modelled")
     if not element_width > 0:
         raise ValueError("the element width must be positive")
     signs = wedge.roof_signs(probe)
