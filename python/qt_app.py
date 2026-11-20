@@ -269,6 +269,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.last_results = calc.results
         if calc.focal_points:
             thickness_mm = self.mat_panel.get_values().get("thickness_mm", 0.0)
+            self.calc_thickness_mm = thickness_mm
             outline_mm = self.wedge_outline_mm()
             self.plot_tab.update_plot(solver, calc.focal_points, calc.wave_type, results=calc.results,
                                       is_matrix=calc.is_matrix, component_thickness_mm=thickness_mm,
@@ -305,7 +306,8 @@ class MainWindow(QtWidgets.QMainWindow):
         tab = self.plot_tab
         cov, note = None, ""
         if legs and tab.solver is not None and tab.focal_points:
-            thickness = self.mat_panel.get_values().get("thickness_mm", 0.0) * 1e-3
+            # The thickness of the calculation the views show (not an edit made since).
+            thickness = getattr(self, "calc_thickness_mm", 0.0) * 1e-3
             if not thickness > 0:
                 note = "Set the component Thickness to show coverage."
             else:

@@ -85,7 +85,7 @@ class ProjectionPlot(pg.PlotWidget):
         self.addItem(self.central)
 
     # -- setup (once per calculation) -------------------------------------------------
-    def set_setup(self, scene, component_thickness_mm, extra_points_mm=(), coverage=()):
+    def set_setup(self, scene, component_thickness_mm, extra_points_mm=(), coverage=(), central=False):
         for it in self.setup_items:
             self.removeItem(it)
         self.setup_items = []
@@ -166,7 +166,7 @@ class ProjectionPlot(pg.PlotWidget):
         # The draggable TargetItem cannot draw a legend sample: a plain marker stands in.
         self.legend.addItem(pg.ScatterPlotItem(symbol="+", size=12, pen=pg.mkPen(COLOR_ELEMENT_ACTIVE, width=2.5)),
                             "Focal point (drag in X-Z)" if self.dim == 0 else "Focal point")
-        if coverage:
+        if central:
             self.legend.addItem(self.central, "Central ray (skips)")
         self.setRange(xRange=(lo[0], hi[0]), yRange=(lo[1], hi[1]), padding=0)
         self.pick.setData([], [])
@@ -336,10 +336,13 @@ class RayTab(PlayMixin, LawTab):
         indices = list(range(len(self.focal_points))) if show_all else [self.nav.current]
         scene = build_scene(self.solver, self._get_law_data, indices, outline_mm=self.outline_mm)
         if not self._setup_drawn:
-            foci = [np.asarray(self.focal_points) * 1e3]
-            cov = coverage_prims(self.coverage) if self.coverage is not None else []
+            extra = [np.asarray(self.focal_points) * 1e3]
+            cov = []
+            if self.coverage is not None:
+                cov = coverage_prims(self.coverage)
+                extra += [np.asarray(p) * 1e3 for p in self.coverage.paths]   # frame every skip path
             for p in (self.xz, self.yz):
-                p.set_setup(scene, self.component_thickness_mm, foci, cov)
+                p.set_setup(scene, self.component_thickness_mm, extra, cov, central=self.coverage is not None)
             self._setup_drawn = True
             self.highlight_element(self.selected_element)
         path = None if show_all else self.coverage_path_mm()
