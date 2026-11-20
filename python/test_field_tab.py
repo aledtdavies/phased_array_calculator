@@ -3,9 +3,20 @@ import unittest
 
 import numpy as np
 
+from beam_field import field_region, section_grid
 from test_qt_gui import HAVE_QT, QtCase
 
-from qt_field import section_grid
+
+class TestRegion(unittest.TestCase):
+    def test_the_section_holds_the_focus_whichever_way_the_beam_steers(self):
+        """Review of PR #30: the lower X bound ignored the focus."""
+        ip = np.array([[0.000, 0, 0], [0.005, 0, 0]])
+        for fx in (-0.030, 0.002, 0.040):
+            (lo, hi), (zl, zh) = field_region({"interface_points": ip, "fx": fx, "fz": 0.03}, 0.0, [0, 1])
+            self.assertLessEqual(lo, min(fx, 0.0) - 0.02 + 1e-12)
+            self.assertGreaterEqual(hi, max(fx, 0.005) + 0.02 - 1e-12)
+            self.assertEqual(zl, 0.0)
+            self.assertAlmostEqual(zh, 0.039)
 
 
 class TestGrid(unittest.TestCase):
@@ -107,6 +118,50 @@ class TestFieldTab(QtCase):
         ft.set_values(vals)
         self.win.apply_config({})                       # a file without the key: defaults
         self.assertTrue(ft.is_default())
+
+    def test_negative_steering_maps_its_focus(self):
+        """Review of PR #30: a beam steered to -X kept its focus outside the map."""
+        w = self.win
+        w.probe_panel.set_values({"probe_type": "Linear", "num_elements": 8, "pitch_mm": 0.6, "freq_mhz": 5})
+        w.wedge_panel.set_values({"angle_deg": 0, "height_mm": 10})
+        w.scan_panel.set_values({"focus_mode": "Constant Depth", "param_val": 30, "wave_type": "Longitudinal",
+                                 "start_angle": -40, "end_angle": -40, "step_angle": 5})
+        w.run_calculation()
+        self.assertEqual(self.errors(), [])
+        w.field_tab.set_values({"element_width_mm": 0.5, "grid_mm": 1.0})
+        w.field_tab.compute(sync=True)
+        s = w.field_tab.job["sections"][0]
+        r = w.plot_tab.current_result()
+        self.assertLess(r["fx"], 0)
+        self.assertLessEqual(s["h"][0], r["fx"] - 0.019)
+        # the focus lies inside the mapped beam (a small aperture: the peak itself sits nearer the probe)
+        ix = int(np.argmin(np.abs(s["h"] - r["fx"])))
+        iz = int(np.argmin(np.abs(s["z"] - r["fz"])))
+        self.assertGreater(s["db"][iz, ix], -12.0)
+        self.assertGreater(s["db"][iz, ix], s["db"][iz, int(np.argmin(np.abs(s["h"] + r["fx"])))] + 10)
+
+    def test_setup_edits_make_the_field_stale_until_the_laws_are_recalculated(self):
+        """Review of PR #30: editing the setup left the field fresh and in 3D."""
+        edits = [lambda w: w.mat_panel.set_values({"thickness_mm": 50}),
+                 lambda w: w.mat_panel.set_values({"vel_shear_ms": 3100}),
+                 lambda w: w.probe_panel.set_values({"pitch_mm": 0.7}),
+                 lambda w: w.wedge_panel.set_values({"height_mm": 7}),
+                 lambda w: w.sub_aperture_panel.set_values({"start_element": 3})]
+        self.setup_linear()
+        ft = self.win.field_tab
+        for k, change in enumerate(edits):
+            with self.subTest(k):
+                self.win.run_calculation()
+                ft.compute(sync=True)
+                self.assertTrue(ft.job["fresh"], ft.status.text())
+                change(self.win)
+                self.assertFalse(ft.job["fresh"])
+                self.assertIsNone(self.field3d[-1])
+                self.assertIsNone(self.win.scene3d_tab.field_slices)
+                old = ft.job
+                ft.compute(sync=True)                     # refused against the old solver
+                self.assertIs(ft.job, old)
+                self.assertIn("Calculate Laws", ft.status.text())
 
     def test_no_laws_no_field(self):
         self.win.field_tab.compute(sync=True)

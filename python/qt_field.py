@@ -21,37 +21,14 @@ import numpy as np
 import pyqtgraph as pg
 from qtpy import QtCore, QtWidgets
 
-from beam_field import MODEL_NOTE, Solid, beam_field, element_sources
+from beam_field import (MODEL_NOTE, Solid, beam_field, element_sources, field_region,
+                        section_grid)
 from beam_metrics import beam_axis
 
 FLOOR_DB = -30.0
 MAX_POINTS = {2: 40000, 3: 12000}     # per section; the grid step grows to stay below
 MODELS = ["2D: line elements (X-Z section)", "3D: rectangular elements (X-Z and Y-Z)"]
 PULSES = ["Pulsed (Hann burst)", "Continuous wave"]
-
-
-def section_grid(lo, hi, step, max_points):
-    """Two 1D grids spanning lo..hi (each a 2-tuple, m) at step (m), coarsened (and the step
-    returned) so their product stays within max_points."""
-    n = [max(2, int(math.floor((h - l) / step)) + 1) for l, h in zip(lo, hi)]
-    while n[0] * n[1] > max_points:
-        step *= 1.25
-        n = [max(2, int(math.floor((h - l) / step)) + 1) for l, h in zip(lo, hi)]
-    return [l + np.arange(k) * step for l, k in zip(lo, n)], step
-
-
-def field_region(result, thickness_m, active_x):
-    """
-    X and Z extents (m) of the X-Z section for a law: from 10 mm before the first interface
-    point to 20 mm beyond the focus or the last interface point; from just below the surface
-    to the component thickness, or 1.3 x the focus depth when no thickness is set.
-    """
-    ip = np.asarray(result["interface_points"])[active_x]
-    fx, fz = result["fx"], result["fz"]
-    x_lo = float(np.min(ip[:, 0])) - 0.010
-    x_hi = max(fx, float(np.max(ip[:, 0]))) + 0.020
-    z_hi = thickness_m if thickness_m > 0 else max(1.3 * fz, 0.010)
-    return (x_lo, x_hi), (0.0, z_hi)
 
 
 class FieldWorker(QtCore.QThread):
@@ -162,6 +139,7 @@ class FieldTab(QtWidgets.QWidget):
         self.plots = []
 
         self.context = None          # the law the window shows: see set_context
+        self.setup_dirty = False     # a setup panel edited since the laws were calculated
         self.job = None              # the computed (or running) field
         self.worker = None
         self.compute_btn.clicked.connect(lambda: self.compute())
@@ -218,6 +196,12 @@ class FieldTab(QtWidgets.QWidget):
         if not same:
             self._stale("the law changed" if new else "no law")
 
+    def setup_edited(self):
+        """A setup panel (probe, wedge, component, aperture) changed: the laws shown no longer
+        match it, so the field goes stale and cannot be computed until the laws are recalculated."""
+        self.setup_dirty = True
+        self._stale("the setup changed")
+
     def _stale(self, why):
         if self.job is not None and "sections" in self.job and self.job.get("fresh", False):
             self.job["fresh"] = False
@@ -230,6 +214,8 @@ class FieldTab(QtWidgets.QWidget):
         c = self.context
         if c is None:
             raise ValueError("calculate laws first")
+        if self.setup_dirty:
+            raise ValueError("the setup changed since the laws were calculated: press Calculate Laws")
         v = self.get_values()
         solver, r = c["solver"], c["result"]
         dim = 3 if v["model"] == "3D" else 2
