@@ -87,7 +87,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.tabs.addTab(self.field_tab, "Beam Field")
         self.field_tab.field_changed.connect(self.scene3d_tab.set_field)
         # Edits to the setup the laws were solved for make a computed field stale.
-        for panel in (self.probe_panel, self.wedge_panel, self.mat_panel, self.sub_aperture_panel):
+        for panel in (self.probe_panel, self.wedge_panel, self.mat_panel, self.scan_panel,
+                      self.sub_aperture_panel):
             for w in panel.findChildren(QtWidgets.QLineEdit):
                 w.textChanged.connect(lambda *_: self.field_tab.setup_edited())
             for w in panel.findChildren(QtWidgets.QComboBox):

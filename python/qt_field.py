@@ -199,7 +199,7 @@ class FieldTab(QtWidgets.QWidget):
         self._stale("the law changed" if new else "no law")
 
     def setup_edited(self):
-        """A setup panel (probe, wedge, component, aperture) changed: the laws shown no longer
+        """A setup panel (probe, wedge, component, scan, aperture) changed: the laws shown no longer
         match it, so the field goes stale and cannot be computed until the laws are recalculated."""
         self.setup_dirty = True
         self.setup_rev += 1
