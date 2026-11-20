@@ -159,6 +159,19 @@ def _passes_cross(p, a1, a2, b1, b2):
     return inside[0] != inside[1]
 
 
+def split_lobes(poly, tol=GEOM_TOL_MM):
+    """
+    A simple outline that touches itself at points (a pinch: a closed-root double-V's two Vs)
+    as its separate lobes, each a simple polygon; an outline without a pinch as [itself].
+    """
+    n = len(poly)
+    for i in range(n):
+        for j in range(i + 2, n):
+            if np.hypot(*(poly[i] - poly[j])) <= tol:
+                return split_lobes(poly[i:j], tol) + split_lobes(np.vstack([poly[j:], poly[:i]]), tol)
+    return [poly]
+
+
 def outline_fault(poly, tol=GEOM_TOL_MM):
     """
     Why a closed outline (cleaned, see _clean) is not a simple polygon, or None: two edges

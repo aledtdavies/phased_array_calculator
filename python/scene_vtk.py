@@ -13,6 +13,8 @@ from __future__ import annotations
 import numpy as np
 import pyvista as pv
 
+from weld import split_lobes
+
 from scene import (COLOR_BACKWALL, COLOR_ELEMENT_ACTIVE, COLOR_ELEMENT_INACTIVE, COLOR_ELEMENT_TX,
                    COLOR_MATERIAL, COLOR_WEDGE_EDGE, COLOR_WEDGE_FACE, LAW_CMAP)
 
@@ -107,9 +109,15 @@ def add_setup(pl, scene, component_thickness_mm=0.0, section=False):
                           name=f"setup:elements-{p.meta['array']}-{int(p.meta['active'])}")
     for p in scene.find("weld"):
         # The weld runs along Y through the component: its outline extruded across the view.
-        xz = p.coords[:, [0, 2]]
-        pts = np.c_[xz[:, 0], np.full(len(xz), lo[1]), xz[:, 1]]
-        face = pv.PolyData(pts, np.r_[len(pts), np.arange(len(pts))]).triangulate()
+        # A pinched outline (two lobes touching) is drawn lobe by lobe: VTK triangulates only
+        # simple polygons.
+        lobes = []
+        for xz in split_lobes(p.coords[:, [0, 2]]):
+            pts = np.c_[xz[:, 0], np.full(len(xz), lo[1]), xz[:, 1]]
+            lobes.append(pv.PolyData(pts, np.r_[len(pts), np.arange(len(pts))]).triangulate())
+        face = pv.merge(lobes) if len(lobes) > 1 else lobes[0]
+        if face.n_cells == 0:
+            raise ValueError("the weld outline could not be triangulated for 3D")
         body = face.extrude((0, hi[1] - lo[1], 0), capping=True)
         pl.add_mesh(clip(body), color=WELD_FACE, opacity=0.30, name="setup:weld", label="Weld")
         pl.add_mesh(body.extract_feature_edges(30), color=WELD_EDGE, line_width=1, name="setup:weld-edges")
