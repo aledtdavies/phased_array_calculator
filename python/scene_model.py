@@ -34,6 +34,7 @@ Roles:
                    coverage.py); meta leg (1 = direct, 2 = first skip, ...)
   central-ray      polyline, the current law's (or dragged focus's) central ray with its skips;
                    meta legs
+  coverage-extent  points, every law's central-ray path: for framing only, never drawn
 """
 from __future__ import annotations
 
@@ -358,4 +359,6 @@ def coverage_prims(cov, path_mm=None):
             prims.append(Prim("quads", np.vstack(quads) * 1000, "coverage", {"leg": leg}))
     if path_mm is not None:
         prims.append(Prim("polyline", np.asarray(path_mm, dtype=float), "central-ray", {"legs": cov.legs}))
+    # Not drawn: every law's path, so views frame all skips (a sweep with no fans included).
+    prims.append(Prim("points", np.vstack(cov.paths) * 1000, "coverage-extent", {}))
     return prims
