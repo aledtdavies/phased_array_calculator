@@ -709,6 +709,20 @@ class Weld(_WindowCase):
         self.assertEqual(w.plot_tab.weld_prims, [])
         self.assertEqual(w.weld_note.text(), "")
 
+    def test_hidden_fields_never_block_the_chosen_weld(self):
+        """Review of PR #29: a blank field of another weld type is ignored."""
+        p = self.win.weld_panel
+        p.set_values({"type": "Single-J"})
+        p.entries["root_radius_mm"].setText("")
+        p.set_values({"type": "Single-V"})
+        self.assertEqual(p.profile(25).source.split(" ")[0], "single-V")
+        self.assertNotIn("root_radius_mm", p.get_values())
+        p.set_values({"type": "None"})
+        self.assertIsNone(p.profile(25))
+        p.set_values({"type": "Single-J"})
+        with self.assertRaisesRegex(ValueError, "J Radius"):
+            p.profile(25)
+
     def test_configuration_round_trip(self):
         w = self.win
         w.weld_panel.set_values(dict(self.WELD, type="Single-J", j_side="far", root_radius_mm=5))
