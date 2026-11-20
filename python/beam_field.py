@@ -292,13 +292,23 @@ def hann_toneburst_spectrum(f, f0, cycles):
 # Field sections (grids for the views)
 # ---------------------------------------------------------------------------------------------
 def section_grid(lo, hi, step, max_points):
-    """Two 1D grids spanning lo..hi (each a 2-tuple, m) at step (m), coarsened (and the step
-    returned) so their product stays within max_points."""
-    n = [max(2, int(math.floor((h - l) / step)) + 1) for l, h in zip(lo, hi)]
-    while n[0] * n[1] > max_points:
+    """Two 1D grids within lo..hi (each a 2-tuple, m) at step (m), coarsened (and the step
+    returned) so their product stays within max_points. Every sample lies inside its bounds:
+    an axis shorter than the step gets two samples at its ends instead. Refuses empty bounds."""
+    if any(not h > l for l, h in zip(lo, hi)):
+        raise ValueError("the field section has no extent (check the thickness and the grid step)")
+
+    def axes(step):
+        out = []
+        for l, h in zip(lo, hi):
+            k = int(math.floor((h - l) / step * (1 + 1e-12))) + 1
+            out.append(l + np.arange(k) * step if k >= 2 else np.array([l, h]))
+        return out
+    g = axes(step)
+    while g[0].size * g[1].size > max_points:
         step *= 1.25
-        n = [max(2, int(math.floor((h - l) / step)) + 1) for l, h in zip(lo, hi)]
-    return [l + np.arange(k) * step for l, k in zip(lo, n)], step
+        g = axes(step)
+    return g, step
 
 
 def field_region(result, thickness_m, active_x):

@@ -234,14 +234,15 @@ class FieldTab(QtWidgets.QWidget):
             raise ValueError("the law has no active element")
         (xl, xh), (zl, zh) = field_region(r, c["thickness_mm"] * 1e-3, active)
         step = v["grid_mm"] * 1e-3
-        (X, Z), used = section_grid((xl, step), (xh, zh), step, MAX_POINTS[dim])
+        z0 = min(step, zh / 2)                # first depth below the surface, inside the part
+        (X, Z), used = section_grid((xl, z0), (xh, zh), step, MAX_POINTS[dim])
         y0 = float(np.mean(solver._geometry()[0][active][:, 1])) if dim == 3 else 0.0
         GX, GZ = np.meshgrid(X, Z)
         sections = [dict(name="X-Z", h=X, z=Z, shape=GX.shape, fixed=("Y", y0),
                          points=np.column_stack([GX.ravel(), np.full(GX.size, y0), GZ.ravel()]))]
         if dim == 3:
             half = max(v["elevation_mm"] * 1e-3, 0.005) + 0.010
-            (Y, Z2), _ = section_grid((r["fy"] - half, step), (r["fy"] + half, zh), used, MAX_POINTS[dim])
+            (Y, Z2), _ = section_grid((r["fy"] - half, z0), (r["fy"] + half, zh), used, MAX_POINTS[dim])
             GY, GZ2 = np.meshgrid(Y, Z2)
             sections.append(dict(name="Y-Z", h=Y, z=Z2, shape=GY.shape, fixed=("X", r["fx"]),
                                  points=np.column_stack([np.full(GY.size, r["fx"]), GY.ravel(), GZ2.ravel()])))

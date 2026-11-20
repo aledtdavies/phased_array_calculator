@@ -29,6 +29,17 @@ class TestGrid(unittest.TestCase):
         self.assertEqual(step, 1e-3)
         self.assertEqual((x.size, z.size), (11, 11))
 
+    def test_samples_stay_inside_thin_parts(self):
+        """Review of PR #30: a coarse grid put samples below the backwall."""
+        for th, step in ((0.005, 0.005), (0.003, 0.005), (0.005, 0.0012)):
+            z0 = min(step, th / 2)
+            (x, z), _ = section_grid((0.0, z0), (0.05, th), step, 40000)
+            self.assertGreaterEqual(z.size, 2)
+            self.assertTrue(np.all((z > 0) & (z <= th + 1e-15)), (th, step, z))
+            self.assertEqual(len(set(np.round(z, 12))), z.size)
+        with self.assertRaises(ValueError):
+            section_grid((0.0, 0.01), (0.05, 0.01), 0.001, 1000)
+
 
 @unittest.skipUnless(HAVE_QT, "PySide6/qtpy/pyvistaqt not installed, or no display")
 class TestFieldTab(QtCase):
@@ -177,6 +188,17 @@ class TestFieldTab(QtCase):
         self.assertIn("Stale", ft.status.text())
         self.assertIsNone(self.field3d[-1])
         self.assertIsNone(self.win.scene3d_tab.field_slices)
+
+    def test_a_thin_plate_with_a_coarse_grid_maps_only_inside_it(self):
+        self.setup_linear()
+        self.win.mat_panel.set_values({"thickness_mm": 5})
+        self.win.run_calculation()
+        ft = self.win.field_tab
+        ft.set_values({"grid_mm": 5})
+        ft.compute(sync=True)
+        z = ft.job["sections"][0]["z"]
+        self.assertGreaterEqual(z.size, 2)
+        self.assertTrue(np.all((z > 0) & (z <= 0.005 + 1e-15)), z)
 
     def test_no_laws_no_field(self):
         self.win.field_tab.compute(sync=True)
