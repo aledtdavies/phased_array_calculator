@@ -62,8 +62,7 @@ class Scene3DTab(PlayMixin, LawTab):
         """Beam field sections to draw (qt_field.FieldTab.field_changed), or None."""
         self.field_slices = slices
         self._setup_drawn = False
-        if self.isVisible():
-            self.refresh_plot()
+        self.request_redraw()       # now, or when this tab is next shown
 
     # -- view ------------------------------------------------------------------------
     def _make_view(self, lay):
