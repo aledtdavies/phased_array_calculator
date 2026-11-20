@@ -440,6 +440,63 @@ class ReviewFixes(_WindowCase):
 
 
 @unittest.skipUnless(HAVE_QT, "PySide6/pyqtgraph/pyvistaqt not installed, or no display")
+class Coverage(_WindowCase):
+    """Plan step 5a: coverage fans and the central ray with skips in the 2D and 3D views."""
+
+    def setUp(self):
+        super().setUp()
+        self.win.mat_panel.set_values({"thickness_mm": 25})
+
+    def test_off_by_default_and_needs_a_thickness(self):
+        w = self.calc(LINEAR)
+        self.assertIsNone(w.plot_tab.coverage)
+        w.mat_panel.set_values({"thickness_mm": 0})
+        w.coverage_combo.setCurrentIndex(2)
+        self.assertIsNone(w.plot_tab.coverage)
+        self.assertIn("Thickness", w.coverage_note.text())
+
+    def test_fans_and_central_ray_follow_the_law_and_a_dragged_focus(self):
+        import pyqtgraph as pg
+        w = self.calc(LINEAR, scan={"wave_type": "Shear", "start_angle": 40, "end_angle": 70, "step_angle": 5})
+        w.coverage_combo.setCurrentIndex(2)                 # direct + 1st skip
+        tab = w.plot_tab
+        cov = tab.coverage
+        self.assertEqual(cov.legs, 2)
+        self.assertIn("no mode conversion", w.coverage_note.text())
+        polys = [it for it in tab.xz.setup_items if isinstance(it, QtWidgets.QGraphicsPolygonItem)]
+        n_quads = sum(len(q) for q in cov.fans.values())
+        self.assertGreaterEqual(len(polys), n_quads)
+        centre = tab.solver.aperture_centre() * 1e3
+        for law in (0, 3, len(w.last_results) - 1):
+            tab.show_law(law)
+            x, z = tab.xz.central.getData()
+            want = np.vstack([centre[None, :], cov.paths[law] * 1e3])
+            np.testing.assert_allclose(x, want[:, 0])
+            np.testing.assert_allclose(z, want[:, 2])
+            np.testing.assert_allclose(z[1:], [0.0, 25.0, 0.0], atol=1e-9)    # surface, backwall, surface
+        tab.xz.focus.setPos(40.0, 12.0)                      # dragged: the central ray follows
+        x, z = tab.xz.central.getData()
+        self.assertAlmostEqual(float(np.interp(12.0, z[1:3], x[1:3])), 40.0, places=6)
+        # the 3D view carries the same
+        w.scene3d_tab.refresh_plot()
+        actors = w.scene3d_tab.plotter.renderer.actors
+        self.assertIn("setup:coverage-1", actors)
+        self.assertIn("setup:coverage-2", actors)
+        self.assertIn("law:central-ray", actors)
+        w.coverage_combo.setCurrentIndex(0)                 # off again
+        self.assertIsNone(tab.coverage)
+        x, _ = tab.xz.central.getData()
+        self.assertTrue(x is None or len(x) == 0)
+
+    def test_matrix_skew_sweep_one_fan_per_skew(self):
+        w = self.calc(dict(DUAL, probe_type="Matrix"), scan={"start_skew": -10, "end_skew": 10, "step_skew": 20,
+                                                             "start_angle": 40, "end_angle": 60, "step_angle": 10})
+        w.coverage_combo.setCurrentIndex(1)
+        cov = w.plot_tab.coverage
+        self.assertEqual(len(cov.fans[1]), 2 * 2)          # 2 skews x (3 angles - 1)
+
+
+@unittest.skipUnless(HAVE_QT, "PySide6/pyqtgraph/pyvistaqt not installed, or no display")
 class ShownWindow(unittest.TestCase):
     """The window shown and painted: what a hidden window cannot catch (paint-time errors)."""
 

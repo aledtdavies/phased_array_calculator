@@ -1,5 +1,20 @@
 # Changelog
 
+## Step 5a: coverage fans and skips — 2026-11-20
+
+Plan step 5a (approved by the owner on 2026-11-20).
+
+- **`coverage.py`:**
+  - Each law's central ray runs from the active aperture's centre to its focus, refracted at the entry by Snell's law. This holds for any focus: a sweep law, a Y-sweep target or a dragged focus.
+  - The ray is carried through a flat plate of the component Thickness with skips: specular reflections at the backwall and the surface.
+  - Coverage fans join neighbouring laws leg by leg, one fan per skew.
+- **ASSUMPTION, shown in the window:** each reflection keeps the wave mode (no mode conversion), and only central rays are drawn, not the beam's spread.
+- **Qt window:** a Coverage selector (Off, Direct, + 1st skip, + 2 skips) in a new toolbar. Fans are drawn as translucent polygons in X-Z and Y-Z and as sheets in 3D. The current law's central ray is drawn from the aperture centre with its skips (dashed in 2D) and follows a dragged focus. Coverage needs a Thickness; without one the toolbar says so.
+- **Tests:**
+  - Snell's law holds at every entry point, and the central ray's direction is the focal rule's (sin β cos φ, sin β sin φ, cos β).
+  - Skip points lie on the walls, with the angle to the normal and the horizontal direction preserved; ± skew move ± Y.
+  - Fans group by skew; the views draw them, and the central ray follows the law and a dragged focus.
+
 ## Migration step 4: live 2D views on pyqtgraph — 2026-11-20
 
 Plan step 4 (`docs/plans/PLAN-2026-11-qt-vtk-migration.md`).

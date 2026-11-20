@@ -19,13 +19,15 @@ from qt_plotting import LawTab, PlayMixin
 from scene import (COLOR_BACKWALL, COLOR_ELEMENT_ACTIVE, COLOR_ELEMENT_INACTIVE, COLOR_ELEMENT_TX,
                    COLOR_MATERIAL, COLOR_PROBE_EDGE, COLOR_PROBE_FACE, COLOR_WEDGE_EDGE,
                    COLOR_WEDGE_FACE)
-from scene_model import build_scene, user_element_numbers, wedge_yz_rect
+from scene_model import build_scene, coverage_prims, user_element_numbers, wedge_yz_rect
 
 pg.setConfigOptions(antialias=True, background="w", foreground="k")
 
 ELEMENT_COLOUR = {"single": COLOR_ELEMENT_ACTIVE, "tx": COLOR_ELEMENT_TX, "rx": COLOR_ELEMENT_ACTIVE}
 RAY_COLOUR = {"single": "#2563eb", "tx": "#1f77b4", "rx": "#d62728"}     # tab:blue / tab:red
 PICK_COLOUR = "#f59e0b"
+COVERAGE_COLOUR = {1: "#2563eb", 2: "#7c3aed", 3: "#db2777"}
+COVERAGE_NAME = {1: "Coverage, direct", 2: "Coverage, 1st skip", 3: "Coverage, 2nd skip"}
 
 
 def _rgba(hex_colour, alpha):
@@ -78,9 +80,12 @@ class ProjectionPlot(pg.PlotWidget):
         self.pick = pg.ScatterPlotItem(size=13, brush=pg.mkBrush(PICK_COLOUR), pen=pg.mkPen("k"))
         self.pick.setZValue(7)
         self.addItem(self.pick)
+        self.central = pg.PlotDataItem(pen=pg.mkPen("k", width=2, style=QtCore.Qt.DashLine))
+        self.central.setZValue(4.5)
+        self.addItem(self.central)
 
     # -- setup (once per calculation) -------------------------------------------------
-    def set_setup(self, scene, component_thickness_mm, extra_points_mm=()):
+    def set_setup(self, scene, component_thickness_mm, extra_points_mm=(), coverage=()):
         for it in self.setup_items:
             self.removeItem(it)
         self.setup_items = []
@@ -97,6 +102,18 @@ class ProjectionPlot(pg.PlotWidget):
 
         pts = [p.coords[:, [d, 2]] for p in scene.prims if p.kind != "text"]
         pts += [np.asarray(e)[:, [d, 2]] for e in extra_points_mm if len(e)]
+        for p in coverage:
+            if p.role == "coverage":
+                pts.append(p.coords[:, [d, 2]])
+                quads = p.coords[:, [d, 2]].reshape(-1, 4, 2)
+                col = COVERAGE_COLOUR.get(p.meta["leg"], "#64748b")
+                for k, q in enumerate(quads):
+                    item = _polygon(q, col, col, 0.10)
+                    item.setPen(QtGui.QPen(QtCore.Qt.NoPen))
+                    add(item, 0.5)
+                self.legend.addItem(pg.PlotDataItem(pen=pg.mkPen(col), fillLevel=0,
+                                                    brush=pg.mkBrush(_rgba(col, 0.3))),
+                                    COVERAGE_NAME.get(p.meta["leg"], f"Coverage, leg {p.meta['leg']}"))
         if scene.contact:
             c = scene.one("contact")
             add(pg.TextItem(c.meta["text"], color=COLOR_PROBE_EDGE, anchor=(0, 1)), 6).setPos(
@@ -149,6 +166,8 @@ class ProjectionPlot(pg.PlotWidget):
         # The draggable TargetItem cannot draw a legend sample: a plain marker stands in.
         self.legend.addItem(pg.ScatterPlotItem(symbol="+", size=12, pen=pg.mkPen(COLOR_ELEMENT_ACTIVE, width=2.5)),
                             "Focal point (drag in X-Z)" if self.dim == 0 else "Focal point")
+        if coverage:
+            self.legend.addItem(self.central, "Central ray (skips)")
         self.setRange(xRange=(lo[0], hi[0]), yRange=(lo[1], hi[1]), padding=0)
         self.pick.setData([], [])
 
@@ -212,6 +231,14 @@ class ProjectionPlot(pg.PlotWidget):
             it.setData([], [])
         self.focus.setVisible(False)
         self.pick.setData([], [])
+        self.central.setData([], [])
+
+    def set_central(self, path_mm):
+        """The current law's central ray with its skips (None: hidden)."""
+        if path_mm is None:
+            self.central.setData([], [])
+        else:
+            self.central.setData(path_mm[:, self.dim], path_mm[:, 2])
 
     def set_pick(self, point_mm):
         if point_mm is None:
@@ -275,6 +302,10 @@ class RayTab(PlayMixin, LawTab):
         self.yz.setVisible(probe.num_elements_y > 1 or hasattr(probe, "array_separation"))
         self.update_navigation(solver, focal_points, wave_type, results, is_matrix)
 
+    def _coverage_changed(self):
+        self._setup_drawn = False
+        self._all_drawn = False
+
     def reset_focus_marker(self):
         """Put the X-Z marker back on the focus shown (after a refused drag); no solve follows."""
         if not self.focal_points:
@@ -306,15 +337,18 @@ class RayTab(PlayMixin, LawTab):
         scene = build_scene(self.solver, self._get_law_data, indices, outline_mm=self.outline_mm)
         if not self._setup_drawn:
             foci = [np.asarray(self.focal_points) * 1e3]
+            cov = coverage_prims(self.coverage) if self.coverage is not None else []
             for p in (self.xz, self.yz):
-                p.set_setup(scene, self.component_thickness_mm, foci)
+                p.set_setup(scene, self.component_thickness_mm, foci, cov)
             self._setup_drawn = True
             self.highlight_element(self.selected_element)
+        path = None if show_all else self.coverage_path_mm()
         for p in (self.xz, self.yz):
             if show_all:
                 p.set_all(scene, indices)
             else:
                 p.set_law(scene, self.nav.current)
+            p.set_central(path)
         self._all_drawn = show_all
         if show_all:
             self.lbl_angle.setText(f"All {len(self.focal_points)} Laws")
