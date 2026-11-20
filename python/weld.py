@@ -21,7 +21,8 @@ DXF (read with ezdxf): the closed outline of the weld region, drawn in CAD axes 
 the weld (x = 0 the weld centreline) and y up. The datum says where y = 0 is: 'surface' (the
 scanning surface, the part drawn below it, Z = -y) or 'backwall' (the part drawn above it,
 Z = T - y). LINE, ARC, LWPOLYLINE (bulges included), POLYLINE, SPLINE, ELLIPSE and CIRCLE are
-read; curves are flattened to within FLATTEN_MM. Units follow $INSUNITS (unset: millimetres)
+read; curves are flattened from the exact curve (vertices on it) to within FLATTEN_MM, and
+polylines are split into their lines and arcs first. A self-crossing outline is refused. Units follow $INSUNITS (unset: millimetres)
 unless given: files are often stamped with units their coordinates are not in.
 
 Fusion faces are the boundary chains of the profile that lie on neither the surface nor the
@@ -123,10 +124,39 @@ def fusion_faces(poly, thickness_mm, centre_x_mm=0.0):
     return out
 
 
+def _orient(a, b, c):
+    return (b[..., 0] - a[..., 0]) * (c[..., 1] - a[..., 1]) - (b[..., 1] - a[..., 1]) * (c[..., 0] - a[..., 0])
+
+
+def self_crossing(poly):
+    """The first pair of edges (i, j) of a closed outline that cross properly, or None."""
+    n = len(poly)
+    a, b = poly, np.roll(poly, -1, axis=0)
+    scale = max(1.0, float(np.ptp(poly)))
+    eps = 1e-12 * scale * scale
+    for i in range(n - 2):
+        j = np.arange(i + 2, n if i > 0 else n - 1)        # not neighbours of edge i
+        if not j.size:
+            continue
+        c, d = a[j], b[j]
+        o1, o2 = _orient(a[i], b[i], c), _orient(a[i], b[i], d)
+        o3, o4 = _orient(c, d, a[i]), _orient(c, d, b[i])
+        hit = (o1 * o2 < -eps * eps) & (o3 * o4 < -eps * eps)
+        if hit.any():
+            return i, int(j[np.argmax(hit)])
+    return None
+
+
 def _profile(poly, thickness_mm, centre_x_mm, source, notes=()):
     poly = _clean(poly)
     if len(poly) < 3 or abs(polygon_area(poly)) < 1e-9:
         raise ValueError("the weld outline encloses no area")
+    cross = self_crossing(poly)
+    if cross is not None:
+        i, j = cross
+        raise ValueError(f"the weld outline crosses itself (the edge from X {poly[i, 0]:.3f}, "
+                         f"Z {poly[i, 1]:.3f} mm crosses the one from X {poly[j, 0]:.3f}, "
+                         f"Z {poly[j, 1]:.3f} mm)")
     if polygon_area(poly) < 0:                   # one orientation for every profile
         poly = poly[::-1]
     return WeldProfile(poly, fusion_faces(poly, thickness_mm, centre_x_mm), source,
@@ -213,7 +243,6 @@ def template_profile(kind, thickness_mm, centre_x_mm=0.0, **params):
 def _dxf_pieces(path, layer, units=None):
     try:
         import ezdxf
-        from ezdxf import path as ezpath
     except ImportError as e:      # pragma: no cover - a dependency of the window
         raise ValueError("reading DXF needs the ezdxf package (pip install ezdxf)") from e
     try:
@@ -242,11 +271,29 @@ def _dxf_pieces(path, layer, units=None):
         layers.add(lay)
         if layer is not None and lay != layer:
             continue
-        p = ezpath.make_path(e)
-        pts = np.array([(v.x, v.y) for v in p.flattening(FLATTEN_MM / scale)], dtype=float) * scale
-        if len(pts) >= 2:
-            pieces.append((lay, pts))
+        for pts in _entity_points(e, FLATTEN_MM / scale):
+            if len(pts) >= 2:
+                pieces.append((lay, pts * scale))
     return pieces, sorted(layers), units, scale
+
+
+def _entity_points(e, tol):
+    """
+    Polylines (drawing units) of one entity, every vertex on the exact curve: lines by their
+    ends, arcs, circles, ellipses and splines by ezdxf's own curve flattening (chord deviation
+    <= tol), polylines split into their lines and arcs (bulges) first. Not through ezdxf.path,
+    whose cubic approximation of arcs adds an error the tolerance would not bound.
+    """
+    t = e.dxftype()
+    if t == "LINE":
+        return [np.array([(e.dxf.start.x, e.dxf.start.y), (e.dxf.end.x, e.dxf.end.y)], dtype=float)]
+    if t in ("LWPOLYLINE", "POLYLINE"):
+        out = []
+        for sub in e.virtual_entities():
+            out += _entity_points(sub, tol)
+        return out
+    pts = list(e.flattening(tol))                # ARC, CIRCLE, ELLIPSE, SPLINE: exact-curve vertices
+    return [np.array([(v.x, v.y) for v in pts], dtype=float)]
 
 
 def _chain(pieces, tol=JOIN_TOL_MM):

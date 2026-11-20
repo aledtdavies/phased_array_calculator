@@ -118,6 +118,52 @@ class TemplateMatchesDXF(unittest.TestCase):
                 _write_dxf(p, segs, [arc])
                 self.check(prof, p)
 
+    def test_large_radius_j_and_circle_vertices(self):
+        """Review of PR #29: arcs are flattened from the exact curve, so large radii meet the tolerance."""
+        g, r, R, b, TT = 2.0, 1.5, 100.0, 10.0, 400.0
+        prof = template_profile("single-J", TT, 0.0, bevel_deg=b, root_gap_mm=g, root_face_mm=r, root_radius_mm=R)
+        te = math.radians(90 - b)
+        cz = TT - r - R
+        ex, ez = -g / 2 - R * math.sin(te), cz + R * math.cos(te)
+        tx = ex - ez * math.tan(math.radians(b))
+        segs = [(g / 2, 0, g / 2, -TT), (g / 2, -TT, -g / 2, -TT), (-g / 2, -TT, -g / 2, -(TT - r)),
+                (ex, -ez, tx, 0), (tx, 0, g / 2, 0)]
+        p = os.path.join(self.dir, "bigj.dxf")
+        _write_dxf(p, segs, [(-g / 2, -cz, R, 270 - math.degrees(te), 270.0)])
+        d = dxf_profile(p, TT)
+        self.assertLessEqual(boundary_distance(prof.polygon, d.polygon), TOL_MM)
+        # every imported vertex of the radius lies on the analytic circle
+        on_arc = np.abs(np.hypot(d.polygon[:, 0] + g / 2, d.polygon[:, 1] - cz) - R) < 1.0
+        np.testing.assert_allclose(np.hypot(d.polygon[on_arc, 0] + g / 2, d.polygon[on_arc, 1] - cz), R, atol=1e-9)
+        self.assertGreater(on_arc.sum(), 20)
+        # a CIRCLE and a bulged LWPOLYLINE (a semicircle cap): vertices on the curve, chords within tolerance
+        doc = ezdxf.new()
+        doc.header["$INSUNITS"] = 4
+        doc.modelspace().add_circle((0, -200), 100)
+        p2 = os.path.join(self.dir, "circle.dxf")
+        doc.saveas(p2)
+        c = dxf_profile(p2, TT)
+        rad = np.hypot(c.polygon[:, 0], c.polygon[:, 1] - 200)
+        np.testing.assert_allclose(rad, 100, atol=1e-9)
+        mids = 0.5 * (c.polygon + np.roll(c.polygon, -1, axis=0))
+        self.assertLessEqual(100 - np.hypot(mids[:, 0], mids[:, 1] - 200).min(), weld.FLATTEN_MM + 1e-9)
+        doc = ezdxf.new()
+        doc.header["$INSUNITS"] = 4
+        doc.modelspace().add_lwpolyline([(-50, 0, 0, 0, 0), (50, 0, 0, 0, -1.0)], format="xyseb", close=True)
+        p3 = os.path.join(self.dir, "bulge.dxf")
+        doc.saveas(p3)
+        h = dxf_profile(p3, TT)
+        self.assertAlmostEqual(polygon_area(h.polygon), math.pi * 50 ** 2 / 2, delta=0.5)
+        below = h.polygon[h.polygon[:, 1] > 1e-9]
+        np.testing.assert_allclose(np.hypot(below[:, 0], below[:, 1]), 50, atol=1e-9)
+
+    def test_self_crossing_outline_is_refused(self):
+        p = os.path.join(self.dir, "cross.dxf")
+        pts = [(0, 0), (10, -20), (0, -20), (20, 0)]
+        _write_dxf(p, [(*a, *b) for a, b in zip(pts, pts[1:] + pts[:1])])
+        with self.assertRaisesRegex(ValueError, "crosses itself"):
+            dxf_profile(p, T)
+
     def test_hand_written_r12_file(self):
         """An ASCII DXF written without ezdxf: LINE entities only, no header, mm assumed."""
         pts = _corners("single-V", 2.0, 1.5, 30.0)

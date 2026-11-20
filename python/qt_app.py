@@ -178,6 +178,8 @@ class MainWindow(QtWidgets.QMainWindow):
                            ("sub_aperture", self.sub_aperture_panel), ("weld", self.weld_panel)):
             if key in config:
                 panel.set_values(config[key])
+        if "weld" not in config:     # saved without a weld (or before welds existed): none
+            self.weld_panel.set_values({"type": "None"})
         self.catalog.loaded(config, {"probe": self.probe_panel.get_values(),
                                      "wedge": self.wedge_panel.get_values()})
 

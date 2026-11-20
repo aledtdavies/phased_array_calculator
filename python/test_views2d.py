@@ -638,6 +638,38 @@ class Weld(_WindowCase):
         self.assertTrue(w.calc_weld.source.startswith("DXF weld.dxf"))
         self.assertAlmostEqual(w.fusion.covered_mm(), template, delta=0.1)
 
+    def test_refused_crossed_dxf_warns_and_the_laws_are_calculated(self):
+        import tempfile
+        import ezdxf
+        doc = ezdxf.new()
+        doc.header["$INSUNITS"] = 4
+        doc.modelspace().add_lwpolyline([(0, 0), (10, -20), (0, -20), (20, 0)], close=True)
+        path = os.path.join(tempfile.mkdtemp(), "cross.dxf")
+        doc.saveas(path)
+        w = self.win
+        w.weld_panel.set_values({"type": "DXF file", "dxf_path": path})
+        self.calc(LINEAR, scan=self.SCAN)
+        self.assertGreater(len(w.last_results), 0)
+        self.assertIsNone(w.calc_weld)
+        self.assertIn("crosses itself", w.weld_note.text())
+        self.assertEqual(len(self.warnings), 1)
+
+    def test_a_configuration_without_a_weld_clears_it(self):
+        """Review of PR #29: loading a weld-free (or older) configuration leaves no weld behind."""
+        w = self.win
+        w.weld_panel.set_values(self.WELD)
+        self.calc(LINEAR, scan=self.SCAN)
+        self.assertIsNotNone(w.calc_weld)
+        config = w.config_dict()
+        del config["weld"]
+        w.apply_config(config)
+        self.assertIsNone(w.weld_panel.kind())
+        self.calc(LINEAR, scan=self.SCAN)
+        w.coverage_combo.setCurrentIndex(2)
+        self.assertIsNone(w.calc_weld)
+        self.assertEqual(w.plot_tab.weld_prims, [])
+        self.assertEqual(w.weld_note.text(), "")
+
     def test_configuration_round_trip(self):
         w = self.win
         w.weld_panel.set_values(dict(self.WELD, type="Single-J", j_side="far", root_radius_mm=5))
