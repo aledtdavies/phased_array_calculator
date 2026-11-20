@@ -194,6 +194,29 @@ class TemplateMatchesDXF(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "crosses itself"):
                     dxf_profile(p, T)
 
+    def test_closed_root_double_v_in_any_entity_order(self):
+        """Review of PR #29: the two touching lobes import as one outline whatever the order."""
+        import itertools
+        prof = template_profile("double-V", T, 0.0, bevel_deg=30, root_gap_mm=0, root_face_mm=0)
+        w = (T / 2) * math.tan(math.radians(30))
+        pts = [(-w, 0), (w, 0), (0, T / 2), (w, T), (-w, T), (0, T / 2)]
+        segs = _loop_segments(pts)
+        self.assertEqual(len(segs), 6)
+        orders = [(0, 1, 2, 3, 4, 5), (0, 1, 3, 5, 2, 4)] + random.Random(3).sample(
+            list(itertools.permutations(range(6))), 40)
+        for k, order in enumerate(orders):
+            with self.subTest(order=order):
+                doc = ezdxf.new()
+                doc.header["$INSUNITS"] = 4
+                for n, i in enumerate(order):
+                    x0, y0, x1, y1 = segs[i]
+                    if n % 3 == 1:
+                        x0, y0, x1, y1 = x1, y1, x0, y0         # some drawn in reverse
+                    doc.modelspace().add_line((x0, y0), (x1, y1), dxfattribs={"layer": "WELD"})
+                p = os.path.join(self.dir, f"dv0_{k}.dxf")
+                doc.saveas(p)
+                self.check(prof, p, layer="WELD")
+
     def test_zero_gap_j_matches_a_dxf_drawn_without_the_root_face(self):
         """A closed root (no gap): the root face is not part of the weld region in either source."""
         r, R, b = 1.5, 6.0, 10.0

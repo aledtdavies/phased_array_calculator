@@ -376,6 +376,51 @@ def _entity_points(e, tol):
     return [np.array([(v.x, v.y) for v in pts], dtype=float)]
 
 
+def _dedupe(poly, tol):
+    """Drop consecutive repeated vertices (and a repeated closing vertex) only."""
+    keep = [poly[0]]
+    for v in poly[1:]:
+        if np.hypot(*(v - keep[-1])) > tol:
+            keep.append(v)
+    if len(keep) > 1 and np.hypot(*(keep[0] - keep[-1])) <= tol:
+        keep.pop()
+    return np.array(keep, dtype=float)
+
+
+def _join_touching(loops, tol=JOIN_TOL_MM):
+    """
+    Closed loops that touch at a shared vertex, joined into one pinched outline (the lobes of a
+    closed-root double-V, whichever order the file's entities came in), when the joined
+    outline is simple apart from the pinch (a loop inside another sharing a vertex is not).
+    """
+    # A loop that passes a point twice (chaining can walk a pinch as a figure-eight) is split
+    # into its lobes first, so every lobe takes one orientation before they are rejoined.
+    # (Split before _clean: walked as a figure-eight, the pinch can sit on the straight line
+    # through its neighbours, and _clean would drop it.)
+    loops = [_clean(lobe) for l in loops for lobe in split_lobes(_dedupe(l, tol), tol)]
+    loops = [l if polygon_area(l) > 0 else l[::-1] for l in loops if len(l) >= 3]
+    merged = True
+    while merged and len(loops) > 1:
+        merged = False
+        for a in range(len(loops)):
+            for b in range(a + 1, len(loops)):
+                A, B = loops[a], loops[b]
+                d = np.hypot(A[:, None, 0] - B[None, :, 0], A[:, None, 1] - B[None, :, 1])
+                ia, ib = np.unravel_index(np.argmin(d), d.shape)
+                if d[ia, ib] > tol:
+                    continue
+                # A up to the shared vertex, all of B round from it, then the rest of A
+                joined = np.vstack([A[:ia + 1], B[ib:], B[:ib], A[ia:]])
+                joined = _clean(joined)
+                if outline_fault(joined) is None:
+                    loops = [l for k, l in enumerate(loops) if k not in (a, b)] + [joined]
+                    merged = True
+                    break
+            if merged:
+                break
+    return loops
+
+
 def _chain(pieces, tol=JOIN_TOL_MM):
     """Join polylines end to end into closed loops; returns (loops, open chains)."""
     todo = [p for p in pieces]
@@ -399,7 +444,10 @@ def _chain(pieces, tol=JOIN_TOL_MM):
                 todo.pop(i)
                 grown = True
                 break
-        (loops if np.hypot(*(cur[0] - cur[-1])) <= tol and len(cur) > 3 else open_).append(cur)
+        if np.hypot(*(cur[0] - cur[-1])) <= tol and len(cur) > 3:
+            loops.append(cur[:-1])          # closed: the end point repeats the start
+        else:
+            open_.append(cur)
     return loops, open_
 
 
@@ -417,6 +465,7 @@ def dxf_profile(path, thickness_mm, centre_x_mm=0.0, datum="surface", layer=None
         raise ValueError(f"{name} has no layer {layer!r} with outline entities "
                          f"(layers: {', '.join(layers) or 'none'})")
     loops, open_ = _chain([p for _, p in pieces])
+    loops = _join_touching(loops)
     if not loops:
         if open_:
             ends = open_[0][[0, -1]]
