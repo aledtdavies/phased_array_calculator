@@ -172,11 +172,16 @@ scaneval was checked for pyqtgraph parts (FBK-0019): its linked views are still 
 
 **Finish:** each leg's reflection point lies on the backwall and the angle is preserved, tested for positive and negative skew (rotation-sign rule).
 
-**5b. Part and weld geometry.**
+**5b. Part and weld geometry.** **Status: done 2026-11-20** (`weld.py`; Weld panel in the Qt window).
 - Weld-preparation templates (single-V, double-V, J), and DXF import of the cross-section, read into the scene model.
 - Mark coverage gaps on the fusion faces.
 
 **Finish:** a template weld and a DXF of the same weld give the same polygon to tolerance.
+- Tolerance, set before the comparison was written: 0.01 mm on the boundary (symmetric Hausdorff distance), with arcs flattened to 0.002 mm on both sides. Met in `test_weld.py` for all three templates: by datum (surface or backwall), in inches, with a J radius as a DXF ARC, and for an ASCII R12 file written without ezdxf.
+- ASSUMPTION: a fusion-face point counts as covered when any fan of the selected legs reaches it (in X-Z; the weld runs along Y). The incidence angle on the face and the path through weld metal are not judged; the weld is the parent material acoustically.
+- Part geometry other than a flat plate (curved or stepped parts from DXF) is not in this step.
+
+![single-V, direct + 1st skip](images/step5b_singlev_xz.png)
 
 **Needed for:** coverage checks of scan plans for the Pogo-CIVA and weld studies.
 

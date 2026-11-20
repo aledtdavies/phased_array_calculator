@@ -19,11 +19,12 @@ from qtpy import QtCore, QtGui, QtWidgets
 
 from catalog import Catalog, CatalogError, default_catalog_dir
 from qt_catalog_dialog import CatalogPicker
-from qt_panels import MaterialPanel, ProbePanel, ScanPanel, SubAperturePanel, WedgePanel
+from qt_panels import MaterialPanel, ProbePanel, ScanPanel, SubAperturePanel, WedgePanel, WeldPanel
 from qt_plotting import PlayController
 from qt_view3d import Scene3DTab
 from qt_views2d import DelayTab, RayTab
 from coverage import MODE_ASSUMPTION, SweepCoverage
+from weld import fusion_coverage
 from session import (TABLE_HEADINGS, CatalogLinks, asset_message, build_solver, calculate,
                      law_result, write_laws_csv)
 
@@ -42,6 +43,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.mat_panel = MaterialPanel()
         self.scan_panel = ScanPanel()
         self.sub_aperture_panel = SubAperturePanel()
+        self.weld_panel = WeldPanel()
+        self.calc_weld = None         # the weld.WeldProfile of the last calculation, or None
         inner = QtWidgets.QWidget()
         col = QtWidgets.QVBoxLayout(inner)
         for p in self.panels():
@@ -94,6 +97,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.coverage_note = QtWidgets.QLabel("")
         self.coverage_note.setStyleSheet("color: #64748b; padding-left: 8px")
         bar.addWidget(self.coverage_note)
+        self.weld_note = QtWidgets.QLabel("")
+        self.weld_note.setStyleSheet("padding-left: 12px")
+        bar.addWidget(self.weld_note)
         self.coverage_combo.currentIndexChanged.connect(lambda _: self.update_coverage())
         self.calc_btn.clicked.connect(self.run_calculation)
         self.export_btn.clicked.connect(self.export_csv)
@@ -132,7 +138,7 @@ class MainWindow(QtWidgets.QMainWindow):
     # -- structure ------------------------------------------------------------------
     def panels(self):
         return (self.probe_panel, self.wedge_panel, self.mat_panel, self.scan_panel,
-                self.sub_aperture_panel)
+                self.sub_aperture_panel, self.weld_panel)
 
     def _menu(self):
         m = self.menuBar().addMenu("&File")
@@ -158,6 +164,8 @@ class MainWindow(QtWidgets.QMainWindow):
         config = {"probe": self.probe_panel.get_values(), "wedge": self.wedge_panel.get_values(),
                   "material": self.mat_panel.get_values(), "scan": self.scan_panel.get_values(),
                   "sub_aperture": self.sub_aperture_panel.get_values()}
+        if self.weld_panel.kind() is not None:      # saved only when there is a weld
+            config["weld"] = self.weld_panel.get_values()
         refs = self.catalog_status()
         if refs:
             config["catalog"] = refs
@@ -167,7 +175,7 @@ class MainWindow(QtWidgets.QMainWindow):
         """Set the panels from a saved configuration (either window's)."""
         for key, panel in (("probe", self.probe_panel), ("wedge", self.wedge_panel),
                            ("material", self.mat_panel), ("scan", self.scan_panel),
-                           ("sub_aperture", self.sub_aperture_panel)):
+                           ("sub_aperture", self.sub_aperture_panel), ("weld", self.weld_panel)):
             if key in config:
                 panel.set_values(config[key])
         self.catalog.loaded(config, {"probe": self.probe_panel.get_values(),
@@ -270,6 +278,11 @@ class MainWindow(QtWidgets.QMainWindow):
         if calc.focal_points:
             thickness_mm = self.mat_panel.get_values().get("thickness_mm", 0.0)
             self.calc_thickness_mm = thickness_mm
+            self.calc_weld, weld_error = None, None
+            try:
+                self.calc_weld = self.weld_panel.profile(thickness_mm)
+            except ValueError as e:
+                weld_error = str(e)
             outline_mm = self.wedge_outline_mm()
             self.plot_tab.update_plot(solver, calc.focal_points, calc.wave_type, results=calc.results,
                                       is_matrix=calc.is_matrix, component_thickness_mm=thickness_mm,
@@ -282,7 +295,12 @@ class MainWindow(QtWidgets.QMainWindow):
                                       global_max_delay=calc.global_max_delay, results=calc.results,
                                       is_matrix=calc.is_matrix)
             self.update_coverage()
+            if weld_error:
+                self.weld_note.setText(f"Weld not drawn: {weld_error}")
+                self.warn("Weld", f"The weld is not drawn: {weld_error}")
         else:
+            self.calc_weld = None
+            self.weld_note.setText("")
             for tab in (self.plot_tab, self.hist_tab, self.scene3d_tab):
                 tab.clear_laws()
 
@@ -318,8 +336,17 @@ class MainWindow(QtWidgets.QMainWindow):
                 except (ValueError, ArithmeticError) as e:
                     note = f"No coverage: {e}"
         self.coverage_note.setText(note)
+        weld, self.fusion = None, None
+        if self.calc_weld is not None and tab.focal_points:
+            if cov is not None:
+                self.fusion = fusion_coverage(self.calc_weld, cov)
+            weld = (self.calc_weld, self.fusion)
+            self.weld_note.setText(f"{self.calc_weld.source}: " +
+                                   (self.fusion.summary() if self.fusion else "turn Coverage on for fusion-face gaps"))
+        else:
+            self.weld_note.setText("")
         for t in (self.plot_tab, self.scene3d_tab):
-            t.set_coverage(cov)
+            t.set_coverage(cov, weld)
 
     def law_tabs(self):
         return (self.plot_tab, self.hist_tab, self.scene3d_tab)
