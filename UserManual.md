@@ -213,6 +213,13 @@ Drag to rotate, scroll to zoom. **Iso**, **X-Z**, **Y-Z** and **Top** set the ca
 
 **Tk window (matplotlib).** A rotatable 3D scene of the selected law (mm, global frame, depth drawn downward): the wedge body (catalogue outline or schematic silhouette, extruded across the element footprint), the interface plane and optional backwall, active and inactive elements (Tx/Rx coloured for dual probes), rays element → interface → focus for the active elements (an even subset of at most 48 for large apertures, ends kept), the interface points, and the focal points of the whole sweep coloured by law index. Camera presets **Iso**, **X-Z**, **Y-Z** and **Top** give the projections from within the 3D view; drag to rotate. Roof angles tilt the drawn elements but not the wedge body.
 
+### Qt window: live 2D views
+
+In the Qt window the Ray Tracing and Delays tabs are pyqtgraph views:
+- **Navigation:** scroll to zoom, drag to pan; right-click for the view menu. The law shown is shared: moving the slider, stepping or playing in any tab (or selecting a table row) moves every tab to that law.
+- **Drag the focus:** drag the focal-point marker in the X-Z view to move the focus. The law for that point is solved as you drag and shown in every tab (rays, delays, 3D), with the readout "Dragged focus (not in the sweep)". The focus keeps the current law's Y. It isn't added to the sweep, the table or the CSV, and a slider, step or table selection returns to the sweep. A focus above the surface is refused.
+- **Select an element:** click an element marker (X-Z or Y-Z), a delay bar, a delay-map cell or an element in the 3D view. It is selected in every tab: orange in the projections and the 3D view, outlined in the delay map, and reported in the 3D readout.
+
 ### Data Table Tab
 
 | Column | Description |
@@ -585,6 +592,7 @@ Pitch (Y-axis rotation by θ):          Roll (X-axis rotation by φ):
 | `session.py` | Solver from panel values, sweep into laws and table rows, focal-law CSV, catalogue links (shared by both GUIs) |
 | `navigation.py` | Law navigation: angle/skew sliders, step buttons, table selection |
 | `qt_view3d.py` | Qt 3D tab (pyvistaqt): picking, section, camera presets |
+| `qt_views2d.py` | Qt Ray Tracing and Delays tabs (pyqtgraph): dragged focus, linked element selection |
 | `scene_vtk.py` | PyVista renderer of the scene model; off-screen rendering for tests and exports |
 | `panels.py` | Input panels (Probe, Wedge, Material, Scan, SubAperture) |
 | `plotting.py` | Ray tracing, 3D view and delay GUI panels |

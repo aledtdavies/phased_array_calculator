@@ -139,6 +139,20 @@ The renderer (`add_scene` in the prototype) draws from the scene model:
 
 ### 4. Live 2D on pyqtgraph
 
+**Status: built 2026-11-20** (`qt_views2d.py`). The performance criterion is for the owner to accept, against these measurements (`tests/benchmarks/redraw_timing.py`, dev laptop, 64-element linear and 16 × 4 dual matrix, two runs):
+
+| | Ray Tracing | Delays | 3D View |
+|---|---|---|---|
+| Median per law | 19 / 33 ms | 17 / 29 ms | 25 / 30 ms |
+| Steady-state maximum | 21 / 35–50 ms | 21 / 32–35 ms | 40 / 39–40 ms |
+| First redraw after the tab is first shown (one-off cache warm-up) | 18–20 / 33 ms | 19 / 49–67 ms | 25–26 / 25–26 ms |
+
+Values are linear / dual matrix. Every steady-state maximum is at most 50 ms (one run at 49.5 ms). The first redraw of the dual-matrix Delays maps exceeds 50 ms once. Accepting the criterion as "every steady-state redraw ≤ 50 ms; one-off first redraws excluded" is the owner's call.
+
+The views stay in step, tested through shared navigation and a single Play, linked selection, the dragged focus and item reuse.
+
+scaneval was checked for pyqtgraph parts (FBK-0019): its linked views are still a backlog task, so there was nothing to copy.
+
 - X-Z and Y-Z views, delay chart, and delay map as an `ImageItem`.
 - Artist reuse: update data, never rebuild per tick.
 - Linked selection across the views and the table.

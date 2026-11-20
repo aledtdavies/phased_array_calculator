@@ -1,5 +1,29 @@
 # Changelog
 
+## Migration step 4: live 2D views on pyqtgraph — 2026-11-20
+
+Plan step 4 (`docs/plans/PLAN-2026-11-qt-vtk-migration.md`).
+
+- **The Qt window's Ray Tracing and Delays tabs on pyqtgraph** (`qt_views2d.py`), drawn from the scene model:
+  - items are built once per calculation, and only the current law's are updated per tick;
+  - X-Z, plus Y-Z for matrix and dual probes, with the wedge, probe body, dimensions, elements, envelope rays, focus and component;
+  - Delays shows a bar chart (linear) or per-array delay maps with element numbers and a colour bar (matrix).
+- **Drag the focus in X-Z.** The law for the dragged focus is solved live and shown in every tab, marked "dragged focus (not in the sweep)". The table and CSV are unchanged; any slider, step or table selection returns to the sweep. A focus dragged above the surface is refused.
+- **One current law for every tab.** A slider, step, Play or table selection in any tab moves them all; hidden tabs draw it when shown.
+- **Linked element selection.** Clicking an element marker, a delay bar, a map cell or an element in the 3D view selects it in every tab.
+- **Hidden tabs redraw only when shown,** and the 3D tab updates the law's meshes in place: a 3D redraw per law went from about 125–156 ms to 28–30 ms.
+- **Redraw per law** (dev laptop, `tests/benchmarks/redraw_timing.py`, medians):
+
+  | | Ray Tracing | Delays | 3D View | Dragged focus (solve + visible tab) |
+  |---|---|---|---|---|
+  | 64-element linear | 19 ms | 17 ms | 25 ms | 35 ms |
+  | 16 × 4 dual matrix | 33 ms | 29 ms | 30 ms | 66 ms |
+
+  Steady-state maxima are at most 50 ms. The first redraw after a tab is first shown (a one-off cache warm-up) reached 67 ms for the dual-matrix Delays maps. The dual-matrix drag includes solving 128 elements with the 3D solver. Hidden tabs redraw when shown: a drag followed by showing every tab in turn takes 126 and 160 ms, tab switching included.
+- **One Play for the window:** a single timer steps the shared law, and every Play button shows the same state.
+- `scene_model.wedge_yz_rect` (the Y-Z wedge silhouette) is shared by both renderers; the Tk images are unchanged. `session.law_result` holds one law's fields.
+- `requirements.txt` adds pyqtgraph. The Qt window no longer uses matplotlib; the Tk window and static exports still do.
+
 ## Migration step 3: the 3D view on PyVista — 2026-11-20
 
 Plan step 3 (`docs/plans/PLAN-2026-11-qt-vtk-migration.md`).

@@ -20,10 +20,11 @@ from qtpy import QtCore, QtGui, QtWidgets
 from catalog import Catalog, CatalogError, default_catalog_dir
 from qt_catalog_dialog import CatalogPicker
 from qt_panels import MaterialPanel, ProbePanel, ScanPanel, SubAperturePanel, WedgePanel
-from qt_plotting import DelayTab, RayTab
+from qt_plotting import PlayController
 from qt_view3d import Scene3DTab
+from qt_views2d import DelayTab, RayTab
 from session import (TABLE_HEADINGS, CatalogLinks, asset_message, build_solver, calculate,
-                     write_laws_csv)
+                     law_result, write_laws_csv)
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -84,7 +85,15 @@ class MainWindow(QtWidgets.QMainWindow):
         self.calc_btn.clicked.connect(self.run_calculation)
         self.export_btn.clicked.connect(self.export_csv)
         self.tree.itemSelectionChanged.connect(self.on_table_select)
+        # A click on the row already selected changes no selection but still returns the
+        # tabs to that law (for instance from a dragged focus).
+        self.tree.cellClicked.connect(lambda *_: self.on_table_select())
         self.probe_panel.probe_type_changed.connect(self.on_probe_type_changed)
+        self.play = PlayController(self.law_tabs())     # one Play for the window
+        for tab in self.law_tabs():
+            tab.element_selected.connect(self.select_element)
+            tab.law_changed.connect(self.on_law_changed)
+        self.plot_tab.focus_dragged.connect(self.on_focus_dragged)
         self.on_probe_type_changed(self.probe_panel.type_combo.currentText())
 
     # -- dialogs (overridable, so tests run without user input) -----------------------
@@ -276,6 +285,42 @@ class MainWindow(QtWidgets.QMainWindow):
         return [[self.tree.item(r, c).text() for c in range(self.tree.columnCount())]
                 for r in range(self.tree.rowCount())]
 
+    def law_tabs(self):
+        return (self.plot_tab, self.hist_tab, self.scene3d_tab)
+
+    def select_element(self, idx):
+        """An element clicked in any view: show it selected in every view."""
+        for tab in self.law_tabs():
+            tab.highlight_element(idx)
+
+    def on_law_changed(self, idx):
+        """One tab chose sweep law idx: every tab shows it (hidden tabs draw it when shown)."""
+        source = self.sender()
+        for t in self.law_tabs():
+            if t is not source and (t.custom is not None or t.current_idx != idx):
+                t.show_law(idx, notify=False)
+
+    def on_focus_dragged(self, x, z):
+        """The X-Z focus dragged to (x, z) m: solve that law live and show it in every tab."""
+        tab = self.plot_tab
+        if tab.solver is None or not tab.focal_points:
+            return
+        y = float(tab.current_focal()[1])
+        if not z > 0:
+            self.statusBar().showMessage("The focus must be below the surface (Z > 0).")
+            tab.reset_focus_marker()
+            return
+        try:
+            result = law_result(tab.solver, (x, y, z), tab.wave_type)
+        except (ValueError, ArithmeticError) as e:
+            self.statusBar().showMessage(f"No law for that focus: {e}")
+            tab.reset_focus_marker()
+            return
+        for t in self.law_tabs():
+            t.set_custom(result, (x, y, z))
+        self.statusBar().showMessage(f"Dragged focus: ({x*1e3:.1f}, {y*1e3:.1f}, {z*1e3:.1f}) mm "
+                                     "(not in the sweep; the table and CSV are unchanged)")
+
     def on_table_select(self):
         rows = self.tree.selectionModel().selectedRows()
         if not rows:
@@ -283,8 +328,8 @@ class MainWindow(QtWidgets.QMainWindow):
         idx = self.tree.item(rows[0].row(), 0).data(QtCore.Qt.UserRole)
         if idx is None:      # a refused law
             return
-        for tab in (self.plot_tab, self.hist_tab, self.scene3d_tab):
-            tab.show_law(idx)
+        for tab in self.law_tabs():
+            tab.show_law(idx, notify=False)
 
     # -- exports ----------------------------------------------------------------------
     def export_csv(self):
