@@ -654,6 +654,36 @@ class Weld(_WindowCase):
         self.assertIn("crosses itself", w.weld_note.text())
         self.assertEqual(len(self.warnings), 1)
 
+    def test_dxf_with_meshes_beside_the_outline(self):
+        """Review of PR #29: mesh POLYLINEs in the file neither stop Calculate nor the weld."""
+        import tempfile
+        import ezdxf
+        from weld import template_outline
+        doc = ezdxf.new()
+        doc.header["$INSUNITS"] = 4
+        msp = doc.modelspace()
+        msp.add_lwpolyline([(x, -z) for x, z in template_outline("single-V", 25, bevel_deg=30)], close=True)
+        msp.add_polymesh((2, 2))
+        msp.add_polyface().append_face([(200, 0, 0), (201, 0, 0), (201, 1, 0)])
+        path = os.path.join(tempfile.mkdtemp(), "mesh.dxf")
+        doc.saveas(path)
+        w = self.win
+        w.weld_panel.set_values({"type": "DXF file", "dxf_path": path, "centre_x_mm": 45})
+        self.calc(LINEAR, scan=self.SCAN)
+        self.assertGreater(len(w.last_results), 0)
+        self.assertIsNotNone(w.calc_weld)
+        self.assertEqual(self.warnings, [])
+
+    def test_a_weld_fault_never_stops_the_calculation(self):
+        w = self.win
+        w.weld_panel.set_values(self.WELD)
+        def boom(_t):
+            raise AttributeError("unexpected")
+        w.weld_panel.profile = boom
+        self.calc(LINEAR, scan=self.SCAN)
+        self.assertGreater(len(w.last_results), 0)
+        self.assertIn("AttributeError", w.weld_note.text())
+
     def test_a_configuration_without_a_weld_clears_it(self):
         """Review of PR #29: loading a weld-free (or older) configuration leaves no weld behind."""
         w = self.win

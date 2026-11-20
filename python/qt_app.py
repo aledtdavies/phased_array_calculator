@@ -285,6 +285,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.calc_weld = self.weld_panel.profile(thickness_mm)
             except ValueError as e:
                 weld_error = str(e)
+            except Exception as e:      # a fault reading a file must not stop the laws being shown
+                weld_error = f"{type(e).__name__}: {e}"
             outline_mm = self.wedge_outline_mm()
             self.plot_tab.update_plot(solver, calc.focal_points, calc.wave_type, results=calc.results,
                                       is_matrix=calc.is_matrix, component_thickness_mm=thickness_mm,
