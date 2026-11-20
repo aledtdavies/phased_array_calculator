@@ -23,6 +23,7 @@ from qt_panels import MaterialPanel, ProbePanel, ScanPanel, SubAperturePanel, We
 from qt_plotting import PlayController
 from qt_view3d import Scene3DTab
 from qt_views2d import DelayTab, RayTab
+from coverage import MODE_ASSUMPTION, SweepCoverage
 from session import (TABLE_HEADINGS, CatalogLinks, asset_message, build_solver, calculate,
                      law_result, write_laws_csv)
 
@@ -82,6 +83,18 @@ class MainWindow(QtWidgets.QMainWindow):
         self.statusBar().showMessage("Ready.")
 
         self._menu()
+        bar = self.addToolBar("View")
+        bar.setObjectName("view-toolbar")
+        bar.addWidget(QtWidgets.QLabel(" Coverage: "))
+        self.coverage_combo = QtWidgets.QComboBox()
+        self.coverage_combo.addItems(["Off", "Direct", "Direct + 1st skip", "Direct + 2 skips"])
+        self.coverage_combo.setToolTip("Central rays of the sweep through a flat plate of the "
+                                       "component Thickness. " + MODE_ASSUMPTION)
+        bar.addWidget(self.coverage_combo)
+        self.coverage_note = QtWidgets.QLabel("")
+        self.coverage_note.setStyleSheet("color: #64748b; padding-left: 8px")
+        bar.addWidget(self.coverage_note)
+        self.coverage_combo.currentIndexChanged.connect(lambda _: self.update_coverage())
         self.calc_btn.clicked.connect(self.run_calculation)
         self.export_btn.clicked.connect(self.export_csv)
         self.tree.itemSelectionChanged.connect(self.on_table_select)
@@ -256,6 +269,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.last_results = calc.results
         if calc.focal_points:
             thickness_mm = self.mat_panel.get_values().get("thickness_mm", 0.0)
+            self.calc_thickness_mm = thickness_mm
             outline_mm = self.wedge_outline_mm()
             self.plot_tab.update_plot(solver, calc.focal_points, calc.wave_type, results=calc.results,
                                       is_matrix=calc.is_matrix, component_thickness_mm=thickness_mm,
@@ -267,6 +281,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.hist_tab.update_plot(solver, calc.focal_points, calc.wave_type,
                                       global_max_delay=calc.global_max_delay, results=calc.results,
                                       is_matrix=calc.is_matrix)
+            self.update_coverage()
         else:
             for tab in (self.plot_tab, self.hist_tab, self.scene3d_tab):
                 tab.clear_laws()
@@ -284,6 +299,27 @@ class MainWindow(QtWidgets.QMainWindow):
         """The Data Table's text, row by row (as the Tk window shows it)."""
         return [[self.tree.item(r, c).text() for c in range(self.tree.columnCount())]
                 for r in range(self.tree.rowCount())]
+
+    def update_coverage(self):
+        """Compute the sweep's coverage for the selected legs and hand it to the views."""
+        legs = self.coverage_combo.currentIndex()
+        tab = self.plot_tab
+        cov, note = None, ""
+        if legs and tab.solver is not None and tab.focal_points:
+            # The thickness of the calculation the views show (not an edit made since).
+            thickness = getattr(self, "calc_thickness_mm", 0.0) * 1e-3
+            if not thickness > 0:
+                note = "Set the component Thickness to show coverage."
+            else:
+                try:
+                    cov = SweepCoverage(tab.solver, tab.results, tab.focal_points, thickness, legs,
+                                        tab.wave_type.lower())
+                    note = MODE_ASSUMPTION
+                except (ValueError, ArithmeticError) as e:
+                    note = f"No coverage: {e}"
+        self.coverage_note.setText(note)
+        for t in (self.plot_tab, self.scene3d_tab):
+            t.set_coverage(cov)
 
     def law_tabs(self):
         return (self.plot_tab, self.hist_tab, self.scene3d_tab)

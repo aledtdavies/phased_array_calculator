@@ -17,7 +17,7 @@ from pyvistaqt import QtInteractor
 from qtpy import QtWidgets
 
 from qt_plotting import LawTab, PlayMixin
-from scene_model import build_scene, user_element_numbers
+from scene_model import build_scene, coverage_prims, user_element_numbers
 from scene_vtk import (VIEWS, add_axes, add_law, add_setup, element_at_display, refit_camera,
                        set_camera)
 
@@ -110,10 +110,16 @@ class Scene3DTab(PlayMixin, LawTab):
 
     def _build_scene(self):
         cur = self.nav.current
-        return build_scene(self.solver, self._get_law_data, [cur], outline_mm=self.outline_mm, current=cur,
+        scene = build_scene(self.solver, self._get_law_data, [cur], outline_mm=self.outline_mm, current=cur,
                            max_rays=self.MAX_RAYS,
                            sweep_focal_mm=np.asarray(self.focal_points) * 1e3 if self.chk_locus.isChecked() else None,
                            element_size_m=self.element_size_m)
+        if self.coverage is not None:
+            scene.prims += coverage_prims(self.coverage, self.coverage_path_mm())
+        return scene
+
+    def _coverage_changed(self):
+        self._setup_drawn = False
 
     def _rebuild(self):
         self._setup_drawn = False

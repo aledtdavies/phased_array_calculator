@@ -64,6 +64,7 @@ class LawTab(QtWidgets.QWidget):
         self.is_playing = False
         self.custom = None
         self.selected_element = None
+        self.coverage = None          # coverage.SweepCoverage, or None (off)
         self._stale = False
         self._set_skew_visible(False)
 
@@ -123,6 +124,7 @@ class LawTab(QtWidgets.QWidget):
         self.is_matrix = is_matrix
         self.custom = None
         self.selected_element = None
+        self.coverage = None          # the window sets the new calculation's coverage
         self.nav.set_laws(results, len(self.focal_points))
         self._set_sliders(len(self.nav.angle_values) or len(self.focal_points),
                           len(self.nav.skew_values), 0, 0)
@@ -143,6 +145,24 @@ class LawTab(QtWidgets.QWidget):
         self.nav.clear()
         self.lbl_law.setText("")
         self._blank_view()
+
+    def set_coverage(self, cov):
+        """Show (or, with None, hide) the sweep's coverage and the central ray with its skips."""
+        self.coverage = cov
+        self._coverage_changed()
+        self.request_redraw()
+
+    def _coverage_changed(self):
+        """Subclasses rebuild whatever draws the coverage."""
+
+    def coverage_path_mm(self):
+        """The current law's (or dragged focus's) central-ray path in mm, or None."""
+        if self.coverage is None or not self.focal_points:
+            return None
+        path = (self.coverage.path_for(self.custom["focal"]) if self.custom
+                else self.coverage.paths[self.nav.current])
+        # From the aperture centre: the wedge leg, then the legs in the component.
+        return np.vstack([self.solver.aperture_centre()[None, :], path]) * 1e3
 
     def set_custom(self, result, focal):
         """Show a law solved for a dragged focus (result as session.calculate's; focal in m)."""

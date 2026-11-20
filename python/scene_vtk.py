@@ -17,6 +17,7 @@ from scene import (COLOR_BACKWALL, COLOR_ELEMENT_ACTIVE, COLOR_ELEMENT_INACTIVE,
                    COLOR_MATERIAL, COLOR_WEDGE_EDGE, COLOR_WEDGE_FACE, LAW_CMAP)
 
 ELEMENT_COLOUR = {"single": COLOR_ELEMENT_ACTIVE, "tx": COLOR_ELEMENT_TX, "rx": COLOR_ELEMENT_ACTIVE}
+COVERAGE_COLOUR = {1: "#2563eb", 2: "#7c3aed", 3: "#db2777"}
 RAY_COLOUR = {"single": "#2563eb", "tx": "#1d4ed8", "rx": "#dc2626"}
 
 # Camera presets: (azimuth, elevation) in degrees of the view direction; see set_camera.
@@ -101,6 +102,12 @@ def add_setup(pl, scene, component_thickness_mm=0.0, section=False):
             pl.add_points(p.coords, color=ELEMENT_COLOUR[p.meta["array"]] if p.meta["active"] else COLOR_ELEMENT_INACTIVE,
                           point_size=8, render_points_as_spheres=True,
                           name=f"setup:elements-{p.meta['array']}-{int(p.meta['active'])}")
+    for p in scene.find("coverage"):
+        n = len(p.coords) // 4
+        faces = np.c_[np.full(n, 4), np.arange(4 * n).reshape(n, 4)].ravel()
+        pl.add_mesh(pv.PolyData(p.coords, faces), color=COVERAGE_COLOUR.get(p.meta["leg"], "#64748b"),
+                    opacity=0.15, name=f"setup:coverage-{p.meta['leg']}",
+                    label={1: "Coverage, direct", 2: "Coverage, 1st skip", 3: "Coverage, 2nd skip"}.get(p.meta["leg"]))
     for p in scene.find("focus-sweep"):
         if len(p.coords) > 1:
             pl.add_points(p.coords, scalars=np.asarray(p.meta["law"], dtype=float), cmap=LAW_CMAP,
@@ -117,6 +124,9 @@ def _law_geometry(scene):
                                                                          opacity=0.6, line_width=1, label="Rays"))
     for p in scene.find("interface-point"):
         out["law:interface"] = (p.coords, "points", dict(color="black", point_size=4, label="Interface points"))
+    for p in scene.find("central-ray"):
+        out["law:central-ray"] = (p.coords, "polyline", dict(color="black", line_width=3,
+                                                             label="Central ray (skips)"))
     focus = [p for p in scene.find("focus") if p.meta["law"] == current_law(scene)]
     if focus:
         out["law:focus"] = (focus[0].coords, "points", dict(color="black", point_size=16,
@@ -144,8 +154,13 @@ def add_law(pl, scene):
             mesh.points = np.asarray(pts, dtype=float)
             mesh.Modified()
             continue
-        mesh = pv.line_segments_from_points(pts) if kind == "segments" else pv.PolyData(np.asarray(pts, dtype=float))
         if kind == "segments":
+            mesh = pv.line_segments_from_points(pts)
+        elif kind == "polyline":
+            mesh = pv.lines_from_points(np.asarray(pts, dtype=float))
+        else:
+            mesh = pv.PolyData(np.asarray(pts, dtype=float))
+        if kind in ("segments", "polyline"):
             pl.add_mesh(mesh, name=name, **style)
         else:
             pl.add_points(mesh, name=name, **style)
