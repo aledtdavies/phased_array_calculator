@@ -164,6 +164,22 @@ class TemplateMatchesDXF(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "crosses itself"):
             dxf_profile(p, T)
 
+    def test_mesh_polylines_are_ignored(self):
+        """Review of PR #29: polygon and polyface meshes beside the outline do not stop the import."""
+        doc = ezdxf.new()
+        doc.header["$INSUNITS"] = 4
+        msp = doc.modelspace()
+        msp.add_lwpolyline([(x, -z) for x, z in weld.template_outline("single-V", T, bevel_deg=30)], close=True)
+        mesh = msp.add_polymesh((2, 2))
+        for i, (m, n) in enumerate(((0, 0), (0, 1), (1, 0), (1, 1))):
+            mesh.set_mesh_vertex((m, n), (100 + m, 100 + n, i))
+        pf = msp.add_polyface()
+        pf.append_face([(200, 0, 0), (201, 0, 0), (201, 1, 0)])
+        p = os.path.join(self.dir, "mesh.dxf")
+        doc.saveas(p)
+        d = dxf_profile(p, T)
+        self.assertLessEqual(boundary_distance(d.polygon, template_profile("single-V", T, bevel_deg=30).polygon), TOL_MM)
+
     def test_hand_written_r12_file(self):
         """An ASCII DXF written without ezdxf: LINE entities only, no header, mm assumed."""
         pts = _corners("single-V", 2.0, 1.5, 30.0)
@@ -296,6 +312,20 @@ class FusionCoverage(unittest.TestCase):
                 np.testing.assert_array_equal(inside, f.covered)
         self.assertGreater(got[1], got[0])
         self.assertGreater(got[0], 0.0)
+
+    def test_faces_on_a_fans_edges_are_covered(self):
+        """Review of PR #29: a face lying on a fan's boundary is covered, on either side and sloped."""
+        p = template_profile("single-V", T, 0.0, bevel_deg=0, root_gap_mm=2)
+        q = np.array([[-1, 0, 0], [1, 0, 0], [1, 0, 25], [-1, 0, 25]]) * 1e-3
+        fc = fusion_coverage(p, _Cov({1: [q]}, 1))
+        for f in fc.faces:
+            self.assertTrue(f.covered.all(), f.name)
+        s = template_profile("single-V", T, 0.0, bevel_deg=30)
+        _, face = s.faces[1]                     # the +X bevel, as the fan's left edge
+        q2 = np.array([[face[0, 0], 0, face[0, 1]], [face[0, 0] + 30, 0, face[0, 1]],
+                       [face[-1, 0] + 30, 0, face[-1, 1]], [face[-1, 0], 0, face[-1, 1]]]) * 1e-3
+        fc2 = fusion_coverage(s, _Cov({1: [q2]}, 1))
+        self.assertTrue(dict((f.name, f.covered.all()) for f in fc2.faces)["Fusion face, +X side"])
 
     def test_inside(self):
         sq = np.array([[0, 0], [1, 0], [1, 1], [0, 1]], float)

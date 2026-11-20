@@ -40,6 +40,7 @@ FLATTEN_MM = 0.002        # largest chord deviation when an arc or curve is flat
 WALL_TOL_MM = 1e-6        # a vertex this close to Z = 0 or Z = T lies on that wall
 JOIN_TOL_MM = 1e-3        # DXF entity ends this close together are joined
 SAMPLE_MM = 0.05          # fusion faces are tested for coverage at this spacing
+EDGE_TOL_MM = 1e-6        # a face point this close to a fan's edge is inside the fan
 TEMPLATES = ("single-V", "double-V", "single-J")
 
 _INSUNITS_MM = {0: 1.0, 1: 25.4, 2: 304.8, 4: 1.0, 5: 10.0, 6: 1000.0, 14: 100.0}
@@ -267,6 +268,8 @@ def _dxf_pieces(path, layer, units=None):
     for e in doc.modelspace():
         if e.dxftype() not in types:
             continue
+        if e.dxftype() == "POLYLINE" and (e.is_polygon_mesh or e.is_poly_face_mesh):
+            continue        # surface meshes are not cross-section outlines
         lay = e.dxf.get("layer", "0")
         layers.add(lay)
         if layer is not None and lay != layer:
@@ -290,7 +293,8 @@ def _entity_points(e, tol):
     if t in ("LWPOLYLINE", "POLYLINE"):
         out = []
         for sub in e.virtual_entities():
-            out += _entity_points(sub, tol)
+            if sub.dxftype() in ("LINE", "ARC"):     # a 2D/3D polyline's parts; nothing else is an outline
+                out += _entity_points(sub, tol)
         return out
     pts = list(e.flattening(tol))                # ARC, CIRCLE, ELLIPSE, SPLINE: exact-curve vertices
     return [np.array([(v.x, v.y) for v in pts], dtype=float)]
@@ -394,15 +398,21 @@ def boundary_distance(p, q):
 
 # ---------------------------------------------------------------------------
 # Fusion-face coverage
-def _inside(pts, poly):
-    """Even-odd point-in-polygon test, (N,) bool, for points (N, 2) and polygon (K, 2)."""
+def _inside(pts, poly, tol=EDGE_TOL_MM):
+    """
+    Points (N, 2) inside or on the edge (within tol) of polygon (K, 2): (N,) bool. Even-odd
+    test for the interior; a point on an edge counts, so a face lying on a fan's outer ray is
+    covered whichever side the edge falls.
+    """
+    pc = np.vstack([poly, poly[:1]])
+    on_edge = _point_to_segments(pts, pc[:-1], pc[1:]) <= tol
     x, z = pts[:, 0][:, None], pts[:, 1][:, None]
     ax, az = poly[:, 0][None], poly[:, 1][None]
     bx, bz = np.roll(poly[:, 0], -1)[None], np.roll(poly[:, 1], -1)[None]
     cross = (az > z) != (bz > z)
     with np.errstate(divide="ignore", invalid="ignore"):
         xi = ax + (z - az) * (bx - ax) / (bz - az)
-    return np.count_nonzero(cross & (x < xi), axis=1) % 2 == 1
+    return on_edge | (np.count_nonzero(cross & (x < xi), axis=1) % 2 == 1)
 
 
 @dataclass
