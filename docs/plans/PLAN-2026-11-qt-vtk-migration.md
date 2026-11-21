@@ -198,6 +198,31 @@ scaneval was checked for pyqtgraph parts (FBK-0019): its linked views are still 
 
 What this case does and does not test: a steered, unfocused 64-element beam checks the geometry, delays, refraction and the beam's width and direction closely. It checks the amplitude physics (directivity, transmission across angles) only weakly, because those vary slowly across a 45° beam. Beyond −12 dB on the beam's far side the maps differ. The model shows a broad −15 to −25 dB skirt; the FE map blanks most of that region (its first-arrival gate removes up-going arrivals) and also holds head and surface waves the model does not. Not checked: focused laws, longitudinal mode, 3D mode.
 
+**Further checks (owner, 2026-11-21: "do all of the recommendations").** Two more references are staged as buildFE Task 204 (bundle `fe-ref_wedge_laws_20261121`, waiting for the cluster). Each is Task 125's case with another law:
+
+- `focused_sv55`: shear, elements 1–32, focused at plate (67.816, −25.000) mm, which is the calculator's 55° constant-depth law at 25 mm.
+- `steer_l60`: longitudinal, all 64 elements, unfocused at 60°. Its wedge ray is at 20.1°, 3.2° below the first critical angle.
+
+Two further checks cannot be staged yet, because buildFE does not build them:
+- a couplant layer (`contact: "couplant"` is reserved; fluid–solid coupling is not produced);
+- 3D (wedges are refused in 3D until the Task 189 follow-on).
+
+**Tolerances for these two cases, stated in advance (2026-11-21, before the cluster run).** The same measurement rule and FE gate as the 45° case are used (`validation/beam_field`, `--case`).
+
+| Case | Metric | Tolerance |
+|---|---|---|
+| `focused_sv55` | beam axis angle | within 1.5° of the FE value |
+| | axis exit point | within 2.0 mm |
+| | −6 dB width across the beam at Z = 15, 25, 35 mm | within 15 % at each depth |
+| | axis level re the maximum at those depths | within 2.0 dB |
+| | position of the map's peak within the beam band | within 4.0 mm (distance) |
+| `steer_l60` | beam axis angle | within 1.0° |
+| | axis exit point | within 2.0 mm |
+| | −6 dB width at Z = 10, 20, 30, 40 mm | within 10 % at each depth |
+| | axis level at those depths | within 1.5 dB |
+
+These tolerances are wider for the focused case, because its width and level change along the beam and the near-focus region is where the ray model is least exact. A case outside its tolerance is reported as a failure with the numbers; the tolerances are not changed after the results are seen.
+
 - Check first whether buildFE, imageFE or nde-knowledge already provide a validated field or beam model. If one exists, call it; never re-implement it here.
 - Show the field over the X-Z section and on 3D slices.
 
