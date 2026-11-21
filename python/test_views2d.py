@@ -196,6 +196,37 @@ class Views2D(_WindowCase):
         self.assertEqual(tab.current_idx, 3)
 
 
+class DragReframe(_WindowCase):
+    """A focus dragged to the edge of the view: the view widens on release (auto-reframe)."""
+
+    def test_release_widens_the_view_to_the_dragged_law_only_when_needed(self):
+        w = self.calc(LINEAR, sub={"start_element": 5, "num_active_elements": 8})
+        tab = w.plot_tab
+        vb = tab.xz.getViewBox()
+        tab.xz.setRange(xRange=(-10, 40), yRange=(-15, 25), padding=0)    # a zoomed-in view
+        self.qapp.processEvents()
+        before = vb.viewRect()
+        tab.xz.focus.setPos(38.0, 24.0)             # dragged to the corner of the view
+        self.qapp.processEvents()
+        self.assertIsNotNone(tab.custom)
+        tab.xz.focus.sigPositionChangeFinished.emit(tab.xz.focus)   # the mouse is released
+        self.qapp.processEvents()
+        r = vb.viewRect()
+        pts = tab.xz.law_points()
+        m = tab.xz.REFRAME_MARGIN
+        self.assertGreaterEqual(pts[:, 0].min(), r.left() + m * r.width() - 1e-6)
+        self.assertLessEqual(pts[:, 0].max(), r.right() - m * r.width() + 1e-6)
+        self.assertLessEqual(pts[:, 1].max(), r.bottom() - m * r.height() + 1e-6)
+        self.assertTrue(r.contains(before))          # widened, never narrowed
+        # a drag that ends well inside the view leaves the user's framing alone
+        tab.xz.focus.setPos(20.0, 12.0)
+        self.qapp.processEvents()
+        held = vb.viewRect()
+        tab.xz.focus.sigPositionChangeFinished.emit(tab.xz.focus)
+        self.qapp.processEvents()
+        self.assertEqual(vb.viewRect(), held)
+
+
 class _Click:
     """A scene click event as pyqtgraph's scene delivers it (only scenePos is read)."""
 

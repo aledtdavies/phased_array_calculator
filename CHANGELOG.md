@@ -1,5 +1,9 @@
 # Changelog
 
+## Dragged focus: the view reframes on release — 2026-11-21
+
+- Releasing a dragged focus widens the Ray Tracing views (X-Z, and Y-Z where shown) when the law's rays, central ray or focus lie within 10 % of the view's edge or outside it; a view that already shows them is left as the user set it. The view never narrows. Images: `docs/plans/images/drag_reframe_before.png`, `drag_reframe_after.png`.
+
 ## Step 7: headless Docker image — 2026-11-21
 
 Plan step 7 (approved by the owner on 2026-11-20); finish criteria committed first (4e4cbc2).
