@@ -1,0 +1,7 @@
+.git
+**/__pycache__
+build
+dist
+*.pdf
+validation/beam_field/out
+prototypes
