@@ -230,6 +230,14 @@ Docker is useful here for testing and for regenerating the documentation images.
 - **For headless work:** a Linux image that runs the tests and renders the off-screen VTK screenshots (as the prototype does) would make the images and regression screenshots reproducible, for CI or for the cluster.
 - **What still needs checking:** which VTK build renders off-screen headless (an OSMesa or EGL variant, or xvfb). Docker is not installed on this laptop, so nothing was tested. Proposed as optional step 7, after step 3.
 
+**Step 7: status done 2026-11-21** (`docker/`, `tools/render_doc_images.py`, `.github/workflows/headless.yml`). The finish criteria below are met in GitHub Actions: the image builds from this repository alone; 191 tests pass and 2 skip, both for the missing sibling buildFE catalogue; the documentation images render with Mesa llvmpipe. VTK's standard wheel works under Xvfb, so no OSMesa or EGL build is needed.
+
+**Step 7 (approved 2026-11-20), finish criteria fixed 2026-11-21 before the image was built:**
+- `docker/Dockerfile` builds a Linux image from this repository alone (no sibling checkouts), in GitHub Actions (Docker is not on the dev laptop).
+- Inside it, the full test suite runs under Xvfb with Mesa software OpenGL (the standard VTK and PySide6 wheels, native `xcb` platform, as on the laptop). Every test passes; any skip is listed in the run with its reason (expected: the sibling-buildFE catalogue test).
+- `images` renders the documentation screenshots (Qt window grabs, 2D and 3D views) to an artefact, without a GPU or a desktop. They are not expected to be pixel-identical with the Windows images (other GL, fonts and DPI); they are shown to the owner.
+- **Needed for:** reproducible regression runs and documentation images in CI or on the cluster.
+
 ## Parts from other suite components (D3, FBK-0019)
 
 viewFE (PyVista/pyvistaqt, PySide6) and scaneval (pyqtgraph, PySide6) already contain pieces this plan needs: a VTK scene widget, image panels and colour-map handling. The owner allows copying them.
