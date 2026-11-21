@@ -1,0 +1,42 @@
+# Plan step 7: build the headless image (docker/Dockerfile), run the test suite in it under Xvfb,
+# and render the documentation screenshots. Results and images are uploaded as an artefact.
+name: headless
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  docker:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the image
+        run: docker build -t pac-headless -f docker/Dockerfile .
+
+      - name: Versions and OpenGL renderer
+        run: docker run --rm pac-headless info
+
+      - name: Test suite
+        run: |
+          mkdir -p out
+          docker run --rm -v "$PWD/out:/out" pac-headless test
+
+      - name: Documentation images
+        if: always()
+        run: docker run --rm -v "$PWD/out:/out" pac-headless images
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: headless-results
+          path: out/
+          if-no-files-found: warn
