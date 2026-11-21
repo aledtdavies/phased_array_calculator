@@ -1,0 +1,91 @@
+{
+ "_note": "Saved by the Tk window (python/app.py) before it was retired, 2026-11-21: its defaults and a dual-matrix setup. The Qt window must load both unchanged.",
+ "defaults": {
+  "probe": {
+   "num_elements": 16.0,
+   "pitch_mm": 0.5,
+   "num_elements_y": 1.0,
+   "pitch_y_mm": 0.0,
+   "freq_mhz": 5.0,
+   "probe_type": "Linear"
+  },
+  "wedge": {
+   "angle_deg": 36.0,
+   "height_mm": 15.0,
+   "velocity_ms": 2330.0,
+   "offset_mm": 0.0,
+   "array_sep_mm": 0.0,
+   "roof_angle_deg": 0.0
+  },
+  "material": {
+   "vel_long_ms": 5920.0,
+   "vel_shear_ms": 3240.0,
+   "thickness_mm": 0.0
+  },
+  "scan": {
+   "start_angle": 40.0,
+   "end_angle": 70.0,
+   "step_angle": 1.0,
+   "start_skew": 0.0,
+   "end_skew": 0.0,
+   "step_skew": 1.0,
+   "target_y_mm": 0.0,
+   "y_start_mm": 0.0,
+   "y_end_mm": 0.0,
+   "y_step_mm": 1.0,
+   "param_val": 50.0,
+   "focus_mode": "Constant Depth",
+   "wave_type": "Longitudinal",
+   "y_focus_mode": "Derived from Skew"
+  },
+  "sub_aperture": {
+   "start_element": 1,
+   "num_active_elements": 0,
+   "element_order": "column-first"
+  }
+ },
+ "dual_matrix": {
+  "probe": {
+   "num_elements": 6.0,
+   "pitch_mm": 0.8,
+   "num_elements_y": 3.0,
+   "pitch_y_mm": 1.1,
+   "freq_mhz": 5.0,
+   "probe_type": "Dual Matrix"
+  },
+  "wedge": {
+   "angle_deg": 18.95,
+   "height_mm": 8.65,
+   "velocity_ms": 2330.0,
+   "offset_mm": 0.0,
+   "array_sep_mm": 12.0,
+   "roof_angle_deg": 4.0
+  },
+  "material": {
+   "vel_long_ms": 5920.0,
+   "vel_shear_ms": 3240.0,
+   "thickness_mm": 0.0
+  },
+  "scan": {
+   "start_angle": 40.0,
+   "end_angle": 70.0,
+   "step_angle": 1.0,
+   "start_skew": 0.0,
+   "end_skew": 0.0,
+   "step_skew": 1.0,
+   "target_y_mm": 2.5,
+   "y_start_mm": 0.0,
+   "y_end_mm": 0.0,
+   "y_step_mm": 1.0,
+   "param_val": 33.3,
+   "focus_mode": "Vertical Line",
+   "wave_type": "Longitudinal",
+   "y_focus_mode": "Fixed Y"
+  },
+  "sub_aperture": {
+   "start_element": 4,
+   "num_active_elements": 9,
+   "element_order": "row-first"
+  }
+ }
+}
