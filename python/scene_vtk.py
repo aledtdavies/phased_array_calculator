@@ -164,6 +164,25 @@ def _law_geometry(scene):
     return out
 
 
+def add_field(pl, slices, floor_db=-30.0):
+    """
+    Beam field sections (qt_field: dicts with points_mm (nz, nh, 3) and db (nz, nh)) as
+    coloured planes: turbo, floor_db to 0 dB, one shared colour bar. Returns the meshes.
+    """
+    meshes = []
+    for k, s in enumerate(slices):
+        P = np.asarray(s["points_mm"], dtype=float)
+        grid = pv.StructuredGrid(P[..., 0], P[..., 1], P[..., 2])
+        grid.point_data["dB"] = np.asarray(s["db"], dtype=float).ravel(order="F")
+        pl.add_mesh(grid, scalars="dB", cmap="turbo", clim=(floor_db, 0.0), name=f"beam-field-{k}",
+                    show_scalar_bar=(k == 0), lighting=False,
+                    scalar_bar_args={"title": "Beam field (dB)", "vertical": True,
+                                     "position_x": 0.88, "position_y": 0.35, "height": 0.4,
+                                     "width": 0.06, "color": "black"})
+        meshes.append(grid)
+    return meshes
+
+
 def add_law(pl, scene):
     """
     The current law's rays, interface points and focus. When the previous law's actors have

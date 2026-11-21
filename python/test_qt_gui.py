@@ -146,7 +146,7 @@ class TestQtWindow(QtCase):
         self.assertEqual(menu, ["Save Configuration", "Load Configuration", "Export Element Coordinates",
                                 "Load Probe from Catalogue...", "Load Wedge from Catalogue...", "Exit"])
         self.assertEqual([self.win.tabs.tabText(i) for i in range(self.win.tabs.count())],
-                         ["Ray Tracing", "Data Table", "Delays", "3D View"])
+                         ["Ray Tracing", "Data Table", "Delays", "3D View", "Beam Field"])   # + step 6
         self.assertTrue(hasattr(self.win.plot_tab, "chk_all") and hasattr(self.win.plot_tab, "play_btn"))
         self.assertEqual(sorted(self.win.scene3d_tab.view_buttons), ["Iso", "Top", "X-Z", "Y-Z"])
 

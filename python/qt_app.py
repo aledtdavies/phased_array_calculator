@@ -21,6 +21,7 @@ from catalog import Catalog, CatalogError, default_catalog_dir
 from qt_catalog_dialog import CatalogPicker
 from qt_panels import MaterialPanel, ProbePanel, ScanPanel, SubAperturePanel, WedgePanel, WeldPanel
 from qt_plotting import PlayController
+from qt_field import FieldTab
 from qt_view3d import Scene3DTab
 from qt_views2d import DelayTab, RayTab
 from coverage import MODE_ASSUMPTION, SweepCoverage
@@ -82,6 +83,18 @@ class MainWindow(QtWidgets.QMainWindow):
         self.tabs.addTab(self.tree, "Data Table")
         self.tabs.addTab(self.hist_tab, "Delays")
         self.tabs.addTab(self.scene3d_tab, "3D View")
+        self.field_tab = FieldTab()
+        self.tabs.addTab(self.field_tab, "Beam Field")
+        self.field_tab.field_changed.connect(self.scene3d_tab.set_field)
+        # Edits to the setup the laws were solved for make a computed field stale.
+        for panel in (self.probe_panel, self.wedge_panel, self.mat_panel, self.scan_panel,
+                      self.sub_aperture_panel):
+            for w in panel.findChildren(QtWidgets.QLineEdit):
+                w.textChanged.connect(lambda *_: self.field_tab.setup_edited())
+            for w in panel.findChildren(QtWidgets.QComboBox):
+                w.currentIndexChanged.connect(lambda *_: self.field_tab.setup_edited())
+            for w in panel.findChildren(QtWidgets.QAbstractButton):
+                w.toggled.connect(lambda *_: self.field_tab.setup_edited())
         self.setCentralWidget(self.tabs)
         self.statusBar().showMessage("Ready.")
 
@@ -166,6 +179,8 @@ class MainWindow(QtWidgets.QMainWindow):
                   "sub_aperture": self.sub_aperture_panel.get_values()}
         if self.weld_panel.kind() is not None:      # saved only when there is a weld
             config["weld"] = self.weld_panel.get_values()
+        if not self.field_tab.is_default():          # saved only when set (Tk files stay identical)
+            config["beam_field"] = self.field_tab.get_values()
         refs = self.catalog_status()
         if refs:
             config["catalog"] = refs
@@ -180,6 +195,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 panel.set_values(config[key])
         if "weld" not in config:     # saved without a weld (or before welds existed): none
             self.weld_panel.set_values({"type": "None"})
+        self.field_tab.set_values(config.get("beam_field", self.field_tab.DEFAULTS))
         self.catalog.loaded(config, {"probe": self.probe_panel.get_values(),
                                      "wedge": self.wedge_panel.get_values()})
 
@@ -244,6 +260,11 @@ class MainWindow(QtWidgets.QMainWindow):
             self.wedge_panel.set_values(asset.panel_values())
             self.wedge_panel.material.setCurrentText("Custom")
         self.catalog.apply(kind, asset)
+        if kind == "probe":
+            self.field_tab.set_values({"element_width_mm": asset.element_width and asset.element_width * 1e3,
+                                       "elevation_mm": asset.elevation and asset.elevation * 1e3})
+        else:
+            self.field_tab.set_values({"wedge_shear_ms": asset.shear_velocity, "wedge_density": asset.density})
         self.statusBar().showMessage(f"{kind.capitalize()} from catalogue: {asset.ref.id}")
         self.info("Catalogue entry applied", asset_message(kind, asset))
 
@@ -299,6 +320,8 @@ class MainWindow(QtWidgets.QMainWindow):
                                       global_max_delay=calc.global_max_delay, results=calc.results,
                                       is_matrix=calc.is_matrix)
             self.update_coverage()
+            self.field_tab.setup_dirty = False       # the laws now match the setup
+            self.update_field_context()
             if weld_error:
                 self.weld_note.setText(f"Weld not drawn: {weld_error}")
                 self.warn("Weld", f"The weld is not drawn: {weld_error}")
@@ -307,6 +330,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.weld_note.setText("")
             for tab in (self.plot_tab, self.hist_tab, self.scene3d_tab):
                 tab.clear_laws()
+            self.field_tab.set_context(None, None, None, 0.0)
 
         if not calc.results:
             self.warn("No Results", "No valid focal laws could be calculated.\nPlease check your "
@@ -366,6 +390,16 @@ class MainWindow(QtWidgets.QMainWindow):
         for t in self.law_tabs():
             if t is not source and (t.custom is not None or t.current_idx != idx):
                 t.show_law(idx, notify=False)
+        self.update_field_context()
+
+    def update_field_context(self):
+        """Tell the Beam Field tab which law the window now shows."""
+        tab = self.plot_tab
+        if tab.solver is None or not tab.focal_points:
+            self.field_tab.set_context(None, None, None, 0.0)
+            return
+        self.field_tab.set_context(tab.solver, tab.current_result(), tab.wave_type,
+                                   getattr(self, "calc_thickness_mm", 0.0), tab.lbl_law.text())
 
     def on_focus_dragged(self, x, z):
         """The X-Z focus dragged to (x, z) m: solve that law live and show it in every tab."""
@@ -385,6 +419,7 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         for t in self.law_tabs():
             t.set_custom(result, (x, y, z))
+        self.update_field_context()
         self.statusBar().showMessage(f"Dragged focus: ({x*1e3:.1f}, {y*1e3:.1f}, {z*1e3:.1f}) mm "
                                      "(not in the sweep; the table and CSV are unchanged)")
 
@@ -397,6 +432,7 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         for tab in self.law_tabs():
             tab.show_law(idx, notify=False)
+        self.update_field_context()
 
     # -- exports ----------------------------------------------------------------------
     def export_csv(self):
@@ -434,6 +470,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
 
     def closeEvent(self, event):      # noqa: N802 - Qt's name
+        self.field_tab.shutdown()            # stop and join a running field computation
         self.scene3d_tab.plotter.close()     # release the VTK render window
         super().closeEvent(event)
 

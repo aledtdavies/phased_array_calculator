@@ -187,10 +187,34 @@ scaneval was checked for pyqtgraph parts (FBK-0019): its linked views are still 
 
 ### 6. Beam field view (optional; approval needed)
 
+**Status: done 2026-11-20** (`beam_field.py`, `beam_metrics.py`, `qt_field.py`; `validation/beam_field/`). The finish criterion is met: every metric is within the tolerance below, which was committed (fb37a6a) before the comparison was run.
+
+| Metric | buildFE FE | Calculator | Difference | Tolerance |
+|---|---|---|---|---|
+| Axis angle (deg) | 45.27 | 44.90 | −0.37 | ≤ 1.0 |
+| Exit X (mm, plate frame) | 44.59 | 44.59 | +0.01 | ≤ 2.0 |
+| −6 dB width at Z 10 / 20 / 30 / 40 mm | 37.89 / 37.67 / 37.45 / 37.02 | 37.91 / 37.69 / 37.26 / 37.04 | +0.07 / +0.07 / −0.52 / +0.06 % | ≤ 10 % |
+| Axis level at Z 10 / 20 / 30 / 40 mm (dB) | −0.49 / −0.61 / −0.55 / −0.40 | −0.46 / −0.23 / −0.10 / −0.04 | +0.03 / +0.38 / +0.44 / +0.36 | ≤ 1.5 |
+
+What this case does and does not test: a steered, unfocused 64-element beam checks the geometry, delays, refraction and the beam's width and direction closely. It checks the amplitude physics (directivity, transmission across angles) only weakly, because those vary slowly across a 45° beam. Beyond −12 dB on the beam's far side the maps differ. The model shows a broad −15 to −25 dB skirt; the FE map blanks most of that region (its first-arrival gate removes up-going arrivals) and also holds head and surface waves the model does not. Not checked: focused laws, longitudinal mode, 3D mode.
+
 - Check first whether buildFE, imageFE or nde-knowledge already provide a validated field or beam model. If one exists, call it; never re-implement it here.
 - Show the field over the X-Z section and on 3D slices.
 
 **Finish:** compared with a reference (CIVA or a buildFE solve) on one case, with the tolerance stated in advance.
+
+**Survey (2026-11-20).** No suite component holds an analytic or semi-analytic beam model: buildFE makes full-wave FE field maps (Tasks 125, 128, 129), imageFE builds travel-time tables in MATLAB, and nde-knowledge has no beam model. The calculator therefore gets its own ray-based model (a delayed sum of element contributions with Miller-Pursey strip directivity, wedge-to-part transmission and beam spread), with arim (MIT) functions copied with attribution where they fit.
+
+**Reference case, fixed before the model was run.** buildFE Task 125's defect-free wedge beam (case `f74b8bab65`, returned 2026-10-07): 2.25L64-A2 on SA2-N55S, all 64 elements, `steer` law at 45 degrees shear, 3-cycle Hann toneburst at 2.25 MHz, 2D plane strain, wedge bonded to the steel (shared nodes), steel 5900/3230 m/s, Rexolite 2337 m/s. The FE map is the time-flattened peak envelope of the first arrival (buildFE `make_field_figures`, gate `first`). The calculator runs the same case in its 2D (line-element) mode with the same delays.
+
+**Tolerance, stated in advance (2026-11-20, before any comparison was run).** Both maps are measured with one Python port of `make_field_figures`' beam metrics (axis through the midpoints of each row's -6 dB band, widths across the axis). The port is checked first: on the FE frames it must reproduce buildFE's `beam_metrics.csv` to within one grid cell (0.31 mm) and 0.1 degree. Then the calculator's map passes if:
+
+| Metric | Tolerance |
+|---|---|
+| Beam axis angle from vertical | within 1.0 degree of the FE value |
+| Axis exit point on the surface | within 2.0 mm |
+| -6 dB width across the beam at Z = 10, 20, 30, 40 mm | within 10 % of the FE width at each depth |
+| Axis level re the beam maximum at those depths | within 1.5 dB |
 
 ## Packaging
 
