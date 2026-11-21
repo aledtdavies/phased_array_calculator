@@ -55,7 +55,7 @@ Both **Python** (Qt GUI + importable library) and **MATLAB** (App Designer GUI +
 **Requirements:** Python 3.9+ and `python/requirements.txt` (numpy, scipy, matplotlib, PySide6, qtpy, pyvista, pyvistaqt, pyqtgraph, ezdxf)
 
 ```bash
-pip install numpy scipy matplotlib
+pip install -r python/requirements.txt
 python python/qt_app.py      # the window
 ```
 
