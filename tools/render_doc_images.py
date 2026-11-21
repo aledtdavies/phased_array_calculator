@@ -69,7 +69,8 @@ class Shots:
         time.sleep(0.2)
         self.app.processEvents()
         path = os.path.join(self.out, name)
-        w.grab().save(path)
+        if not w.grab().save(path):
+            raise RuntimeError(f"could not save {path}")
         self.index.append(f"{name}\t{note}")
         print(name, "|", note)
 
@@ -78,6 +79,15 @@ class Shots:
         with open(os.path.join(self.out, "index.txt"), "w", encoding="utf-8") as f:
             f.write(f"probe and wedge from: {src}\n")
             f.write("\n".join(self.index) + "\n")
+
+
+def compute(w, **values):
+    """Compute the field and refuse to go on with a failed or stale one."""
+    w.field_tab.set_values(values)
+    w.field_tab.compute(sync=True)
+    job = w.field_tab.job
+    if job is None or not job.get("fresh"):
+        raise RuntimeError(f"no field: {w.field_tab.status.text()}")
 
 
 def main(out):
@@ -98,11 +108,9 @@ def main(out):
     idx = [i for i, r in enumerate(w.plot_tab.results) if abs(r["angle"] - 55) < 1e-6][0]
     w.plot_tab.show_law(idx)
     s.app.processEvents()
-    w.field_tab.set_values({"model": "2D", "pulsed": True, "cycles": 3, "grid_mm": 0.25})
-    w.field_tab.compute(sync=True)
+    compute(w, model="2D", pulsed=True, cycles=3, grid_mm=0.25)
     s.save(w, w.field_tab, "step6_field_2d.png", w.field_tab.status.text())
-    w.field_tab.set_values({"model": "3D", "pulsed": False, "grid_mm": 0.5})
-    w.field_tab.compute(sync=True)
+    compute(w, model="3D", pulsed=False, grid_mm=0.5)
     s.save(w, w.field_tab, "step6_field_3d_sections.png", w.field_tab.status.text())
     w.scene3d_tab.set_view("Iso")
     s.save(w, w.scene3d_tab, "step6_field_3d_view.png")
