@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>Beam field: how it is computed and where it can be trusted</title>
+<style>
+  body { font-family: "Segoe UI", Arial, sans-serif; max-width: 960px; margin: 2em auto; padding: 0 1.2em;
+         color: #1e293b; line-height: 1.5; }
+  h1 { font-size: 1.7em; margin-bottom: 0.2em; }
+  h2 { font-size: 1.3em; margin-top: 2em; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.2em; }
+  h3 { font-size: 1.08em; margin-top: 1.5em; }
+  .sub { color: #64748b; margin-top: 0; }
+  .eq { font-family: "Cambria Math", "Times New Roman", serif; font-size: 1.1em; background: #f8fafc;
+        border-left: 3px solid #94a3b8; padding: 0.5em 1em; margin: 0.8em 0; }
+  var { font-family: "Cambria Math", "Times New Roman", serif; }
+  table { border-collapse: collapse; margin: 0.8em 0; width: 100%; font-size: 0.94em; }
+  th, td { border: 1px solid #cbd5e1; padding: 0.35em 0.6em; text-align: left; vertical-align: top; }
+  th { background: #f1f5f9; }
+  .tag { display: inline-block; font-size: 0.75em; font-weight: 600; padding: 0.05em 0.45em; border-radius: 3px;
+         margin-right: 0.3em; vertical-align: 1px; }
+  .FACT { background: #dcfce7; color: #166534; } .DERIVED { background: #dbeafe; color: #1e40af; }
+  .APPROXIMATION { background: #fef9c3; color: #854d0e; } .ASSUMPTION { background: #fee2e2; color: #991b1b; }
+  .UNKNOWN { background: #e5e7eb; color: #374151; }
+  .good { color: #166534; font-weight: 600; } .care { color: #854d0e; font-weight: 600; }
+  .no { color: #991b1b; font-weight: 600; }
+  figure { margin: 1em 0; } figure img { max-width: 100%; border: 1px solid #e2e8f0; }
+  figcaption { color: #475569; font-size: 0.9em; }
+  .box { background: #f8fafc; border: 1px solid #e2e8f0; padding: 0.6em 1em; border-radius: 4px; }
+  code { background: #f1f5f9; padding: 0 0.25em; border-radius: 3px; font-size: 0.92em; }
+</style>
+</head>
+<body>
+
+<h1>Beam field: how it is computed and where it can be trusted</h1>
+<p class="sub">Phased Array Focal Law Calculator, Beam Field tab (plan step 6). Code: <code>python/beam_field.py</code>,
+<code>python/beam_metrics.py</code>, <code>python/qt_field.py</code>; validation: <code>validation/beam_field/</code>.
+Written 2026-11-21.</p>
+
+<p>Claims are tagged:
+<span class="tag FACT">FACT</span> established physics or a checked property of the code;
+<span class="tag DERIVED">DERIVED</span> follows from the stated model;
+<span class="tag APPROXIMATION">APPROXIMATION</span> a deliberate simplification;
+<span class="tag ASSUMPTION">ASSUMPTION</span> a choice about the physical setup;
+<span class="tag UNKNOWN">UNKNOWN</span> not yet quantified.</p>
+
+<div class="box">
+<b>In one paragraph.</b> For the law the window shows, every active element is treated as a source on the wedge's probe
+face. For each field point in the component the model finds each element's refracted ray (Snell's law at the
+wedge–component interface), gives it an amplitude (element directivity × interface transmission × geometric
+spreading) and an arrival time (travel time + the law's firing delay), adds the contributions of all elements as
+pulses, and maps the peak of the summed displacement envelope in dB re the map's maximum. It is a ray (high-frequency)
+model of the <i>direct</i> beam only. One case has been compared with a full-wave finite-element solve; the beam's
+direction, position and width agreed closely.
+</div>
+
+<h2>1. Frame, units and inputs</h2>
+<ul>
+<li>Global frame, SI units: <var>X</var> along the wedge, <var>Y</var> across, <var>Z</var> down. The wedge–component
+interface is the plane <var>Z</var> = 0; the wedge is <var>Z</var> &lt; 0, the component <var>Z</var> &gt; 0.
+The views draw millimetres with depth downward.</li>
+<li>From the calculation: element positions (probe, wedge angle, height, offset, roof), the active aperture, the
+law's delays, the wave mode in the component (longitudinal or shear), the probe frequency
+<var>f</var><sub>0</sub>, the wave speeds and the component thickness.</li>
+<li>From the Beam Field tab: element width, elevation (3D), the wedge's shear speed and density, the component's
+density, the pulse (whole Hann cycles ≥ 2, or continuous wave), 2D or 3D, and the grid step. Width, elevation and
+the wedge's values are filled from the catalogue when the probe or wedge came from one.</li>
+</ul>
+
+<h2>2. How the field is computed</h2>
+
+<h3>2.1 Sources</h3>
+<p><b>2D mode</b> treats each element as an infinitely long strip (plane strain): one source per element, at its
+centre, in the <var>X</var>–<var>Z</var> plane. It needs a single linear array without roof or <var>Y</var>
+offset, and refuses anything else. <b>3D mode</b> splits each element (width × elevation) into point sources no more
+than half a wedge longitudinal wavelength apart (at 1.5 <var>f</var><sub>0</sub> for pulses, at
+<var>f</var><sub>0</sub> for continuous wave), each weighted by its patch area.
+<span class="tag APPROXIMATION">APPROXIMATION</span> Elements lying wholly above the interface are required; an
+element touching or crossing <var>Z</var> = 0 is refused.</p>
+
+<h3>2.2 The ray from an element to a field point</h3>
+<p>For a source at height <var>a</var> above the interface and a point at depth <var>b</var>, a horizontal distance
+<var>d</var> away, the entry point lies a horizontal distance <var>s</var> from the source where Snell's law holds:</p>
+<div class="eq">s / (c<sub>1</sub> r<sub>1</sub>) = (d − s) / (c<sub>2</sub> r<sub>2</sub>),&emsp;
+r<sub>1</sub> = √(a² + s²),&emsp; r<sub>2</sub> = √(b² + (d − s)²)</div>
+<p>with <var>c</var><sub>1</sub> the wedge's longitudinal speed and <var>c</var><sub>2</sub> the component's speed for
+the chosen mode. The equation is solved for every element–point pair at once (bisection, then Newton steps kept inside
+the bracket). <span class="tag FACT">FACT</span> For a flat interface between homogeneous isotropic media this is the
+least-time (Fermat) path; the test suite checks both Snell's law and the minimum time.
+The arrival time of the element's contribution is</p>
+<div class="eq">t = r<sub>1</sub>/c<sub>1</sub> + r<sub>2</sub>/c<sub>2</sub> + τ<sub>element</sub></div>
+<p>where τ is the law's firing delay for that element.</p>
+
+<h3>2.3 The amplitude of each ray</h3>
+<div class="eq">A = w · D(θ) · T(p) · S(r<sub>1</sub>, r<sub>2</sub>, α<sub>1</sub>, α<sub>2</sub>)</div>
+<table>
+<tr><th>Factor</th><th>What it is</th><th>Status</th></tr>
+<tr><td><var>w</var></td><td>Source weight: 1 per strip (2D) or the patch area (3D).</td><td><span class="tag DERIVED">DERIVED</span></td></tr>
+<tr><td><var>D</var>(θ)</td><td>Longitudinal far-field directivity of a uniform normal load on the free surface of a solid
+(Miller &amp; Pursey 1954):
+<span class="eq" style="display:inline-block;margin:0.3em 0;padding:0.2em 0.6em">D = cos θ (k² − 2 sin²θ) / F<sub>0</sub>(sin θ) · sinc(w<sub>e</sub> sin θ<sub>w</sub> / λ<sub>L</sub>)</span>,
+θ measured from the element's normal, <var>k</var> = <var>c</var><sub>L</sub>/<var>c</var><sub>S</sub> of the wedge,
+the sinc across the element width <var>w</var><sub>e</sub> in 2D only (3D patches are point sources). Rays leaving the
+back of the face get zero. Copied from arim (MIT; notice in <code>THIRD_PARTY_NOTICES.md</code>).</td>
+<td><span class="tag APPROXIMATION">APPROXIMATION</span> far field of each element; the element is taken as a load on a
+free half-space</td></tr>
+<tr><td><var>T</var>(<var>p</var>)</td><td>Plane-wave displacement transmission coefficient from the wedge's longitudinal
+wave to the chosen mode in the component, for a <b>welded</b> (bonded) interface: continuity of both displacement
+components and of normal and shear traction, a 4 × 4 linear system in the horizontal slowness
+<var>p</var> = sin α<sub>1</sub>/<var>c</var><sub>1</sub>. Complex beyond a critical angle (an evanescent wave
+appears), and its phase is carried. Tabulated on 16 385 slownesses and interpolated.</td>
+<td><span class="tag FACT">FACT</span> for plane waves (energy conservation is tested at every angle);
+<span class="tag APPROXIMATION">APPROXIMATION</span> applied ray by ray to curved wavefronts;
+<span class="tag ASSUMPTION">ASSUMPTION</span> bonded contact</td></tr>
+<tr><td><var>S</var></td><td>Geometric spreading through the interface (Schmerr, <i>Fundamentals of Ultrasonic Phased
+Arrays</i>, 2015, ch. 2; arim <code>beamspread_2d_for_path</code>):
+2D: <span class="eq" style="display:inline-block;margin:0.3em 0;padding:0.2em 0.6em">S = 1 / √(r<sub>1</sub> + r<sub>2</sub> c<sub>2</sub>cos²α<sub>1</sub> / (c<sub>1</sub>cos²α<sub>2</sub>))</span>;
+3D: the same in-plane term multiplied under the root by the out-of-plane term
+<var>r</var><sub>1</sub> + <var>r</var><sub>2</sub><var>c</var><sub>2</sub>/<var>c</var><sub>1</sub>.</td>
+<td><span class="tag DERIVED">DERIVED</span> from ray tubes; tested against a numerically traced ray tube in 2D and 3D</td></tr>
+</table>
+<p>2D (line) sources also carry the line-source factor 1/√ω; 3D point sources carry none.
+<span class="tag DERIVED">DERIVED</span> from the far fields of a line and a point source.</p>
+
+<h3>2.4 Polarisation and the sum over elements</h3>
+<p>Each contribution is a displacement vector: along the ray for a longitudinal wave, perpendicular to it in the ray's
+vertical plane for a shear (SV) wave. Contributions are added component by component, so elements whose shear waves
+arrive from different directions do not add as scalars. <span class="tag DERIVED">DERIVED</span></p>
+
+<h3>2.5 Pulsed and continuous-wave maps</h3>
+<ul>
+<li><b>Pulsed:</b> the excitation is a Hann-windowed tone burst, sin(2π<var>f</var><sub>0</sub><var>t</var>)·sin²(π<var>t</var>/<var>T</var>),
+<var>T</var> = cycles/<var>f</var><sub>0</sub> (as buildFE's <code>hann-toneburst</code>). At each point the summed
+displacement is built in the frequency domain over the burst's band (cut where its spectrum falls 40 dB below the
+peak), turned into an analytic signal per component, and the map value is the peak over time of
+√(Σ|<var>u</var><sub>c</sub>(<var>t</var>)|²), refined between samples by a parabola.</li>
+<li><b>Continuous wave:</b> the same sum at <var>f</var><sub>0</sub> only; the map is |Σ <var>A</var> e<sup>iω<var>t</var></sup>|.
+Faster; shows the steady-state pattern, with stronger interference fringes and side lobes than a short pulse.</li>
+</ul>
+<p>The map is shown in dB re its own maximum, from 0 to −30 dB (turbo), with the −6 dB contour. The fitted beam axis
+uses buildFE's rule (<code>beam_metrics.py</code>): the midpoint of each depth row's widest −6 dB run, a straight line
+through the rows within 12 dB of the maximum. <span class="tag APPROXIMATION">APPROXIMATION</span></p>
+
+<h3>2.6 What is not in the model</h3>
+<table>
+<tr><th>Left out</th><th>Effect on the map</th></tr>
+<tr><td>Back-wall and surface reflections, skips</td><td>Only the direct leg is shown; the map stops at the back wall. Skips are shown as central rays by Coverage, not as fields.</td></tr>
+<tr><td>Mode conversion</td><td>Only the chosen mode is mapped. In a shear setup the longitudinal wave (and its head and creeping waves) is absent.</td></tr>
+<tr><td>Attenuation</td><td>No loss with distance in either material: far regions are too strong relative to near ones in attenuating materials.</td></tr>
+<tr><td>A fluid couplant (no shear at the contact)</td><td>Bonded contact is assumed. The beam's direction and position are set by the delays and Snell's law and do not depend on it; its level, and how the level varies with angle, do. <span class="tag UNKNOWN">UNKNOWN</span> by how much for a given wedge.</td></tr>
+<tr><td>The wedge's own geometry</td><td>No reflections inside the wedge, no finite wedge footprint (the interface is infinite), no absorbers.</td></tr>
+<tr><td>Surface, head and evanescent waves; edge (diffracted) waves of the aperture as such</td><td>Not represented near the interface or in shadow regions.</td></tr>
+<tr><td>Anisotropy, curvature, inhomogeneity (welds, cladding)</td><td>Homogeneous isotropic flat plate only. The weld outline is drawn but does not affect the field.</td></tr>
+</table>
+
+<h2>3. Checks and validation</h2>
+
+<h3>3.1 Tests of the pieces (run with every change)</h3>
+<ul>
+<li>Interface coefficients: energy flux conserved to 1e-9 at every angle, for incident P and S, in four material pairs; identical media transmit everything; normal incidence matches 2<var>Z</var><sub>1</sub>/(<var>Z</var><sub>1</sub> + <var>Z</var><sub>2</sub>); the table matches the exact solution (median error 1e-6, at most 1 % beside a critical angle).</li>
+<li>Rays: Snell's law at the entry point and the minimum travel time against a brute-force search.</li>
+<li>Spreading: the 2D and 3D formulas agree with a numerically traced ray tube to 1e-5.</li>
+<li>Synthesis: one source gives its amplitude times the burst's own envelope; separated arrivals do not add, coincident ones double; long pulses converge to the continuous-wave result (this checks the phase convention with complex coefficients); adding a silent, late source changes nothing (window independence).</li>
+<li>Behaviour: a focused law is brightest at its focus; a 3D Y–Z section of a linear array is symmetric; a beam steered either way keeps its focus in the map.</li>
+</ul>
+
+<h3>3.2 Comparison with a full-wave FE solve</h3>
+<p>Reference: buildFE Task 125's Pogo FE solve (case <code>(case ID withheld)</code>): 2.25L64-A2 on SA2-N55S, all 64
+elements, a 45° shear steer, 3-cycle Hann burst at 2.25 MHz, 2D plane strain, wedge bonded to the steel, steel
+5900/3230 m/s, Rexolite 2337/1157 m/s. Both maps were measured by the same rule, and the tolerances were committed
+before the comparison was run.</p>
+<table>
+<tr><th>Metric</th><th>FE</th><th>Calculator</th><th>Difference</th><th>Tolerance</th></tr>
+<tr><td>Beam axis angle</td><td>45.27°</td><td>44.90°</td><td>−0.37°</td><td>± 1°</td></tr>
+<tr><td>Exit point (plate frame)</td><td>44.59 mm</td><td>44.59 mm</td><td>+0.01 mm</td><td>± 2 mm</td></tr>
+<tr><td>−6 dB width at Z = 10/20/30/40 mm</td><td>37.89 / 37.67 / 37.45 / 37.02 mm</td><td>37.91 / 37.69 / 37.26 / 37.04 mm</td><td>within 0.6 %</td><td>± 10 %</td></tr>
+<tr><td>Level on the axis at those depths</td><td>−0.49 / −0.61 / −0.55 / −0.40 dB</td><td>−0.46 / −0.23 / −0.10 / −0.04 dB</td><td>within 0.44 dB</td><td>± 1.5 dB</td></tr>
+</table>
+<figure><img src="plans/images/step6_beam_vs_buildfe.png" alt="FE map above, calculator map below">
+<figcaption>FE (top) and calculator (bottom), dB re each map's maximum, −6 dB (solid) and −12 dB (dashed) contours, fitted axis dotted.</figcaption></figure>
+<p><b>What this case shows and what it does not.</b> A steered, unfocused 64-element beam tests the geometry, the delays,
+refraction, and the beam's direction, position and width closely. It tests the amplitude physics (directivity,
+transmission across angles, spreading) only weakly, because these vary slowly across a wide, collimated 45° beam.
+Below about −12 dB on the beam's far side the two maps differ: the FE map's first-arrival gate blanks most of that
+region, and the FE field also contains head and surface waves the model does not.</p>
+
+<h2>4. Expected range of validity</h2>
+<p>The table gives the expected range, its reason and its evidence. "Tested" means compared with the FE reference;
+"expected" means it follows from the model's assumptions but has not been checked against a reference.</p>
+
+<table>
+<tr><th>Situation</th><th>Expectation</th><th>Why</th></tr>
+<tr><td>Direction, position and −6 dB width of a 2D steered beam, bonded wedge</td><td class="good">Tested: within 0.4°, 0.01 mm, 0.6 %</td><td>The FE comparison above.</td></tr>
+<tr><td>Level along the main beam (2D)</td><td class="good">Tested: within 0.5 dB over 10–40 mm depth</td><td>FE comparison; the beam was collimated, so this is a weak test of spreading.</td></tr>
+<tr><td>Focused laws: focal position, focal size, focal shift</td><td class="care">Expected good, not tested</td><td>Same delays and rays; focusing depends more on relative amplitudes across the aperture than a steer does.</td></tr>
+<tr><td>Longitudinal-wave laws</td><td class="care">Expected good away from critical angles, not tested</td><td>Same model; no reference yet.</td></tr>
+<tr><td>3D mode: elevation focusing, Y–Z sections, matrix and dual probes</td><td class="care">Not validated</td><td>Same ingredients with point sources; the 3D spreading is tested against a ray tube, the field is not compared with a reference.</td></tr>
+<tr><td>Fine structure below about −12 dB, side lobes, grating lobes</td><td class="care">Indicative only</td><td>Sensitive to element directivity, contact condition and the pulse's band; differences from the FE map were seen on the far side of the beam.</td></tr>
+<tr><td>Absolute amplitude, comparing different wedges or materials</td><td class="no">Not supported</td><td>Maps are normalised to their own maximum; no transducer sensitivity, attenuation or couplant model.</td></tr>
+<tr><td>Within about two wavelengths of the interface (≈ 3 mm for 2.25 MHz shear in steel, λ<sub>S</sub> ≈ 1.4 mm)</td><td class="no">Not reliable</td><td>Ray and far-field assumptions break down; surface, head and evanescent waves are not modelled. The FE comparison also left out the top 2 mm.</td></tr>
+<tr><td>Rays near a critical angle (Rexolite → steel: first 23.3°, second 46.3° in the wedge)</td><td class="care">Approximate</td><td>Plane-wave coefficients change abruptly there (a sharp edge is visible in shear maps where wedge rays pass the first critical angle); real beams smooth this, and head waves appear. The coefficient table is within 1 % of exact beside the kink.</td></tr>
+<tr><td>Refracted angles near grazing (above about 80°)</td><td class="no">Not reliable</td><td>Spreading becomes singular as cos α<sub>2</sub> → 0; creeping waves are not modelled.</td></tr>
+<tr><td>Close to the elements in the wedge (source height of a few wavelengths)</td><td class="care">Approximate</td><td>Element far field and plane-wave transmission both assume the wavefront is locally flat at the interface (<var>k r</var><sub>1</sub> ≫ 1). With λ<sub>wedge</sub> ≈ 1.04 mm at 2.25 MHz, a 5 mm element-1 height is about 5 λ.</td></tr>
+<tr><td>Behind the back wall, skips, mode-converted echoes</td><td class="no">Not modelled</td><td>Direct leg only.</td></tr>
+<tr><td>Fluid-coupled wedges in practice</td><td class="care">Direction and width expected good; level versus angle uncertain</td><td>Bonded contact is assumed; a couplant carries no shear, changing the transmission and its angle dependence.</td></tr>
+<tr><td>Attenuating, anisotropic or coarse-grained materials (austenitic welds, cast)</td><td class="no">Not supported</td><td>Homogeneous, isotropic, lossless media only.</td></tr>
+<tr><td>Pulses</td><td>Whole Hann cycles, at least 2</td><td>Shorter or fractional bursts have a DC part and a wider band than the synthesis window allows; they are refused.</td></tr>
+</table>
+
+<h3>Numerical accuracy (separate from the physics)</h3>
+<ul>
+<li>Pulse spectrum cut at −40 dB: map values reproducible to about 1e-3 (0.01 dB) between synthesis windows.</li>
+<li>Transmission table: within 1 % next to a critical angle, to rounding elsewhere.</li>
+<li>Grid: the map is sampled at the grid step (coarsened automatically for large areas; the tab states the step used).
+Use a step of about a quarter of the component wavelength or finer to resolve fringes and side lobes
+(≈ 0.35 mm for 2.25 MHz shear in steel).</li>
+<li>3D sources: half a wedge wavelength apart at 1.5 <var>f</var><sub>0</sub> (pulsed) or <var>f</var><sub>0</sub> (continuous wave).</li>
+</ul>
+
+<h2>5. How to use it</h2>
+<ul>
+<li class="good">Good for: where a law's beam goes, how wide it is, how a sweep's beams compare, where the focus
+really falls, and the effect of aperture size and steering on the main lobe.</li>
+<li class="care">With care: side lobes and levels below −12 dB, anything near a critical angle, 3D and matrix
+patterns.</li>
+<li class="no">Not for: absolute sensitivity, echo amplitudes, attenuation, couplant effects, near-surface
+fields, or anything after a reflection. Use buildFE (full-wave FE) for those.</li>
+</ul>
+
+<h2>6. Next checks that would widen the validated range</h2>
+<ol>
+<li>A focused law (for example 55° shear focused at 25 mm) against an FE solve of the same wedge: focal position and size.</li>
+<li>A longitudinal law, including a ray set near the first critical angle.</li>
+<li>A 3D case against CIVA or a 3D buildFE solve (buildFE Task 189), for elevation focusing.</li>
+<li>The same 45° case with a couplant layer (buildFE Task 128, rung 3), to measure the effect of bonded contact.</li>
+</ol>
+
+<h2>References</h2>
+<ul>
+<li>Miller G F and Pursey H (1954), The field and radiation impedance of mechanical radiators on the free surface of a semi-infinite isotropic solid, <i>Proc. R. Soc. A</i> 223, 521–541.</li>
+<li>Drinkwater B W and Wilcox P D (2006), Ultrasonic arrays for non-destructive evaluation: a review, <i>NDT&amp;E Int.</i> 39, 525–541.</li>
+<li>Schmerr L W (2015), <i>Fundamentals of Ultrasonic Phased Arrays</i>, Springer, ch. 2 (ray spreading through an interface).</li>
+<li>arim, University of Bristol, MIT licence, <code>src/arim/model.py</code> at commit 0cee9de.</li>
+<li>buildFE Task 125 and <code>examples/fe-ref-field/make_field_figures.m</code> (FE reference and beam-measurement rule).</li>
+</ul>
+</body>
+</html>
