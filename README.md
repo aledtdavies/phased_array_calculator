@@ -39,6 +39,21 @@ pip install pyinstaller
 python build_executable.py
 ```
 
+### Headless (Docker): tests and documentation images
+
+A Linux image runs the test suite and renders the documentation screenshots without a GPU or a
+desktop (Xvfb with Mesa software OpenGL). It is for testing and images, not for running the GUI.
+
+```bash
+docker build -t pac-headless -f docker/Dockerfile .
+docker run --rm -v "$PWD/out:/out" pac-headless test     # suite -> out/pytest.txt, out/junit.xml
+docker run --rm -v "$PWD/out:/out" pac-headless images   # screenshots -> out/images
+docker run --rm pac-headless info                        # versions and the OpenGL renderer
+```
+
+GitHub Actions (`.github/workflows/headless.yml`) does the same on every pull request and push to
+`main`, and uploads `out/` as the `headless-results` artefact.
+
 ### MATLAB
 
 **Requirements:** MATLAB R2019b or later (no additional toolboxes required).

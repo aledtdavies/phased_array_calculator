@@ -1,5 +1,15 @@
 # Changelog
 
+## Step 7: headless Docker image — 2026-11-21
+
+Plan step 7 (approved by the owner on 2026-11-20); finish criteria committed first (4e4cbc2).
+
+- **`docker/Dockerfile`:** Python 3.12 on Debian bookworm with Xvfb, Mesa software OpenGL, the xcb libraries Qt loads, Tk and fonts; the repository's requirements and pytest. Qt runs on its native `xcb` platform and VTK on GLX (Mesa llvmpipe), as on a desktop.
+- **`docker/entrypoint.sh`:** `test` (first checks that Qt and VTK open a window, so the GUI tests cannot skip silently; then the suite with every skip listed), `images`, `info`.
+- **`tools/render_doc_images.py`:** the step 5b and step 6 screenshots from a shown window; fails if a field is not computed or an image is not saved.
+- **`.github/workflows/headless.yml`:** builds the image and runs `info`, `test` and `images` on pull requests and pushes to `main`; uploads the results.
+- **Finish criteria met** (run 2026-11-21): the image builds in Actions from this repository alone; 191 tests pass, 2 skip (both "no sibling buildFE checkout"); the five documentation images render, with the same coverage and beam-axis figures as on the laptop. Renderer: llvmpipe (LLVM 15), OpenGL 4.5, Mesa 22.3.6.
+
 ## Step 6: beam field view — 2026-11-20
 
 Plan step 6 (approved by the owner on 2026-11-20).
