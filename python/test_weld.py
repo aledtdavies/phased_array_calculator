@@ -202,6 +202,20 @@ class TemplateMatchesDXF(unittest.TestCase):
         prof = dxf_profile(p, 25.0)
         self.assertAlmostEqual(abs(polygon_area(prof.polygon)), 90.0, places=9)
         self.assertTrue(any("open" in n for n in prof.notes))
+        # ... and a straight polyline segment with a tilted extrusion but flat in X-Y is accepted
+        doc = ezdxf.new()
+        doc.header["$INSUNITS"] = 4
+        m = doc.modelspace()
+        pl = m.add_lwpolyline([(-5, 3), (5, 3)], dxfattribs={"extrusion": (0, 0.6, 0.8)})   # WCS y -2.4
+        w0, w1 = [v for v in pl.vertices_in_wcs()]
+        far = (w1.x, w1.y - 9, w1.z)
+        m.add_line(w1, far)
+        m.add_line(far, (w0.x, w0.y - 9, w0.z))
+        m.add_line((w0.x, w0.y - 9, w0.z), w0)
+        p = os.path.join(self.dir, "tilted_straight_polyline.dxf")
+        doc.saveas(p)
+        self.assertAlmostEqual(abs(w0.z - w1.z), 0.0, places=12)
+        self.assertAlmostEqual(abs(polygon_area(dxf_profile(p, 25.0).polygon)), 90.0, places=6)
         # a flat outline at a constant elevation is a cross-section like any other
         doc = ezdxf.new()
         doc.header["$INSUNITS"] = 4
