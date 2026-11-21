@@ -196,6 +196,7 @@ class Views2D(_WindowCase):
         self.assertEqual(tab.current_idx, 3)
 
 
+@unittest.skipUnless(HAVE_QT, "PySide6/pyqtgraph/pyvistaqt not installed, or no display")
 class DragReframe(_WindowCase):
     """A focus dragged to the edge of the view: the view widens on release (auto-reframe)."""
 
