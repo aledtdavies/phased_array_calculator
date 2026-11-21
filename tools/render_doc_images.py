@@ -43,11 +43,15 @@ class Shots:
     def window(self, thickness, scan, weld=None):
         w = qt_app.MainWindow()
         w.info = w.warn = lambda *a: None
-        w.error = lambda *a: print("ERROR", a, file=sys.stderr)
+        def fail(title, text):
+            raise RuntimeError(f"{title}: {text}")      # a catalogue or calculation error stops the run
+        w.error = fail
         if self.catalog:
             w.pick_catalog_entry = lambda c, k: "evident-2.25L64-A2" if k == "probe" else "evident-SA2-N55S"
             w.load_from_catalog("probe", path=os.path.join(self.catalog, "probes.json"))
             w.load_from_catalog("wedge", path=os.path.join(self.catalog, "wedges.json"))
+            if sorted(w.catalog.assets) != ["probe", "wedge"]:
+                raise RuntimeError(f"the catalogue in {self.catalog} did not give both the probe and the wedge")
         else:
             w.probe_panel.set_values(PROBE)
             w.wedge_panel.set_values(WEDGE)
