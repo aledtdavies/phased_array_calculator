@@ -146,7 +146,7 @@ through the rows within 12 dB of the maximum. <span class="tag APPROXIMATION">AP
 <tr><td>Back-wall and surface reflections, skips</td><td>Only the direct leg is shown; the map stops at the back wall. Skips are shown as central rays by Coverage, not as fields.</td></tr>
 <tr><td>Mode conversion</td><td>Only the chosen mode is mapped. In a shear setup the longitudinal wave (and its head and creeping waves) is absent.</td></tr>
 <tr><td>Attenuation</td><td>No loss with distance in either material: far regions are too strong relative to near ones in attenuating materials.</td></tr>
-<tr><td>A fluid couplant (no shear at the contact)</td><td>Bonded contact is assumed. The beam's direction and position are set by the delays and Snell's law and do not depend on it; its level, and how the level varies with angle, do. <span class="tag UNKNOWN">UNKNOWN</span> by how much for a given wedge.</td></tr>
+<tr><td>A fluid couplant (no shear at the contact)</td><td>Bonded contact is assumed. The ray paths (set by the delays and Snell's law) do not depend on it, but the transmission weights each ray before the sum, so the level, how it varies with angle, and through them the measured beam axis and width can change. <span class="tag UNKNOWN">UNKNOWN</span> by how much for a given wedge.</td></tr>
 <tr><td>The wedge's own geometry</td><td>No reflections inside the wedge, no finite wedge footprint (the interface is infinite), no absorbers.</td></tr>
 <tr><td>Surface, head and evanescent waves; edge (diffracted) waves of the aperture as such</td><td>Not represented near the interface or in shadow regions.</td></tr>
 <tr><td>Anisotropy, curvature, inhomogeneity (welds, cladding)</td><td>Homogeneous isotropic flat plate only. The weld outline is drawn but does not affect the field.</td></tr>
@@ -201,7 +201,7 @@ region, and the FE field also contains head and surface waves the model does not
 <tr><td>Refracted angles near grazing (above about 80°)</td><td class="no">Not reliable</td><td>Spreading becomes singular as cos α<sub>2</sub> → 0; creeping waves are not modelled.</td></tr>
 <tr><td>Close to the elements in the wedge (source height of a few wavelengths)</td><td class="care">Approximate</td><td>Element far field and plane-wave transmission both assume the wavefront is locally flat at the interface (<var>k r</var><sub>1</sub> ≫ 1). With λ<sub>wedge</sub> ≈ 1.04 mm at 2.25 MHz, a 5 mm element-1 height is about 5 λ.</td></tr>
 <tr><td>Behind the back wall, skips, mode-converted echoes</td><td class="no">Not modelled</td><td>Direct leg only.</td></tr>
-<tr><td>Fluid-coupled wedges in practice</td><td class="care">Direction and width expected good; level versus angle uncertain</td><td>Bonded contact is assumed; a couplant carries no shear, changing the transmission and its angle dependence.</td></tr>
+<tr><td>Fluid-coupled wedges in practice</td><td class="care">Ray paths unchanged; level, its angle dependence and the measured axis and width not quantified</td><td>Bonded contact is assumed; a couplant carries no shear, changing the transmission and its angle dependence.</td></tr>
 <tr><td>Attenuating, anisotropic or coarse-grained materials (austenitic welds, cast)</td><td class="no">Not supported</td><td>Homogeneous, isotropic, lossless media only.</td></tr>
 <tr><td>Pulses</td><td>Whole Hann cycles, at least 2</td><td>Shorter or fractional bursts have a DC part and a wider band than the synthesis window allows; they are refused.</td></tr>
 </table>
