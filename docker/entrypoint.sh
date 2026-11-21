@@ -39,7 +39,8 @@ print("PySide6", PySide6.__version__, "| pyvista", pyvista.__version__, "| vtk",
 pl = pyvista.Plotter(off_screen=True)
 pl.add_mesh(pyvista.Sphere())
 pl.screenshot("/tmp/x.png")
-print(pl.render_window.ReportCapabilities().splitlines()[:4])
+caps = pl.render_window.ReportCapabilities().splitlines()
+print("\n".join(l for l in caps if l.startswith(("OpenGL vendor", "OpenGL renderer", "OpenGL version"))))
 EOF
     ;;
   *)
