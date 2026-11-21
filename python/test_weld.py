@@ -157,6 +157,33 @@ class TemplateMatchesDXF(unittest.TestCase):
         below = h.polygon[h.polygon[:, 1] > 1e-9]
         np.testing.assert_allclose(np.hypot(below[:, 0], below[:, 1]), 50, atol=1e-9)
 
+    def test_an_outline_not_in_one_xy_plane_is_refused(self):
+        """Review of PR #29 (MINOR): DXF Z was ignored, so 3D or tilted outlines were read flattened."""
+        sq = [(-5, -1, 5, -1), (5, -1, 5, -10), (5, -10, -5, -10), (-5, -10, -5, -1)]
+        cases = {
+            "a corner lifted": lambda m: [m.add_line((a, b, 0), (c, d, 3.0 if (c, d) == (5, -10) else 0))
+                                          for a, b, c, d in sq],
+            "a tilted arc": lambda m: m.add_arc((0, -5), 3, 0, 360, dxfattribs={"extrusion": (0, 0.6, 0.8)}),
+            "a 3D polyline": lambda m: m.add_polyline3d([(-5, -1, 0), (5, -1, 0), (5, -10, 2), (-5, -10, 0)], close=True),
+        }
+        for name, draw in cases.items():
+            with self.subTest(name):
+                doc = ezdxf.new()
+                doc.header["$INSUNITS"] = 4
+                draw(doc.modelspace())
+                p = os.path.join(self.dir, "z.dxf")
+                doc.saveas(p)
+                with self.assertRaisesRegex(ValueError, "one X-Y plane"):
+                    dxf_profile(p, 25.0)
+        # a flat outline at a constant elevation is a cross-section like any other
+        doc = ezdxf.new()
+        doc.header["$INSUNITS"] = 4
+        for a, b, c, d in sq:
+            doc.modelspace().add_line((a, b, 7.5), (c, d, 7.5))
+        p = os.path.join(self.dir, "elevated.dxf")
+        doc.saveas(p)
+        self.assertAlmostEqual(abs(polygon_area(dxf_profile(p, 25.0).polygon)), 90.0, places=9)
+
     def test_self_crossing_outline_is_refused(self):
         p = os.path.join(self.dir, "cross.dxf")
         pts = [(0, 0), (10, -20), (0, -20), (20, 0)]

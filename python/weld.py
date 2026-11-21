@@ -39,6 +39,7 @@ import numpy as np
 FLATTEN_MM = 0.002        # largest chord deviation when an arc or curve is flattened
 WALL_TOL_MM = 1e-6        # a vertex this close to Z = 0 or Z = T lies on that wall
 JOIN_TOL_MM = 1e-3        # DXF entity ends this close together are joined
+PLANAR_TOL_MM = 1e-6      # DXF outline points must share one Z (the drawing plane) to this
 SAMPLE_MM = 0.05          # fusion faces are tested for coverage at this spacing
 EDGE_TOL_MM = 1e-6        # a face point this close to a fan's edge is inside the fan
 TEMPLATES = ("single-V", "double-V", "single-J")
@@ -353,27 +354,35 @@ def _dxf_pieces(path, layer, units=None):
         for pts in _entity_points(e, FLATTEN_MM / scale):
             if len(pts) >= 2:
                 pieces.append((lay, pts * scale))
+    # The cross-section is read in the drawing's X-Y plane. An outline whose points do not share
+    # one Z (drawn in 3D, or in a tilted plane) would be read flattened: refuse it.
+    if pieces:
+        z = np.concatenate([p[:, 2] for _, p in pieces])
+        if z.max() - z.min() > PLANAR_TOL_MM:
+            raise ValueError(f"{os.path.basename(path)}: the outline is not drawn in one X-Y plane "
+                             f"(Z spans {z.min():g} to {z.max():g} mm); draw the cross-section flat")
+    pieces = [(lay, p[:, :2]) for lay, p in pieces]
     return pieces, sorted(layers), units, scale
 
 
 def _entity_points(e, tol):
     """
-    Polylines (drawing units) of one entity, every vertex on the exact curve: lines by their
+    Polylines (drawing units, world X, Y, Z) of one entity, every vertex on the exact curve: lines by their
     ends, arcs, circles, ellipses and splines by ezdxf's own curve flattening (chord deviation
     <= tol), polylines split into their lines and arcs (bulges) first. Not through ezdxf.path,
     whose cubic approximation of arcs adds an error the tolerance would not bound.
     """
     t = e.dxftype()
     if t == "LINE":
-        return [np.array([(e.dxf.start.x, e.dxf.start.y), (e.dxf.end.x, e.dxf.end.y)], dtype=float)]
+        return [np.array([tuple(e.dxf.start), tuple(e.dxf.end)], dtype=float)]
     if t in ("LWPOLYLINE", "POLYLINE"):
         out = []
         for sub in e.virtual_entities():
             if sub.dxftype() in ("LINE", "ARC"):     # a 2D/3D polyline's parts; nothing else is an outline
                 out += _entity_points(sub, tol)
         return out
-    pts = list(e.flattening(tol))                # ARC, CIRCLE, ELLIPSE, SPLINE: exact-curve vertices
-    return [np.array([(v.x, v.y) for v in pts], dtype=float)]
+    pts = list(e.flattening(tol))                # ARC, CIRCLE, ELLIPSE, SPLINE: exact-curve vertices (WCS)
+    return [np.array([(v.x, v.y, v.z) for v in pts], dtype=float)]
 
 
 def _dedupe(poly, tol):

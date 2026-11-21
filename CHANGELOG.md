@@ -1,5 +1,9 @@
 # Changelog
 
+## DXF weld outlines must be flat — 2026-11-21
+
+- `weld.dxf_profile` refuses an outline whose points do not share one Z (a 3D drawing, a tilted arc or a 3D polyline) instead of reading it flattened onto X-Y. An outline drawn flat at any constant elevation is read as before. (Codex MINOR on PR #29.)
+
 ## Step 7: headless Docker image — 2026-11-21
 
 Plan step 7 (approved by the owner on 2026-11-20); finish criteria committed first (4e4cbc2).
