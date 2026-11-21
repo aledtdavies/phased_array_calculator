@@ -351,24 +351,28 @@ def _dxf_pieces(path, layer, units=None):
         layers.add(lay)
         if layer is not None and lay != layer:
             continue
-        tilted, z_extra = _entity_plane(e)
-        for pts in _entity_points(e, FLATTEN_MM / scale):
-            if len(pts) >= 2:
-                z = np.concatenate([pts[:, 2], z_extra]) * scale
-                pieces.append((lay, pts[:, :2] * scale, (float(z.min()), float(z.max()), tilted)))
+        # A polyline is judged part by part (its lines by their points, its arcs by their plane).
+        parts = ([s for s in e.virtual_entities() if s.dxftype() in ("LINE", "ARC")]
+                 if e.dxftype() in ("LWPOLYLINE", "POLYLINE") else [e])
+        for part in parts:
+            tilted, z_extra = _entity_plane(part)
+            for pts in _entity_points(part, FLATTEN_MM / scale):
+                if len(pts) >= 2:
+                    z = np.concatenate([pts[:, 2], z_extra]) * scale
+                    pieces.append((lay, pts[:, :2] * scale, (float(z.min()), float(z.max()), tilted)))
     return pieces, sorted(layers), units, scale
 
 
 def _entity_plane(e):
     """
     (tilted, extra Z values) of an entity, in drawing units: tilted when its own plane (the
-    extrusion of an arc, circle, ellipse or 2D polyline) is not parallel to X-Y, whatever its
-    sampled vertices show; extra Z from a spline's control and fit points, which its flattened
+    extrusion of an arc, circle or ellipse, including a polyline's arcs) is not parallel to X-Y,
+    whatever its sampled vertices show (a straight line is judged by its end points); extra Z from a spline's control and fit points, which its flattened
     vertices may not reach.
     """
     t = e.dxftype()
     tilted = False
-    if t in ("ARC", "CIRCLE", "ELLIPSE", "LWPOLYLINE") or (t == "POLYLINE" and not e.is_3d_polyline):
+    if t in ("ARC", "CIRCLE", "ELLIPSE"):
         ext = np.asarray(tuple(e.dxf.get("extrusion", (0.0, 0.0, 1.0))), dtype=float)
         n = np.linalg.norm(ext)
         tilted = not (n > 0 and abs(abs(ext[2]) / n - 1.0) <= 1e-12)
