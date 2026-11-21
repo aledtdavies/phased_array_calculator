@@ -101,7 +101,7 @@ Each step states its finish criteria and what it is needed for. Steps 1–4 repl
 
 ### 2. Qt shell with matplotlib canvases
 
-**Status: done 2026-11-19, except retiring the Tk window, which is left for the owner to accept first.**
+**Status: done 2026-11-19. The Tk window was retired on 2026-11-21 (owner: "do all of the recommendations"):** `app.py`, `panels.py`, `plotting.py`, `catalog_dialog.py`, `test_gui.py` and the step 1 reference-image check (`tests/refactor_check`, which rendered with the Tk window) were removed. Configuration files the Tk window saved still load unchanged (`tests/fixtures/tk_saved_configs.json`).
 - **Qt window:** `qt_app.py`, sharing `session.py` with the Tk window.
 - **Parity tests:** `test_qt_gui.py`, covering identical tables, configurations both ways and the ported GUI regressions.
 - **Carried from #24's review:** one refusal per requested law in Y sweeps.

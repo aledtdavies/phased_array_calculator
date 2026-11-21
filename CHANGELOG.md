@@ -1,5 +1,12 @@
 # Changelog
 
+## The Tk window is retired — 2026-11-21
+
+- Removed: `python/app.py`, `panels.py`, `plotting.py`, `catalog_dialog.py` and `test_gui.py`, and `tests/refactor_check` (the step 1 reference-image check rendered with the Tk window; it is in the history up to fb82aa6). The Qt window (`python/qt_app.py`) is the calculator's window; the PyInstaller build already used it.
+- Kept: `scene.py` (the matplotlib drawing used by `visualisation.py`, and colours used by the Qt views), `session.py`, `navigation.py` and the library.
+- Configuration files saved by the Tk window load unchanged: a Tk-saved default and dual-matrix setup are kept as `tests/fixtures/tk_saved_configs.json` and tested. The Tk-vs-Qt table test becomes "the Data Table is `session.calculate`'s rows".
+- The headless image no longer installs Tk.
+
 ## Step 7: headless Docker image — 2026-11-21
 
 Plan step 7 (approved by the owner on 2026-11-20); finish criteria committed first (4e4cbc2).
