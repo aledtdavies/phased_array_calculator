@@ -175,6 +175,33 @@ class TemplateMatchesDXF(unittest.TestCase):
                 doc.saveas(p)
                 with self.assertRaisesRegex(ValueError, "one X-Y plane"):
                     dxf_profile(p, 25.0)
+        # Review of PR #33: a short tilted arc whose sampled vertices share one Z is still refused
+        doc = ezdxf.new()
+        doc.header["$INSUNITS"] = 4
+        m = doc.modelspace()
+        arc = m.add_arc((0, -5), 3, 89, 91, dxfattribs={"extrusion": (0, 0.6, 0.8)})
+        s0, s1 = arc.start_point, arc.end_point             # WCS ends, at one Z
+        apex = ((s0.x + s1.x) / 2, (s0.y + s1.y) / 2 - 2.0, s0.z)
+        m.add_line(s1, apex)                                 # two lines at that Z close it
+        m.add_line(apex, s0)
+        p = os.path.join(self.dir, "short_tilted_arc.dxf")
+        doc.saveas(p)
+        a = [e for e in ezdxf.readfile(p).modelspace()][0]
+        zs = [v.z for v in a.flattening(weld.FLATTEN_MM)]
+        self.assertLessEqual(max(zs) - min(zs), 1e-9)          # what the sampling alone would see
+        with self.assertRaisesRegex(ValueError, "one X-Y plane"):
+            dxf_profile(p, 25.0)
+        # ... and an unrelated open entity at another Z does not block a flat outline
+        doc = ezdxf.new()
+        doc.header["$INSUNITS"] = 4
+        for a_, b_, c_, d_ in sq:
+            doc.modelspace().add_line((a_, b_, 0), (c_, d_, 0))
+        doc.modelspace().add_line((20, -1, 7.5), (30, -1, 7.5))
+        p = os.path.join(self.dir, "flat_plus_stray.dxf")
+        doc.saveas(p)
+        prof = dxf_profile(p, 25.0)
+        self.assertAlmostEqual(abs(polygon_area(prof.polygon)), 90.0, places=9)
+        self.assertTrue(any("open" in n for n in prof.notes))
         # a flat outline at a constant elevation is a cross-section like any other
         doc = ezdxf.new()
         doc.header["$INSUNITS"] = 4

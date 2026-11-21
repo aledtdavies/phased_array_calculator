@@ -351,18 +351,42 @@ def _dxf_pieces(path, layer, units=None):
         layers.add(lay)
         if layer is not None and lay != layer:
             continue
+        tilted, z_extra = _entity_plane(e)
         for pts in _entity_points(e, FLATTEN_MM / scale):
             if len(pts) >= 2:
-                pieces.append((lay, pts * scale))
-    # The cross-section is read in the drawing's X-Y plane. An outline whose points do not share
-    # one Z (drawn in 3D, or in a tilted plane) would be read flattened: refuse it.
-    if pieces:
-        z = np.concatenate([p[:, 2] for _, p in pieces])
-        if z.max() - z.min() > PLANAR_TOL_MM:
-            raise ValueError(f"{os.path.basename(path)}: the outline is not drawn in one X-Y plane "
-                             f"(Z spans {z.min():g} to {z.max():g} mm); draw the cross-section flat")
-    pieces = [(lay, p[:, :2]) for lay, p in pieces]
+                z = np.concatenate([pts[:, 2], z_extra]) * scale
+                pieces.append((lay, pts[:, :2] * scale, (float(z.min()), float(z.max()), tilted)))
     return pieces, sorted(layers), units, scale
+
+
+def _entity_plane(e):
+    """
+    (tilted, extra Z values) of an entity, in drawing units: tilted when its own plane (the
+    extrusion of an arc, circle, ellipse or 2D polyline) is not parallel to X-Y, whatever its
+    sampled vertices show; extra Z from a spline's control and fit points, which its flattened
+    vertices may not reach.
+    """
+    t = e.dxftype()
+    tilted = False
+    if t in ("ARC", "CIRCLE", "ELLIPSE", "LWPOLYLINE") or (t == "POLYLINE" and not e.is_3d_polyline):
+        ext = np.asarray(tuple(e.dxf.get("extrusion", (0.0, 0.0, 1.0))), dtype=float)
+        n = np.linalg.norm(ext)
+        tilted = not (n > 0 and abs(abs(ext[2]) / n - 1.0) <= 1e-12)
+    z = []
+    if t == "SPLINE":
+        z = [p[2] for p in e.control_points] + [p[2] for p in e.fit_points]
+    return tilted, np.asarray(z, dtype=float)
+
+
+def _outline_is_flat(name, zinfo):
+    """Refuse an outline (its entities' (zmin, zmax, tilted)) that is not in one X-Y plane."""
+    if any(t for _, _, t in zinfo):
+        raise ValueError(f"{name}: the outline is not drawn in one X-Y plane (an entity lies in a tilted "
+                         "plane); draw the cross-section flat")
+    lo, hi = min(z for z, _, _ in zinfo), max(z for _, z, _ in zinfo)
+    if hi - lo > PLANAR_TOL_MM:
+        raise ValueError(f"{name}: the outline is not drawn in one X-Y plane (Z spans {lo:g} to {hi:g} mm); "
+                         "draw the cross-section flat")
 
 
 def _entity_points(e, tol):
@@ -430,12 +454,17 @@ def _join_touching(loops, tol=JOIN_TOL_MM):
     return loops
 
 
-def _chain(pieces, tol=JOIN_TOL_MM):
-    """Join polylines end to end into closed loops; returns (loops, open chains)."""
+def _chain(pieces, tol=JOIN_TOL_MM, members=None):
+    """
+    Join polylines end to end into closed loops; returns (loops, open chains). If members is a
+    list, the indices (into pieces) of the polylines in each closed loop are appended to it.
+    """
     todo = [p for p in pieces]
+    ids = list(range(len(pieces)))
     loops, open_ = [], []
     while todo:
         cur = todo.pop(0)
+        used = [ids.pop(0)]
         grown = True
         while grown and np.hypot(*(cur[0] - cur[-1])) > tol:
             grown = False
@@ -451,10 +480,13 @@ def _chain(pieces, tol=JOIN_TOL_MM):
                 else:
                     continue
                 todo.pop(i)
+                used.append(ids.pop(i))
                 grown = True
                 break
         if np.hypot(*(cur[0] - cur[-1])) <= tol and len(cur) > 3:
             loops.append(cur[:-1])          # closed: the end point repeats the start
+            if members is not None:
+                members.append(used)
         else:
             open_.append(cur)
     return loops, open_
@@ -473,7 +505,8 @@ def dxf_profile(path, thickness_mm, centre_x_mm=0.0, datum="surface", layer=None
     if layer is not None and layer not in layers:
         raise ValueError(f"{name} has no layer {layer!r} with outline entities "
                          f"(layers: {', '.join(layers) or 'none'})")
-    loops, open_ = _chain([p for _, p in pieces])
+    members = []
+    loops, open_ = _chain([p for _, p, _ in pieces], members=members)
     loops = _join_touching(loops)
     if not loops:
         if open_:
@@ -485,6 +518,10 @@ def dxf_profile(path, thickness_mm, centre_x_mm=0.0, datum="surface", layer=None
         raise ValueError(f"{name} has {len(loops)} closed outlines" +
                          (f" on layer {layer!r}" if layer else "") +
                          f"; put the weld region alone on one layer and name it (layers: {', '.join(layers)})")
+    # The cross-section is read in the drawing's X-Y plane: the entities that make the outline
+    # (every closed loop, joined into the one outline) must lie in one such plane; open entities
+    # elsewhere in the file do not matter.
+    _outline_is_flat(name, [pieces[i][2] for m in members for i in m])
     xy = loops[0]
     z = -xy[:, 1] if datum == "surface" else T - xy[:, 1]
     poly = np.c_[xy[:, 0] + centre_x_mm, z]
