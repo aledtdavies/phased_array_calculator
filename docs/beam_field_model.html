@@ -136,7 +136,7 @@ peak), turned into an analytic signal per component, and the map value is the pe
 <li><b>Continuous wave:</b> the same sum at <var>f</var><sub>0</sub> only; the map is |Σ <var>A</var> e<sup>iω<var>t</var></sup>|.
 Faster; shows the steady-state pattern, with stronger interference fringes and side lobes than a short pulse.</li>
 </ul>
-<p>The map is shown in dB re its own maximum, from 0 to −30 dB (turbo), with the −6 dB contour. The fitted beam axis
+<p>The map is shown in dB, from 0 to −30 dB (turbo), with the −6 dB contour. In 2D the reference is the section's own maximum; in 3D both sections share one reference, the larger of their two maxima, so the weaker section can peak below 0 dB and its −6 dB contour is drawn against the shared reference. The fitted beam axis
 uses buildFE's rule (<code>beam_metrics.py</code>): the midpoint of each depth row's widest −6 dB run, a straight line
 through the rows within 12 dB of the maximum. <span class="tag APPROXIMATION">APPROXIMATION</span></p>
 
@@ -195,7 +195,7 @@ region, and the FE field also contains head and surface waves the model does not
 <tr><td>Longitudinal-wave laws</td><td class="care">Expected good away from critical angles, not tested</td><td>Same model; no reference yet.</td></tr>
 <tr><td>3D mode: elevation focusing, Y–Z sections, matrix and dual probes</td><td class="care">Not validated</td><td>Same ingredients with point sources; the 3D spreading is tested against a ray tube, the field is not compared with a reference.</td></tr>
 <tr><td>Fine structure below about −12 dB, side lobes, grating lobes</td><td class="care">Indicative only</td><td>Sensitive to element directivity, contact condition and the pulse's band; differences from the FE map were seen on the far side of the beam.</td></tr>
-<tr><td>Absolute amplitude, comparing different wedges or materials</td><td class="no">Not supported</td><td>Maps are normalised to their own maximum; no transducer sensitivity, attenuation or couplant model.</td></tr>
+<tr><td>Absolute amplitude, comparing different wedges or materials</td><td class="no">Not supported</td><td>Maps are normalised to their own maximum (in 3D, the larger of the two sections' maxima); no transducer sensitivity, attenuation or couplant model.</td></tr>
 <tr><td>Within about two wavelengths of the interface (≈ 3 mm for 2.25 MHz shear in steel, λ<sub>S</sub> ≈ 1.4 mm)</td><td class="no">Not reliable</td><td>Ray and far-field assumptions break down; surface, head and evanescent waves are not modelled. The FE comparison also left out the top 2 mm.</td></tr>
 <tr><td>Rays near a critical angle (Rexolite → steel: first 23.3°, second 46.3° in the wedge)</td><td class="care">Approximate</td><td>Plane-wave coefficients change abruptly there (a sharp edge is visible in shear maps where wedge rays pass the first critical angle); real beams smooth this, and head waves appear. The coefficient table's error is below 0.8 % of the coefficient's largest value at any angle, and largest right at a critical angle.</td></tr>
 <tr><td>Refracted angles near grazing (above about 80°)</td><td class="no">Not reliable</td><td>Spreading becomes singular as cos α<sub>2</sub> → 0; creeping waves are not modelled.</td></tr>
