@@ -29,6 +29,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 \
         libxcb-xkb1 libxcb-xfixes0 libxcb-shm0 libxcb-sync1 libxcb-glx0 \
         libfontconfig1 libfreetype6 libdbus-1-3 fonts-dejavu-core \
+        libglib2.0-0 libopengl0 libegl-mesa0 libxcomposite1 libxdamage1 libxrandr2 libxtst6 libxcursor1 \
         tk libtk8.6 \
     && rm -rf /var/lib/apt/lists/*
 
