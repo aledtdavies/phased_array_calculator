@@ -40,3 +40,47 @@ jobs:
           name: headless-results
           path: out/
           if-no-files-found: warn
+
+  web:
+    # The browser version (plan: web app): the self-contained site as an artefact, and the
+    # nginx image built, run and checked for the content types browsers need.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the web image
+        run: docker build -t pac-web -f docker/web.Dockerfile .
+
+      - name: Serve it and check what a browser fetches
+        run: |
+          docker run -d --name pac-web -p 8080:80 pac-web
+          sleep 2
+          check() {  # url, expected content type
+            t=$(curl -fsS -o /dev/null -w '%{content_type}' "http://localhost:8080/$1")
+            echo "$1 -> $t"
+            case "$t" in "$2"*) ;; *) echo "::error::$1 served as '$t', expected $2"; exit 1 ;; esac
+          }
+          check index.html text/html
+          check worker.js application/javascript
+          check config.js application/javascript
+          check py/session.py text/plain
+          check pyodide/pyodide.mjs text/javascript
+          check pyodide/pyodide.asm.mjs text/javascript
+          check pyodide/pyodide.asm.wasm application/wasm
+          check pyodide/pyodide-lock.json application/json
+          for w in $(python3 -c "import json,sys; d=json.load(open(sys.argv[1]))['packages']; print(' '.join(d[k]['file_name'] for k in ('numpy','scipy')))" <(curl -fsS http://localhost:8080/pyodide/pyodide-lock.json)); do
+            curl -fsS -o /dev/null "http://localhost:8080/pyodide/$w" && echo "pyodide/$w ok"
+          done
+
+      - name: The self-contained site, for any web server
+        run: |
+          python3 tools/build_web.py site --offline
+          (cd site && zip -qr ../pac-web-site.zip .)
+          ls -l pac-web-site.zip
+
+      - name: Upload the site
+        uses: actions/upload-artifact@v4
+        with:
+          name: pac-web-site
+          path: pac-web-site.zip

@@ -1,5 +1,11 @@
 # Changelog
 
+## Browser prototype — 2026-11-22
+
+- `web/`: the calculator in a browser, through Pyodide (Python 3.14 in WebAssembly) running the same `session.py` and `beam_field.py` as the desktop window, in a Web Worker. It covers linear probes on a wedge: laws and table, X-Z rays, delays, and the 2D beam field. Measured on the dev laptop: ready in 18–19 s on a first visit; the beam field 1.2–1.4× the desktop's time.
+- `tools/build_web.py` (`--offline` copies Pyodide in), `python/test_web.py`, `docker/web.Dockerfile` (nginx, for a work-network server), `netlify.toml`, `.github/workflows/pages.yml` (manual), and the `web` job in `headless.yml` (builds and checks the image, uploads the site zip).
+- Plan and hosting options: `docs/plans/PLAN-2026-11-web-app.md`.
+
 ## The Tk window is retired — 2026-11-21
 
 - Removed: `python/app.py`, `panels.py`, `plotting.py`, `catalog_dialog.py` and `test_gui.py`, and `tests/refactor_check` (the step 1 reference-image check rendered with the Tk window; it is in the history up to fb82aa6). The Qt window (`python/qt_app.py`) is the calculator's window; the PyInstaller build already used it.
