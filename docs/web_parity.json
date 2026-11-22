@@ -1,0 +1,56 @@
+{
+  "about": "Desktop (Qt) controls and their browser counterparts. python/test_parity.py fails when a desktop tab, menu entry, button, check box or panel choice is missing from this list, when an entry names a desktop control that no longer exists, or when a browser counterpart is not on the page. 'web' is the page element (an id, or text the page shows); null with a 'gap' says why it is not in the browser. See docs/plans/PLAN-2026-11-web-desktop-parity.md.",
+  "controls": [
+    {"desktop": "Ray Tracing", "kind": "tab", "web": "data-tab=\"rays\""},
+    {"desktop": "Data Table", "kind": "tab", "web": "data-tab=\"table\""},
+    {"desktop": "Delays", "kind": "tab", "web": "data-tab=\"delays\""},
+    {"desktop": "3D View", "kind": "tab", "web": "data-tab=\"3d\""},
+    {"desktop": "Beam Field", "kind": "tab", "web": "data-tab=\"field\""},
+
+    {"desktop": "Save Configuration", "kind": "menu", "web": "data-act=\"save-config\""},
+    {"desktop": "Load Configuration", "kind": "menu", "web": "data-act=\"open-config\""},
+    {"desktop": "Export Element Coordinates", "kind": "menu", "web": "data-act=\"export-coords\""},
+    {"desktop": "Load Probe from Catalogue...", "kind": "menu", "web": "data-act=\"cat-probe\""},
+    {"desktop": "Load Wedge from Catalogue...", "kind": "menu", "web": "data-act=\"cat-wedge\""},
+    {"desktop": "Exit", "kind": "menu", "web": null, "gap": "a browser tab is closed by the browser"},
+
+    {"desktop": "Calculate Laws", "kind": "button", "web": "id=\"calcBtn\""},
+    {"desktop": "Export CSV", "kind": "button", "web": "data-act=\"export-csv\""},
+    {"desktop": "Compute field", "kind": "button", "web": "id=\"fieldBtn\""},
+    {"desktop": "Play", "kind": "button", "web": "id=\"playBtn\""},
+    {"desktop": "◀", "kind": "button", "web": "id=\"prevLaw\""},
+    {"desktop": "▶", "kind": "button", "web": "id=\"nextLaw\""},
+    {"desktop": "...", "kind": "button", "web": "pickFile(", "note": "the DXF file chooser of the Weld panel"},
+    {"desktop": "qt_view3d.py: name", "kind": "dynamic", "web": "data-view=\"Top\"", "note": "one camera button per scene_vtk.VIEWS preset; test_parity compares the presets"},
+
+    {"desktop": "Show All", "kind": "check", "web": "id=\"showAll\""},
+    {"desktop": "Sweep focal points", "kind": "check", "web": "id=\"locus3d\""},
+    {"desktop": "Section", "kind": "check", "web": "id=\"section3d\""},
+    {"desktop": "Show in 3D view", "kind": "check", "web": "id=\"field3d\""},
+    {"desktop": "Usable only", "kind": "check", "web": "pick-row", "note": "the browser lists unusable catalogue entries greyed, with the reason, and they cannot be chosen"},
+
+    {"desktop": "Coverage", "kind": "choice", "web": "id=\"coverage\""},
+    {"desktop": "Probe Type:", "kind": "choice", "web": "\"probe_type\""},
+    {"desktop": "Material:", "kind": "choice", "web": "\"_material\""},
+    {"desktop": "Focus Type:", "kind": "choice", "web": "\"focus_mode\""},
+    {"desktop": "Wave Type:", "kind": "choice", "web": "\"wave_type\""},
+    {"desktop": "Y Focus Mode:", "kind": "choice", "web": "\"y_focus_mode\""},
+    {"desktop": "Element Order:", "kind": "choice", "web": "\"element_order\""},
+    {"desktop": "Weld:", "kind": "choice", "web": "\"type\""},
+    {"desktop": "J Side:", "kind": "choice", "web": "\"j_side\""},
+    {"desktop": "DXF y = 0 at:", "kind": "choice", "web": "\"dxf_datum\""},
+    {"desktop": "DXF Units:", "kind": "choice", "web": "\"dxf_units\""},
+    {"desktop": "Model", "kind": "choice", "web": "\"model\""},
+    {"desktop": "Pulse", "kind": "choice", "web": "\"pulsed\""}
+  ],
+  "interactions": [
+    {"desktop": "drag the focus on the X-Z view", "web": "focus-handle"},
+    {"desktop": "click an element (2D, 3D, Delays)", "web": "pickElement("},
+    {"desktop": "select a table row", "web": "tr.onclick"},
+    {"desktop": "3D camera presets Iso, X-Z, Y-Z, Top", "web": "data-view=\"Top\""},
+    {"desktop": "mouse wheel zoom and pan", "web": "scrollZoom"}
+  ],
+  "browser_only": [
+    {"web": "Place focus", "why": "tap to place the focus: dragging a small handle is awkward on a touch screen"}
+  ]
+}

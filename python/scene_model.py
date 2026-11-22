@@ -384,3 +384,105 @@ def weld_prims(profile, fusion=None):
                 prims.append(Prim("polyline", _xz(run), "fusion-covered" if covered else "fusion-gap",
                                   {"name": f.name}))
     return prims
+
+
+# ---------------------------------------------------------------------------
+# 3D framing, section plane and solids (renderer independent: the Qt/VTK view and the browser's
+# 3D view both use these, so they frame, cut and fill the same way)
+# ---------------------------------------------------------------------------
+def scene_bounds(scene, component_thickness_mm=0.0):
+    """(lo, hi) mm over every primitive (and the wedge's Y extent and the backwall), padded."""
+    prims = scene.prims if isinstance(scene, Scene) else scene
+    pts = [np.asarray(p.coords, dtype=float).reshape(-1, 3) for p in prims if p.kind != "text"]
+    allp = np.vstack(pts)
+    lo, hi = allp.min(axis=0), allp.max(axis=0)
+    for w in [p for p in prims if p.role == "wedge"][:1]:
+        lo[1] = min(lo[1], w.meta["y0"])
+        hi[1] = max(hi[1], w.meta["y1"])
+    if component_thickness_mm > 0:
+        hi[2] = max(hi[2], component_thickness_mm)
+    pad = np.maximum(2.0, 0.06 * (hi - lo))
+    return lo - pad, hi + pad
+
+
+def section_y(scene):
+    """Y (mm) of the 3D views' section: the vertical X-Z plane through the active aperture's centre."""
+    prims = scene.prims if isinstance(scene, Scene) else scene
+    els = [p for p in prims if p.role == "element"]
+    act = [p for p in els if p.meta["active"]] or els
+    return float(np.mean(np.vstack([p.coords for p in act])[:, 1]))
+
+
+def triangulate_polygon(xy):
+    """
+    Triangles (M, 3) of vertex indices filling a simple polygon (N, 2), by ear clipping. The
+    polygon may be concave and either orientation. An ear is cut only when no other vertex lies in
+    its triangle or on its boundary (so a diagonal never passes through a vertex); a collinear
+    vertex between its neighbours is cut as a zero-area ear. Repeated vertices are allowed.
+    """
+    p = np.asarray(xy, dtype=float)
+    n = len(p)
+    if n < 3:
+        return np.zeros((0, 3), dtype=int)
+    area2 = float(np.sum(p[:, 0] * np.roll(p[:, 1], -1) - np.roll(p[:, 0], -1) * p[:, 1]))
+    idx = list(range(n)) if area2 >= 0 else list(range(n - 1, -1, -1))     # counter-clockwise
+    scale = float(np.ptp(p, axis=0).max()) or 1.0
+    eps = 1e-12 * scale * scale
+
+    def cross(a, b, c):
+        return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+
+    def blocks(q, a, b, c):
+        """q (not one of the corners) in the closed triangle a, b, c (counter-clockwise)."""
+        if any(abs(q[0] - v[0]) <= 1e-12 * scale and abs(q[1] - v[1]) <= 1e-12 * scale for v in (a, b, c)):
+            return False
+        return cross(a, b, q) >= -eps and cross(b, c, q) >= -eps and cross(c, a, q) >= -eps
+
+    def is_ear(k, convex):
+        m = len(idx)
+        i0, i1, i2 = idx[k - 1], idx[k], idx[(k + 1) % m]
+        a, b, c = p[i0], p[i1], p[i2]
+        turn = cross(a, b, c)
+        if convex:
+            return turn > eps and not any(blocks(p[j], a, b, c) for j in idx if j not in (i0, i1, i2))
+        # a collinear vertex lying between its neighbours: removing it leaves the outline unchanged
+        return abs(turn) <= eps and (b[0] - a[0]) * (c[0] - b[0]) + (b[1] - a[1]) * (c[1] - b[1]) >= 0
+
+    tris = []
+    while len(idx) > 3:
+        ear = next((k for convex in (True, False) for k in range(len(idx)) if is_ear(k, convex)), None)
+        if ear is None:              # not simple: fan the rest rather than fail
+            tris += [(idx[0], idx[k], idx[k + 1]) for k in range(1, len(idx) - 1)]
+            idx = []
+            break
+        m = len(idx)
+        tris.append((idx[ear - 1], idx[ear], idx[(ear + 1) % m]))
+        del idx[ear]
+    if len(idx) == 3:
+        tris.append(tuple(idx))
+    return np.asarray(tris, dtype=int).reshape(-1, 3)
+
+
+def solid_prims(scene, component_thickness_mm=0.0, lobes=None):
+    """
+    The 3D views' solids as X-Z cross-sections extruded across Y: [{role, xz (N, 2), tris (M, 3),
+    y0, y1}], mm. The component (a plate to the backwall, when its thickness is known), the wedge
+    (its own Y extent) and each weld lobe (the view's whole Y extent). lobes: a function splitting
+    a weld outline into simple polygons (weld.split_lobes); the outline itself when None.
+    """
+    lo, hi = scene_bounds(scene, component_thickness_mm)
+    prims = scene.prims if isinstance(scene, Scene) else scene
+    out = []
+    if component_thickness_mm > 0:
+        xz = np.array([[lo[0], 0.0], [hi[0], 0.0], [hi[0], component_thickness_mm], [lo[0], component_thickness_mm]])
+        out.append(dict(role="component", xz=xz, tris=triangulate_polygon(xz), y0=float(lo[1]), y1=float(hi[1])))
+    for w in [p for p in prims if p.role == "wedge"]:
+        xz = np.asarray(w.coords, dtype=float)[:, [0, 2]]
+        out.append(dict(role="wedge", xz=xz, tris=triangulate_polygon(xz), y0=w.meta["y0"], y1=w.meta["y1"],
+                        source=w.meta.get("source")))
+    for w in [p for p in prims if p.role == "weld"]:
+        xz = np.asarray(w.coords, dtype=float)[:, [0, 2]]
+        for part in (lobes(xz) if lobes else [xz]):
+            out.append(dict(role="weld", xz=np.asarray(part, dtype=float), tris=triangulate_polygon(part),
+                            y0=float(lo[1]), y1=float(hi[1])))
+    return out

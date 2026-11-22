@@ -50,7 +50,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build the web image
-        run: docker build -t pac-web -f docker/web.Dockerfile .
+        run: docker build -t pac-web -f docker/web.Dockerfile --build-arg PAC_BUILD="$(git log -1 --format='%h %cs')" .
 
       - name: Serve it and check what a browser fetches
         run: |
@@ -62,9 +62,12 @@ jobs:
             case "$t" in "$2"*) ;; *) echo "::error::$1 served as '$t', expected $2"; exit 1 ;; esac
           }
           check index.html text/html
+          want="$(git log -1 --format='%h')"
+          curl -fsS http://localhost:8080/config.js | grep -q "PAC_BUILD = \"$want " && echo "build label ok ($want)" || { echo "::error::config.js lacks the build $want"; exit 1; }
           check worker.js application/javascript
           check config.js application/javascript
           check views.js application/javascript
+          check view3d.js application/javascript
           check style.css text/css
           check panels.json application/json
           check vendor/plotly.min.js application/javascript
@@ -91,3 +94,19 @@ jobs:
         with:
           name: pac-web-site
           path: pac-web-site.zip
+
+      - name: The page in a real browser (headless Chromium)
+        # The browser's own checks (tools/web_smoke.py): Python starts, every tab draws, for a linear
+        # probe with a weld and a matrix probe, at desktop and phone width; no page errors.
+        run: |
+          python3 -m pip install --quiet "playwright==1.65.2"
+          python3 -m playwright install --with-deps chromium
+          python3 tools/web_smoke.py site web-smoke
+
+      - name: Upload the browser screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-screenshots
+          path: web-smoke/
+          if-no-files-found: warn
