@@ -242,7 +242,10 @@ class TestBuild(unittest.TestCase):
             os.environ["PAC_BUILD"] = "abc1234 2026-11-22"
             self.assertEqual(build_web.build_id(), "abc1234 2026-11-22")      # a Docker build (no .git)
             del os.environ["PAC_BUILD"]
-            self.assertRegex(build_web.build_id(), r"^[0-9a-f]{7,} \d{4}-\d{2}-\d{2}")   # this checkout
+            if os.path.exists(os.path.join(ROOT, ".git")):                          # a git checkout (not the Docker image)
+                self.assertRegex(build_web.build_id(), r"^[0-9a-f]{7,} \d{4}-\d{2}-\d{2}")
+            else:
+                self.assertEqual(build_web.build_id(), "")
         finally:
             if old is not None:
                 os.environ["PAC_BUILD"] = old
