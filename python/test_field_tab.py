@@ -41,8 +41,7 @@ class TestGrid(unittest.TestCase):
             section_grid((0.0, 0.01), (0.05, 0.01), 0.001, 1000)
 
 
-@unittest.skipUnless(HAVE_QT, "PySide6/qtpy/pyvistaqt not installed, or no display")
-class TestSteps(unittest.TestCase):
+class TestSteps(unittest.TestCase):          # no Qt needed: runs everywhere
     """field_job in steps (the browser's progress and Cancel) gives exactly the one-call field."""
 
     def job(self, **values):
@@ -77,6 +76,7 @@ class TestSteps(unittest.TestCase):
                     np.testing.assert_array_equal(a["db"], b["db"])
 
 
+@unittest.skipUnless(HAVE_QT, "PySide6/qtpy/pyvistaqt not installed, or no display")
 class TestFieldTab(QtCase):
     def setup_linear(self, focus_mm=20.0):
         w = self.win

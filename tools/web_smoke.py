@@ -155,6 +155,18 @@ def main(site, out):
             check(f"{label}: progress and Cancel hidden after", not page.is_visible("#fieldProgress")
                   and not page.is_visible("#fieldCancel"))
             shot("field_cancelled")
+            # Cancel pressed while the last (here the only) step runs: the finished field is not shown
+            shown = page.evaluate("JSON.stringify(window.__pac.fieldSections)")
+            # (the page's worker is wrapped so Cancel is pressed as the step is sent: it lands mid-step)
+            page.evaluate("""async () => {
+              __pacTest.setValues('beam_field', {model: '2D', pulsed: false, grid_mm: 2});
+              const post = worker.postMessage.bind(worker);
+              worker.postMessage = (m) => { if (m.op === 'field_step') document.getElementById('fieldCancel').click(); post(m); };
+              try { await __pacTest.computeField(); } finally { worker.postMessage = post; }
+            }""")
+            status = page.inner_text("#fieldStatus")
+            check(f"{label}: Cancel during the last step", status.startswith("Cancelled")
+                  and page.evaluate("JSON.stringify(window.__pac.fieldSections)") == shown, status)
             run("__pacTest.setValues('beam_field', {model: '2D', pulsed: true, grid_mm: 0.5});", None)
             run("__pacTest.showTab('rays'); await __pacTest.showLaw(2);", "rays_law3")
             cfg = page.evaluate("async () => JSON.stringify(await __pacTest.configDict())")
