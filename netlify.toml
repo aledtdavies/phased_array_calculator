@@ -1,0 +1,15 @@
+# Netlify (plan: web app, hosting option): builds the self-contained browser version and
+# publishes it. Netlify's build image has Python; the build downloads Pyodide once.
+[build]
+  command = "python3 tools/build_web.py site --offline"
+  publish = "site"
+
+[[headers]]
+  for = "/*.mjs"
+  [headers.values]
+    Content-Type = "text/javascript"
+
+[[headers]]
+  for = "/pyodide/*"
+  [headers.values]
+    Cache-Control = "public, max-age=2592000"
