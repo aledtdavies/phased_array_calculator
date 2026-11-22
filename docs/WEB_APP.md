@@ -13,7 +13,8 @@ The plan, the measurements and the comparison of hosting options are in
 Send them the address. They need a current browser (Edge, Chrome, Safari or Firefox; phones and
 tablets work too) and nothing else; the first visit takes about 20 s to start. The Help link on the
 page covers using it and what to do if it does not start. It has the desktop window's inputs, tabs
-and files, except the 3D view.
+(the 3D view included) and files. How the two versions are kept the same:
+`docs/plans/PLAN-2026-11-web-desktop-parity.md`.
 
 ## Publishing (GitHub Pages)
 

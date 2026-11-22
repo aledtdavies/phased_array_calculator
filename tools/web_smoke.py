@@ -1,0 +1,135 @@
+"""
+The browser version, end to end in a real browser (headless Chromium through Playwright): the
+page starts Python, calculates, and every tab draws, for a linear probe with a weld and coverage
+and for a matrix probe. Fails on any page error. Saves screenshots (desktop and phone width).
+
+    python tools/build_web.py site --offline
+    python tools/web_smoke.py site out/web-smoke
+
+Run in CI by .github/workflows/headless.yml (job 'web'); the screenshots are an artefact.
+Plan: docs/plans/PLAN-2026-11-web-desktop-parity.md.
+"""
+from __future__ import annotations
+
+import functools
+import http.server
+import os
+import sys
+import threading
+import time
+
+from playwright.sync_api import sync_playwright
+
+TYPES = {".mjs": "text/javascript", ".js": "application/javascript", ".wasm": "application/wasm",
+         ".json": "application/json", ".py": "text/plain", ".whl": "application/zip"}
+
+LINEAR = """
+const T = __pacTest;
+T.setValues('probe', {probe_type: 'Linear', num_elements: 64, pitch_mm: 0.75, freq_mhz: 2.25});
+T.setValues('wedge', {angle_deg: 36, height_mm: 5, velocity_ms: 2337, offset_mm: 4});
+T.setValues('material', {vel_long_ms: 5900, vel_shear_ms: 3230, thickness_mm: 25});
+T.setValues('sub_aperture', {start_element: 1, num_active_elements: 32});
+T.setValues('scan', {wave_type: 'Shear', focus_mode: 'Constant Sound Path', param_val: 60, start_angle: 40, end_angle: 70, step_angle: 5});
+T.setValues('weld', {type: 'Single-V', centre_x_mm: 60, bevel_deg: 30, root_gap_mm: 2, root_face_mm: 1.5});
+document.getElementById('coverage').value = '1';
+await T.calculate();
+"""
+MATRIX = """
+const T = __pacTest;
+T.setValues('weld', {type: 'None'});
+document.getElementById('coverage').value = '0';
+T.setValues('probe', {probe_type: 'Matrix', num_elements: 16, num_elements_y: 4, pitch_y_mm: 1.0});
+T.setValues('scan', {focus_mode: 'Constant Depth', param_val: 20, start_angle: 40, end_angle: 60, step_angle: 10,
+                     start_skew: -10, end_skew: 10, step_skew: 10});
+await T.calculate();
+"""
+# A plot is drawn when Plotly has given it traces.
+DRAWN = "(id) => { const d = document.getElementById(id); return !!(d && d.data && d.data.length); }"
+
+
+def serve(root):
+    class Handler(http.server.SimpleHTTPRequestHandler):
+        def guess_type(self, path):
+            return TYPES.get(os.path.splitext(path)[1], super().guess_type(path))
+
+        def log_message(self, *a):
+            pass
+    httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(Handler, directory=root))
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    return httpd
+
+
+def main(site, out):
+    os.makedirs(out, exist_ok=True)
+    httpd = serve(site)
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    errors, checks = [], []
+
+    def check(name, ok, detail=""):
+        checks.append((name, bool(ok)))
+        print(("ok    " if ok else "FAIL  ") + name + (f": {detail}" if detail and not ok else ""), flush=True)
+
+    with sync_playwright() as p:
+        # SwiftShader: WebGL (the 3D view) without a GPU
+        browser = p.chromium.launch(args=["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"])
+        for label, size in (("desktop", {"width": 1366, "height": 860}), ("phone", {"width": 390, "height": 844})):
+            page = browser.new_page(viewport=size, device_scale_factor=1)
+            page.on("pageerror", lambda e, label=label: errors.append(f"{label}: {e}"))
+            page.on("console", lambda m, label=label: errors.append(f"{label} console: {m.text}") if m.type == "error" else None)
+            t0 = time.time()
+            page.goto(url)
+            page.wait_for_function("window.__pac && (window.__pac.ready || window.__pac.error)", timeout=300_000)
+            err = page.evaluate("window.__pac.error")
+            check(f"{label}: Python starts", not err, err)
+            if err:
+                page.close()
+                continue
+            print(f"      ready in {time.time() - t0:.0f} s", flush=True)
+            shot = lambda name: page.screenshot(path=os.path.join(out, f"{label}_{name}.png"))  # noqa: E731
+
+            def run(js, name):
+                page.evaluate("async () => {" + js + "}")
+                page.wait_for_function("!window.__pac.busy", timeout=600_000)
+                page.wait_for_timeout(800)
+                shot(name)
+
+            run(LINEAR + ("T.closeSetup();" if label == "phone" else ""), "rays")
+            n = page.evaluate("window.__pac.calc ? window.__pac.calc.laws.length : 0")
+            check(f"{label}: linear laws", n == 7, f"{n} laws")
+            check(f"{label}: X-Z view drawn", page.evaluate(DRAWN, "plotXZ"))
+            check(f"{label}: weld note", "single-v" in page.inner_text("#notes").lower(), page.inner_text("#notes"))
+            run("__pacTest.showTab('table');", "table")
+            check(f"{label}: table rows", page.locator("#lawTable tbody tr").count() == 7)
+            run("await __pacTest.pickElement(5); __pacTest.showTab('delays');", "delays")
+            check(f"{label}: delays drawn", page.evaluate(DRAWN, "plotDelays"))
+            check(f"{label}: element readout", "Element 6" in page.inner_text("#elementInfo"), page.inner_text("#elementInfo"))
+            run("__pacTest.showTab('field'); await __pacTest.computeField();", "field")
+            check(f"{label}: beam field drawn", page.evaluate(DRAWN, "plotField"), page.inner_text("#fieldStatus"))
+            run("__pacTest.showTab('3d');", "3d")
+            kinds = page.evaluate("(document.getElementById('plot3d').data || []).map((t) => t.type)")
+            check(f"{label}: 3D view drawn with solids and the field", "mesh3d" in kinds and "surface" in kinds, kinds)
+            check(f"{label}: 3D view has WebGL", page.locator("#plot3d canvas").count() > 0)
+            run("document.getElementById('section3d').click(); document.querySelector('[data-view=\"X-Z\"]').click();", "3d_section")
+            run("await __pacTest.showCustom(50, 15);", "3d_custom")
+            check(f"{label}: dragged focus", page.evaluate("window.__pac.custom"))
+            run("__pacTest.showTab('rays'); await __pacTest.showLaw(2);", "rays_law3")
+            cfg = page.evaluate("async () => JSON.stringify(await __pacTest.configDict())")
+            check(f"{label}: configuration saves", '"probe"' in cfg and '"weld"' in cfg)
+            run(MATRIX, "matrix_rays")
+            n = page.evaluate("window.__pac.calc ? window.__pac.calc.laws.length : 0")
+            check(f"{label}: matrix laws", n == 9, f"{n} laws")
+            check(f"{label}: Y-Z view drawn", page.evaluate(DRAWN, "plotYZ"))
+            run("__pacTest.showTab('3d'); document.querySelector('[data-view=\"Iso\"]').click();", "matrix_3d")
+            check(f"{label}: matrix 3D drawn", page.evaluate(DRAWN, "plot3d"))
+            page.close()
+        browser.close()
+    httpd.shutdown()
+    for e in errors:
+        print("page error:", e)
+    failed = [n for n, ok in checks if not ok]
+    print(f"{len(checks) - len(failed)}/{len(checks)} checks passed; {len(errors)} page errors; screenshots in {out}")
+    return 1 if failed or errors else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1] if len(sys.argv) > 1 else "site", sys.argv[2] if len(sys.argv) > 2 else "web-smoke"))

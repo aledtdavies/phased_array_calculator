@@ -138,3 +138,11 @@ tr.sel td { background: #dbeafe; } tr.refused td { color: var(--muted); font-sty
   .title { font-size: 15px; }
   .hint:not(#fieldStatus) { display: none; }      /* the field status carries progress and errors: kept */
 }
+
+/* 3D view: the camera presets as one button group */
+.seg { display: inline-flex; }
+.seg .btn { border-radius: 0; border-color: var(--line, #cbd5e1); padding: 6px 11px; }
+.seg .btn:first-child { border-radius: 8px 0 0 8px; }
+.seg .btn:last-child { border-radius: 0 8px 8px 0; }
+.seg .btn + .btn { margin-left: -1px; }
+.build-id { color: #94a3b8; font-size: 11px; margin-top: 4px; }
