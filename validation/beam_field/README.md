@@ -43,3 +43,18 @@ row passes. It runs in about 30 s on the dev laptop.
 ## Result (2026-11-20): pass
 
 See the step 6 status in the plan for the table and what the case does and does not test.
+
+## Further cases (buildFE Task 204, waiting for the cluster run)
+
+`--case focused_sv55` (elements 1-32, 55 degree shear focused at 25 mm depth) and `--case steer_l60`
+(64 elements, 60 degree longitudinal, 3.2 degrees below the first critical angle). Their tolerances
+were fixed in the plan (commit 5ded4b8) before the cluster run. Their reference is buildFE bundle
+`fe-ref_wedge_laws_20261121`; each case's `field_products.h5` comes back in its `results.zip`.
+
+```
+python validation/beam_field/compare_buildfe.py <focused_sv55 field_products.h5> --case focused_sv55
+python validation/beam_field/compare_buildfe.py <steer_l60 field_products.h5> --case steer_l60
+```
+
+Not staged, because buildFE does not build them yet: a couplant layer (`contact: "couplant"` is
+reserved) and 3D (wedges are refused in 3D until the Task 189 follow-on).
