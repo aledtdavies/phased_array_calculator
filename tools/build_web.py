@@ -80,7 +80,7 @@ def build(out, offline=False):
         shutil.rmtree(p) if os.path.isdir(p) else os.remove(p)
     open(os.path.join(out, MARKER), "w").close()
     os.makedirs(os.path.join(out, "py"))
-    for f in ("index.html", "app.js", "worker.js"):
+    for f in ("index.html", "help.html", "app.js", "worker.js", "web.config"):
         shutil.copy2(os.path.join(ROOT, "web", f), os.path.join(out, f))
     shutil.copy2(os.path.join(ROOT, "web", "pac_web.py"), os.path.join(out, "py", "pac_web.py"))
     for f in PY:
