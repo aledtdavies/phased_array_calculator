@@ -202,6 +202,9 @@ function drawProjection(div, dim, data) {
 // Delays: bars for linear and dual linear arrays, maps for matrix arrays.
 function drawDelays(div, probe, law, vmax, pick) {
   const d = law ? law.delays_us : [];
+  // one scale across the sweep, widened while a dragged focus needs more (as the desktop view)
+  const lawMax = Math.max(0, ...d.filter((v) => v !== null && v !== undefined));
+  vmax = Math.max(vmax || 0, lawMax) || 1;
   const numbers = probe.numbers, per = probe.nx * probe.ny, arrays = probe.total / per;
   const names = arrays === 2 ? ["Tx array", "Rx array"] : ["Aperture"];
   const title = law ? (law.custom ? "Delays: dragged focus" : `Delays: law ${law.law + 1}`) : "Delays";
