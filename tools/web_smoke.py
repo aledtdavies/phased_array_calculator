@@ -45,6 +45,17 @@ await T.calculate();
 """
 # A plot is drawn when Plotly has given it traces.
 DRAWN = "(id) => { const d = document.getElementById(id); return !!(d && d.data && d.data.length); }"
+# Everything the 3D view draws lies inside its axis ranges: the traces whose points fall outside
+# (a moved focus or a field section clipped by the axes), as "name: axis".
+OUTSIDE_3D = """() => {
+  const gd = document.getElementById('plot3d'), sc = gd._fullLayout.scene, bad = [];
+  const flat = (a) => (Array.isArray(a) ? a.flat(Infinity) : Array.from(a || [])).filter((v) => v !== null && isFinite(v));
+  for (const t of gd.data) for (const k of ['x', 'y', 'z']) {
+    const r = sc[k + 'axis'].range, lo = Math.min(r[0], r[1]) - 1e-6, hi = Math.max(r[0], r[1]) + 1e-6;
+    if (flat(t[k]).some((v) => v < lo || v > hi)) bad.push((t.name || t.type) + ': ' + k);
+  }
+  return bad;
+}"""
 
 
 def serve(root):
@@ -91,7 +102,8 @@ def main(site, out):
                 page.evaluate("async () => {" + js + "}")
                 page.wait_for_function("!window.__pac.busy", timeout=600_000)
                 page.wait_for_timeout(800)
-                shot(name)
+                if name:
+                    shot(name)
 
             run(LINEAR + ("T.closeSetup();" if label == "phone" else ""), "rays")
             n = page.evaluate("window.__pac.calc ? window.__pac.calc.laws.length : 0")
@@ -112,6 +124,17 @@ def main(site, out):
             run("document.getElementById('section3d').click(); document.querySelector('[data-view=\"X-Z\"]').click();", "3d_section")
             run("await __pacTest.showCustom(50, 15);", "3d_custom")
             check(f"{label}: dragged focus", page.evaluate("window.__pac.custom"))
+            check(f"{label}: 3D view holds everything drawn", page.evaluate(OUTSIDE_3D) == [], page.evaluate(OUTSIDE_3D))
+            run("await __pacTest.showCustom(200, 60);", "3d_far_focus")
+            far = page.evaluate("window.__pac.custom && window.__pac.law.focus")
+            check(f"{label}: far focus solved", bool(far) and abs(far[0] - 200) < 1e-6, far)
+            check(f"{label}: 3D view widens to a far focus", page.evaluate(OUTSIDE_3D) == [], page.evaluate(OUTSIDE_3D))
+            run("await __pacTest.showLaw(3); __pacTest.setValues('beam_field', {model: '3D', pulsed: false, grid_mm: 2, elevation_mm: 10});"
+                "__pacTest.showTab('field'); await __pacTest.computeField(); __pacTest.showTab('3d');", "3d_field3d")
+            surfaces = page.evaluate("document.getElementById('plot3d').data.filter((t) => t.type === 'surface').length")
+            check(f"{label}: 3D field shows both sections", surfaces == 2, f"{surfaces} surfaces; {page.inner_text('#fieldStatus')}")
+            check(f"{label}: 3D view holds both field sections", page.evaluate(OUTSIDE_3D) == [], page.evaluate(OUTSIDE_3D))
+            run("__pacTest.setValues('beam_field', {model: '2D', pulsed: true, grid_mm: 0.5});", None)
             run("__pacTest.showTab('rays'); await __pacTest.showLaw(2);", "rays_law3")
             cfg = page.evaluate("async () => JSON.stringify(await __pacTest.configDict())")
             check(f"{label}: configuration saves", '"probe"' in cfg and '"weld"' in cfg)

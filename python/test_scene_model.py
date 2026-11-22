@@ -132,13 +132,17 @@ class TestSolids(unittest.TestCase):
             "collinear points": [(0, 0), (1, 0), (2, 0), (2, 1), (1, 1), (0, 1)],
             "single-V weld": [(-7, 0), (7, 0), (1, 23.5), (1, 25), (-1, 25), (-1, 23.5)],
             "comb": [(0, 0), (5, 0), (5, 3), (4, 3), (4, 1), (3, 1), (3, 3), (2, 3), (2, 1), (1, 1), (1, 3), (0, 3)],
+            # a vertex on the diagonal (0,0)-(2,2): that diagonal must not be cut (review of PR #40)
+            "vertex on a diagonal": [(0, 0), (2, 0), (2, 2), (1, 1), (0, 2)],
+            "vertex on a diagonal, reversed": [(0, 2), (1, 1), (2, 2), (2, 0), (0, 0)],
+            "notch to the diagonal": [(0, 0), (4, 0), (4, 4), (2, 2), (2, 4), (0, 4)],
         }
         for name, poly in shapes.items():
             with self.subTest(name):
                 p = np.asarray(poly, dtype=float)
                 t = triangulate_polygon(p)
                 self.assertEqual(len(t), len(p) - 2)
-                self.assertAlmostEqual(float(_tri_area(p, t).sum()), _area(p), places=9)
+                self.assertAlmostEqual(float(_tri_area(p, t).sum()), _area(p), places=9)   # no overlap, nothing outside
                 # every triangle inside: its centroid lies in the polygon (non-convex shapes)
                 from matplotlib.path import Path
                 cen = p[t].mean(axis=1)

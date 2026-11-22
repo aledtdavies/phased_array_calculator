@@ -416,8 +416,9 @@ def section_y(scene):
 def triangulate_polygon(xy):
     """
     Triangles (M, 3) of vertex indices filling a simple polygon (N, 2), by ear clipping. The
-    polygon may be concave and either orientation; repeated and collinear vertices are allowed
-    (collinear ones are clipped as zero-area ears last).
+    polygon may be concave and either orientation. An ear is cut only when no other vertex lies in
+    its triangle or on its boundary (so a diagonal never passes through a vertex); a collinear
+    vertex between its neighbours is cut as a zero-area ear. Repeated vertices are allowed.
     """
     p = np.asarray(xy, dtype=float)
     n = len(p)
@@ -431,35 +432,32 @@ def triangulate_polygon(xy):
     def cross(a, b, c):
         return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
 
-    def inside(q, a, b, c):
-        return cross(a, b, q) > eps and cross(b, c, q) > eps and cross(c, a, q) > eps
+    def blocks(q, a, b, c):
+        """q (not one of the corners) in the closed triangle a, b, c (counter-clockwise)."""
+        if any(abs(q[0] - v[0]) <= 1e-12 * scale and abs(q[1] - v[1]) <= 1e-12 * scale for v in (a, b, c)):
+            return False
+        return cross(a, b, q) >= -eps and cross(b, c, q) >= -eps and cross(c, a, q) >= -eps
+
+    def is_ear(k, convex):
+        m = len(idx)
+        i0, i1, i2 = idx[k - 1], idx[k], idx[(k + 1) % m]
+        a, b, c = p[i0], p[i1], p[i2]
+        turn = cross(a, b, c)
+        if convex:
+            return turn > eps and not any(blocks(p[j], a, b, c) for j in idx if j not in (i0, i1, i2))
+        # a collinear vertex lying between its neighbours: removing it leaves the outline unchanged
+        return abs(turn) <= eps and (b[0] - a[0]) * (c[0] - b[0]) + (b[1] - a[1]) * (c[1] - b[1]) >= 0
 
     tris = []
     while len(idx) > 3:
-        m = len(idx)
-        ear = None
-        for strict in (True, False):
-            for k in range(m):
-                i0, i1, i2 = idx[k - 1], idx[k], idx[(k + 1) % m]
-                a, b, c = p[i0], p[i1], p[i2]
-                turn = cross(a, b, c)
-                if strict and turn <= eps:
-                    continue
-                if not strict and turn < -eps:
-                    continue
-                if any(inside(p[j], a, b, c) for j in idx if j not in (i0, i1, i2)):
-                    continue
-                ear = k
-                break
-            if ear is not None:
-                break
+        ear = next((k for convex in (True, False) for k in range(len(idx)) if is_ear(k, convex)), None)
         if ear is None:              # not simple: fan the rest rather than fail
             tris += [(idx[0], idx[k], idx[k + 1]) for k in range(1, len(idx) - 1)]
             idx = []
             break
-        k = ear
-        tris.append((idx[k - 1], idx[k], idx[(k + 1) % m]))
-        del idx[k]
+        m = len(idx)
+        tris.append((idx[ear - 1], idx[ear], idx[(ear + 1) % m]))
+        del idx[ear]
     if len(idx) == 3:
         tris.append(tuple(idx))
     return np.asarray(tris, dtype=int).reshape(-1, 3)
