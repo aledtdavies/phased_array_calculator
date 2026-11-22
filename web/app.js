@@ -96,6 +96,8 @@ async function beamField() {
     $("field").style.opacity = 1;
     $("fieldNote").textContent = text;
     $("fieldModel").textContent = r.note;
+    $("fieldModel").innerHTML = $("fieldModel").innerHTML.replace("docs/beam_field_model.html",
+      '<a href="docs/beam_field_model.html" target="_blank" rel="noopener">the model note (docs/beam_field_model.html)</a>');
     status("Beam field done."); state.fieldDone = true;
   } catch (err) { state.error = err.message; status("Error: " + err.message); }
   lock(false);
@@ -139,7 +141,12 @@ function frame(svg, xs, zs, pad = 30) {
 const el = (tag, attrs) => `<${tag} ${Object.entries(attrs).map(([k, v]) => `${k}="${v}"`).join(" ")}/>`;
 
 function drawLaw() {
-  const r = state.calc; if (!r || !r.laws.length) return;
+  const r = state.calc; if (!r) return;
+  if (!r.laws.length) {                      // no valid law: clear what an earlier scan drew
+    $("lawLabel").textContent = "No valid law in this scan (see the table's refusals)";
+    $("xz").innerHTML = ""; $("delays").innerHTML = "";
+    return;
+  }
   const law = r.laws[state.law];
   $("lawLabel").textContent = `Law ${state.law + 1}/${r.laws.length}: ${law.angle.toFixed(1)}°, F = (${law.focus[0].toFixed(1)}, ${law.focus[1].toFixed(1)}) mm`;
   for (const tr of $("laws").querySelectorAll("tbody tr")) tr.classList.toggle("sel", tr.dataset.law === String(state.law));
