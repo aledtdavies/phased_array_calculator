@@ -191,8 +191,8 @@ function drawProjection(div, dim, data) {
   }
   const layout = Object.assign({}, BASE_LAYOUT, {
     title: { text: dim === 0 ? "Ray tracing X-Z" : "Ray tracing Y-Z (seen from −X)", font: { size: 13 } },
-    xaxis: { title: { text: dim === 0 ? "X (mm)" : "Y (mm)" }, range: [h0 - ph, h1 + ph], zeroline: false, gridcolor: "#eef2f7", constrain: "domain" },
-    yaxis: { title: { text: "Z depth (mm)" }, range: [z1 + pz, z0 - pz], scaleanchor: "x", scaleratio: 1, zeroline: false, gridcolor: "#eef2f7", constrain: "domain" },
+    xaxis: { title: { text: dim === 0 ? "X (mm)" : "Y (mm)" }, range: [h0 - ph, h1 + ph], zeroline: false, gridcolor: "#eef2f7", constrain: narrow() ? "domain" : "range" },
+    yaxis: { title: { text: "Z depth (mm)" }, range: [z1 + pz, z0 - pz], scaleanchor: "x", scaleratio: 1, zeroline: false, gridcolor: "#eef2f7", constrain: narrow() ? "domain" : "range" },
     height: fitHeight(div, h1 - h0 + 2 * ph, z1 - z0 + 2 * pz),
     shapes, annotations: notes, uirevision: data.revision, showlegend: !narrow(),
   });
@@ -267,8 +267,8 @@ function drawField(div, sec, focus, metrics, dim) {
   }
   const layout = Object.assign({}, BASE_LAYOUT, { showlegend: false,
     title: { text: `${sec.name} section at ${sec.fixed[0]} = ${sec.fixed[1].toFixed(1)} mm`, font: { size: 13 } },
-    xaxis: { title: { text: `${sec.name[0]} (mm)` }, range: [sec.h[0], sec.h[sec.h.length - 1]], zeroline: false, constrain: "domain" },
-    yaxis: { title: { text: "Z depth (mm)" }, range: [sec.z[sec.z.length - 1], Math.min(0, sec.z[0])], scaleanchor: "x", zeroline: false, constrain: "domain" },
+    xaxis: { title: { text: `${sec.name[0]} (mm)` }, range: [sec.h[0], sec.h[sec.h.length - 1]], zeroline: false, constrain: narrow() ? "domain" : "range" },
+    yaxis: { title: { text: "Z depth (mm)" }, range: [sec.z[sec.z.length - 1], Math.min(0, sec.z[0])], scaleanchor: "x", zeroline: false, constrain: narrow() ? "domain" : "range" },
     height: fitHeight(div, sec.h[sec.h.length - 1] - sec.h[0], sec.z[sec.z.length - 1] - Math.min(0, sec.z[0]), 90) });
   return Plotly.react(div, traces, layout, PLOT_CONFIG);
 }
