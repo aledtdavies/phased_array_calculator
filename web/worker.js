@@ -1,12 +1,20 @@
-// Web Worker (an ES module worker: Pyodide 314 ships as ES modules): runs Pyodide (Python compiled to WebAssembly) and the calculator's own Python
-// modules, off the page's thread so the page stays responsive while it calculates.
+// Web Worker (an ES module worker: Pyodide 314 ships as ES modules): runs Pyodide (Python
+// compiled to WebAssembly) and the calculator's own Python modules, off the page's thread so the
+// page stays responsive while it calculates.
 //
-// PYODIDE_BASE: where Pyodide is loaded from. The public CDN by default; a site served on a
-// network without internet access sets ?pyodide=<url> (for example "pyodide/" when the
-// files are copied beside the page, as the Docker image does).
-const params = new URL(self.location.href).searchParams;
-// A relative base (the offline build's "pyodide/") is taken relative to the page's folder.
-const PYODIDE_BASE = new URL(params.get("pyodide") || "https://cdn.jsdelivr.net/pyodide/v314.0.8/full/", self.location.href).href;
+// PYODIDE_BASE: where Pyodide is loaded from, as the site's own config.js says (written by
+// tools/build_web.py; the page passes it on): the pinned public CDN, or the site's own copy
+// ("pyodide/", the --offline build). Anything else is refused: the worker receives the user's
+// inputs, so it runs code only from this site or the pinned CDN release (review of PR #37).
+const CDN = "https://cdn.jsdelivr.net/pyodide/v314.0.8/full/";
+const PYODIDE_BASE = (() => {
+  const asked = new URL(self.location.href).searchParams.get("pyodide") || CDN;
+  const url = new URL(asked, self.location.href);
+  if (url.href !== CDN && url.origin !== self.location.origin) {
+    throw new Error("Pyodide must come from this site or " + CDN + ", not " + url.href);
+  }
+  return url.href.endsWith("/") ? url.href : url.href + "/";
+})();
 const PY_FILES = ["probe.py", "wedge.py", "material.py", "delay_law.py", "focal_rules.py",
                   "session.py", "beam_field.py", "beam_metrics.py", "pac_web.py"];
 
