@@ -3,10 +3,9 @@ Phased Array Focal Law Calculator: the Qt window (qtpy; PySide6).
 
     python python/qt_app.py
 
-Plan step 2 (docs/plans/PLAN-2026-11-qt-vtk-migration.md): every feature of the Tk window
-(app.py) on Qt, with the same calculation, table, exports and configuration files through
-session.py. The views are matplotlib canvases for now; steps 3-4 move them to PyVista and
-pyqtgraph.
+The calculator's window (plan docs/plans/PLAN-2026-11-qt-vtk-migration.md). It replaced the Tk
+window (app.py, retired 2026-11-21) with the same calculation, table, exports and configuration
+files through session.py; the views are pyqtgraph (2D) and PyVista (3D).
 """
 from __future__ import annotations
 
@@ -179,7 +178,7 @@ class MainWindow(QtWidgets.QMainWindow):
                   "sub_aperture": self.sub_aperture_panel.get_values()}
         if self.weld_panel.kind() is not None:      # saved only when there is a weld
             config["weld"] = self.weld_panel.get_values()
-        if not self.field_tab.is_default():          # saved only when set (Tk files stay identical)
+        if not self.field_tab.is_default():          # saved only when set (files stay as the Tk window wrote them)
             config["beam_field"] = self.field_tab.get_values()
         refs = self.catalog_status()
         if refs:
@@ -280,7 +279,7 @@ class MainWindow(QtWidgets.QMainWindow):
             QtWidgets.QApplication.processEvents()
             calc = calculate(solver, self.scan_panel.get_values(),
                              self.probe_panel.get_values().get("probe_type", "Linear"))
-        except Exception as e:      # shown, as the Tk window does; nothing is drawn
+        except Exception as e:      # shown; nothing is drawn
             self.error("Error", str(e))
             self.statusBar().showMessage("Error during calculation.")
             return
@@ -342,7 +341,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.export_btn.setEnabled(True)
 
     def table_rows(self):
-        """The Data Table's text, row by row (as the Tk window shows it)."""
+        """The Data Table's text, row by row."""
         return [[self.tree.item(r, c).text() for c in range(self.tree.columnCount())]
                 for r in range(self.tree.rowCount())]
 

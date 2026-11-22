@@ -19,8 +19,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     LIBGL_ALWAYS_SOFTWARE=1 \
     MPLBACKEND=Agg
 
-# X server, Mesa software GL, the xcb libraries Qt's platform plugin loads, Tk for the Tk
-# window's parity tests, fonts.
+# X server, Mesa software GL, the xcb libraries Qt's platform plugin loads, fonts.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         xvfb xauth \
         libgl1 libegl1 libglx-mesa0 libgl1-mesa-dri libglu1-mesa \
@@ -30,7 +29,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libxcb-xkb1 libxcb-xfixes0 libxcb-shm0 libxcb-sync1 libxcb-glx0 \
         libfontconfig1 libfreetype6 libdbus-1-3 fonts-dejavu-core \
         libglib2.0-0 libopengl0 libegl-mesa0 libxcomposite1 libxdamage1 libxrandr2 libxtst6 libxcursor1 \
-        tk libtk8.6 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
