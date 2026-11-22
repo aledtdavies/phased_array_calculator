@@ -131,7 +131,10 @@ def build(out, offline=False):
 
 
 def build_id():
-    """The source commit (short hash and date), or '' outside a git checkout."""
+    """The source commit (short hash and date): the PAC_BUILD environment variable when set (a Docker
+    build has no .git), else from git; '' when neither is available."""
+    if os.environ.get("PAC_BUILD"):
+        return os.environ["PAC_BUILD"].strip()
     try:
         out = subprocess.run(["git", "-C", ROOT, "log", "-1", "--format=%h %cs"], capture_output=True, text=True,
                              timeout=20, check=True).stdout.strip()
