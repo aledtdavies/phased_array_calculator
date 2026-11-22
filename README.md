@@ -56,8 +56,9 @@ GitHub Actions (`.github/workflows/headless.yml`) does the same on every pull re
 ### In a browser: https://aledtdavies.github.io/phased_array_calculator/
 
 The calculator's own Python, run in the browser by Pyodide: nothing to install, and nothing a
-user enters leaves the browser. First version: linear probes, laws, rays, delays and the 2D
-beam field. Publishing, sharing and hosting on a work server: `docs/WEB_APP.md`.
+user enters leaves the browser. It works on phones and tablets too, and has everything the
+desktop window has except the 3D view (next). Publishing, sharing and hosting on a work server:
+`docs/WEB_APP.md`.
 
 ```bash
 python tools/build_web.py site            # or --offline: Pyodide copied in, no internet needed
