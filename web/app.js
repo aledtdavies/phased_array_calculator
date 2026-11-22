@@ -355,7 +355,11 @@ async function drawAll() {
   drawLawViews();
 }
 
-function stepLaw(d) { if (S.calc && S.calc.laws.length) showLaw(S.lawIndex + d); }
+function stepLaw(d) {                              // wraps round, as the desktop's law navigation
+  if (!S.calc || !S.calc.laws.length) return;
+  const n = S.calc.laws.length;
+  showLaw(((S.lawIndex + d) % n + n) % n);
+}
 function sliderLaw() {
   const a = navAngles[+$("angleSlider").value], s = navSkews[+$("skewSlider").value];
   const i = S.calc.laws.findIndex((l) => l.angle === a && (!S.calc.probe.matrix || l.skew === s));

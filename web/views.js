@@ -211,11 +211,12 @@ function drawDelays(div, probe, law, vmax, pick) {
   if (!probe.matrix) {
     const traces = [];
     for (let b = 0; b < arrays; b++) {
-      const x = [], y = [], ix = [], ex = [], ey = [];
-      for (let k = 0; k < per; k++) { const i = b * per + k; if (d[i] === null || d[i] === undefined) { ex.push(numbers[i]); ey.push(0); } else { x.push(numbers[i]); y.push(d[i]); ix.push(i); } }
+      const x = [], y = [], ix = [], ex = [], ey = [], eix = [];
+      for (let k = 0; k < per; k++) { const i = b * per + k; if (d[i] === null || d[i] === undefined) { ex.push(numbers[i]); ey.push(0); eix.push(i); } else { x.push(numbers[i]); y.push(d[i]); ix.push(i); } }
       traces.push({ type: "bar", x, y, customdata: ix, name: names[b], marker: { color: arrays === 2 && b === 0 ? COLOURS.tx : "#2563eb" },
                     hovertemplate: "element %{x}: %{y:.4f} µs<extra></extra>" });
-      if (ex.length) traces.push({ type: "scatter", x: ex, y: ey, mode: "markers", name: "Inactive", hoverinfo: "skip",
+      if (ex.length) traces.push({ type: "scatter", x: ex, y: ey, customdata: eix, mode: "markers", name: "Inactive",
+                                   hovertemplate: "element %{x}: inactive<extra></extra>",
                                    marker: { symbol: "x-thin", size: 7, line: { color: COLOURS.inactive, width: 1.5 } }, showlegend: b === 0 });
     }
     if (pick !== null && pick !== undefined && d[pick] !== null) traces.push({ type: "scatter", x: [numbers[pick]], y: [d[pick]], mode: "markers", name: "Selected", hoverinfo: "skip",
