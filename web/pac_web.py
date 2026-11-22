@@ -235,9 +235,13 @@ def calc(arg):
         frame.append(np.asarray(c.focal_points) * 1e3)
     if _state["coverage"] is not None:
         frame += [np.asarray(p) * 1e3 for p in _state["coverage"].paths]
-    if _state["weld"] is not None:                   # the weld is drawn: frame it too (X-Z, Y = 0)
-        poly = np.asarray(_state["weld"].polygon, dtype=float)
-        frame.append(np.column_stack([poly[:, 0], np.zeros(len(poly)), poly[:, 1]]))
+    # everything drawn is framed, as the desktop views do: wedge, probe body, weld, fans, labels;
+    # a wedge's Y extent (meta y0, y1) frames the Y-Z view
+    for p in setup:
+        frame.append(np.asarray(p.coords, dtype=float).reshape(-1, 3))
+        if p.role == "wedge" and "y0" in p.meta:
+            z = np.asarray(p.coords, dtype=float)[:, 2]
+            frame.append(np.array([[0.0, p.meta["y0"], z.min()], [0.0, p.meta["y1"], z.max()]]))
     frame = np.vstack(frame)
     return _out({
         "headings": list(TABLE_HEADINGS),

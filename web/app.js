@@ -149,7 +149,16 @@ function values(strict = false) {
   return out;
 }
 
+// Refuse values the panels cannot show (an unknown option), before anything is changed.
+function checkValues(secId, vals) {
+  for (const [k, v] of Object.entries(vals || {})) {
+    const w = W[`${secId}.${k}`]; if (!w || !(w.f.type === "select" || w.f.type === "bool")) continue;
+    const s = String(w.f.type === "select" && k === "element_order" ? String(v).toLowerCase() : v);
+    if (![...w.input.options].some((o) => o.value === s)) throw new Error(`${w.sec.title}: '${v}' is not an option for ${w.f.label}`);
+  }
+}
 function setValues(secId, vals) {
+  checkValues(secId, vals);
   for (const [k, v] of Object.entries(vals || {})) {
     const w = W[`${secId}.${k}`]; if (!w) continue;
     if (w.f.type === "file") { setFileValue(secId, k, v); continue; }
@@ -204,14 +213,17 @@ async function applyConfig(config) {
   if (!(await exclusive(() => applyConfigNow(config)))) throw new Error("Wait for the calculation to finish, then open the file again.");
 }
 async function applyConfigNow(config) {
+  // the whole file is checked first: a file that cannot load changes nothing
+  const plan = [];
+  for (const sec of ["probe", "wedge", "material", "scan", "sub_aperture"]) if (config[sec]) plan.push([sec, config[sec]]);
+  plan.push(["weld", config.weld || { type: "None" }], ["beam_field", config.beam_field || FIELD_DEFAULTS()]);
+  for (const [sec, vals] of plan) checkValues(sec, vals);
   S.edits++;
-  for (const sec of ["probe", "wedge", "material", "scan", "sub_aperture"]) if (config[sec]) setValues(sec, config[sec]);
-  setValues("weld", config.weld || { type: "None" });
-  setValues("beam_field", config.beam_field || FIELD_DEFAULTS());
+  if (S.calc) { S.dirty = true; $("fieldBtn").disabled = true; markFieldStale("a configuration was loaded"); }
+  for (const [sec, vals] of plan) setValues(sec, vals);
   for (const k of ["wedge._material", "material._material"]) W[k].input.value = "Custom";
   refreshPanels();
   if (S.ready) await call("config_loaded", { config });
-  if (S.calc) { S.dirty = true; markFieldStale("a configuration was loaded"); }
 }
 
 // ---- calculation and laws -------------------------------------------------------------------
