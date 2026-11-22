@@ -53,6 +53,17 @@ docker run --rm pac-headless info                        # versions and the Open
 GitHub Actions (`.github/workflows/headless.yml`) does the same on every pull request and push to
 `main`, and uploads `out/` as the `headless-results` artefact.
 
+### In a browser (prototype)
+
+The calculator's own Python, run in the browser by Pyodide: nothing to install, and nothing a
+user enters leaves the browser. Prototype only (linear probes, laws, rays, delays, 2D beam field);
+see `docs/plans/PLAN-2026-11-web-app.md` for the plan and the hosting options.
+
+```bash
+python tools/build_web.py site            # or --offline: Pyodide copied in, no internet needed
+cd site && python -m http.server 8000     # then open http://localhost:8000/
+```
+
 ### MATLAB
 
 **Requirements:** MATLAB R2019b or later (no additional toolboxes required).
