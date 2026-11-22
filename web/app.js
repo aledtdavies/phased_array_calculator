@@ -210,6 +210,7 @@ async function applyConfig(config) {
 
 // ---- calculation and laws -------------------------------------------------------------------
 async function calculate() {
+  if (S.busy) return;
   let cfg;
   try { cfg = Object.assign(values(true), { view: { coverage_legs: Number($("coverage").value) } }); }
   catch (e) { status(e.message, true); toast(e.message, true); return; }
@@ -230,8 +231,8 @@ async function calculate() {
       clearViews();
     } else {
       status(`${r.laws.length} laws in ${((performance.now() - t0) / 1000).toFixed(2)} s.`);
-      await showLaw(0);
-      if ($("showAll").checked) await drawAll();
+      await loadLaw(0);
+      if ($("showAll").checked) { S.all = (await call("all_laws")).prims; drawLawViews(); }
     }
     if (window.matchMedia("(max-width: 900px)").matches) closeSetup();
   } catch (e) { status("Error: " + e.message, true); toast(e.message, true); }
@@ -262,7 +263,19 @@ function syncSliders(l) {
   $("angleLabel").textContent = `Angle ${l.angle.toFixed(1)}°`; $("skewLabel").textContent = `Skew ${(+l.skew).toFixed(1)}°`;
 }
 
+// One request to Python at a time. Every action that asks Python (calculate, a law, a moved
+// focus, the beam field, an element, Show all, exports) runs under this lock; one that arrives
+// while another runs is refused, and the page puts back what it showed.
+async function exclusive(fn) {
+  if (S.busy) return false;
+  busy(true);
+  try { await fn(); } finally { busy(false); }
+  return true;
+}
 async function showLaw(i) {
+  if (!(await exclusive(() => loadLaw(i))) && S.calc && S.calc.laws.length) syncSliders(S.calc.laws[S.lawIndex]);
+}
+async function loadLaw(i) {
   if (!S.calc || !S.calc.laws.length) return;
   i = Math.max(0, Math.min(S.calc.laws.length - 1, i));
   S.lawIndex = i; S.custom = false; S.focusRev++;
@@ -277,7 +290,9 @@ async function showLaw(i) {
 }
 
 async function showCustom(x, z) {
-  if (S.busy) { drawLawViews(); return; }           // no focus moves while Python works: put the handle back
+  if (!(await exclusive(() => loadCustom(x, z)))) drawLawViews();   // refused while Python works: handle put back
+}
+async function loadCustom(x, z) {
   S.focusRev++;
   try {
     const r = await call("custom", { x, z, from_law: S.lawIndex });
@@ -307,7 +322,7 @@ async function drawLawViews() {
 
 async function drawAll() {
   if (!S.calc || !S.calc.laws.length) return;
-  S.all = (await call("all_laws")).prims;
+  if (!(await exclusive(async () => { S.all = (await call("all_laws")).prims; }))) { $("showAll").checked = false; return; }
   drawLawViews();
 }
 
@@ -329,8 +344,9 @@ function togglePlay() {
 // ---- elements -------------------------------------------------------------------------------
 async function pickElement(index) {
   if (!S.calc || index === null || index === undefined) return;
+  let info;
+  if (!(await exclusive(async () => { info = await call("element", { index, law: S.lawIndex }); }).catch((e) => { toast(e.message, true); return false; }))) return;
   try {
-    const info = await call("element", { index, law: S.lawIndex });
     S.pick = index; S.pickInfo = info;
     const arr = info.array ? `${info.array} array, ` : "";
     const txt = `Element ${info.number} (${arr}X ${info.x_index}, Y ${info.y_index}): ` +
@@ -357,6 +373,7 @@ function markFieldStale(why) {
   $("fieldStatus").textContent = `Stale (${why}): compute again for the law shown.`;
 }
 async function computeField() {
+  if (S.busy) return;
   if (S.dirty) { toast("The inputs changed: press “Calculate laws” first.", true); return; }
   let v; try { v = values(true).beam_field; } catch (e) { toast(e.message, true); return; }
   const req = { law: S.lawIndex, custom: S.custom, values: v };
@@ -446,6 +463,7 @@ async function cataloguePicker(kind, name) {
 
 async function menu(act) {
   $("fileMenu").classList.remove("open");
+  if (S.busy) { toast("Wait for the calculation to finish."); return; }
   try {
     if (act === "save-config") { download("pac_config.json", JSON.stringify(await configDict(), null, 2), "application/json"); }
     else if (act === "open-config") pickFile(".json", async (file) => { await applyConfig(JSON.parse(await file.text())); toast(`Loaded ${file.name}. Press “Calculate laws”.`); });
