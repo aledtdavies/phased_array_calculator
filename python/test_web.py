@@ -206,6 +206,23 @@ class TestWebLayer(unittest.TestCase):
         self.assertIn("direct beam only", r["note"])
         three = call("field", {"law": 2, "custom": False, "values": dict(FIELD, model="3D", elevation_mm=4)})
         self.assertEqual([s["name"] for s in three["sections"]], ["X-Z", "Y-Z"])
+        # in steps, as the page computes it (progress, Cancel): the same field
+        fine = dict(FIELD, grid_mm=0.3)                     # several blocks of points
+        whole = call("field", {"law": 2, "custom": False, "values": fine})
+        st = call("field_start", {"law": 2, "custom": False, "values": fine})
+        self.assertEqual(st["done"], 0)
+        seen = []
+        while True:
+            st = call("field_step", {"seconds": 0.0})
+            seen.append(st["done"])
+            if st["finished"]:
+                break
+        self.assertGreater(len(seen), 1)
+        self.assertEqual(seen, sorted(seen))
+        self.assertEqual(seen[-1], st["points"])
+        self.assertEqual(st["result"]["sections"], whole["sections"])
+        with self.assertRaises(ValueError):                # finished: nothing left to step
+            call("field_step", {"seconds": 0.0})
 
     @unittest.skipUnless(os.path.isdir(BUILDFE_CATALOG), "no sibling buildFE checkout")
     def test_catalogue_entries_apply_as_on_the_desktop(self):

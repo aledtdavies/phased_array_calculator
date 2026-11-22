@@ -1,5 +1,18 @@
 # Changelog
 
+## Beam field: progress and Cancel in both versions — 2026-11-22
+
+- **Browser:**
+  - the beam field is computed in steps of about 0.4 s, so a bar shows its progress;
+  - **Cancel** stops it between steps and leaves the field shown as it was;
+  - the result equals the one-call field exactly, because steps are whole blocks of points.
+- **Desktop:** the Beam Field tab gains a **Cancel** button beside its progress bar, which before only stopped when the window closed.
+- **Shared code:** both versions step through the same field job in `field_job.py` (`start_job`, `step_job`, `finish_job`; `run_job` runs them in one go). `beam_field.point_block` gives the block size.
+- **Tests:**
+  - stepped equals one-call, exactly, in 2D pulsed and 3D continuous wave (`test_field_tab.TestSteps`, `test_web`);
+  - the desktop Cancel keeps the field shown;
+  - the browser check starts a long 3D field, sees progress, cancels and checks that the field shown is kept.
+
 ## Browser version: the 3D view, and keeping it in step with the desktop — 2026-11-22
 
 - **3D view in the browser** (tab "3D"), as the desktop's 3D tab:
