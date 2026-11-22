@@ -37,6 +37,7 @@ class FieldWorker(QtCore.QThread):
     progress = QtCore.Signal(float)
     done = QtCore.Signal(object)
     failed = QtCore.Signal(str)
+    cancelled_signal = QtCore.Signal()
 
     def __init__(self, job):
         super().__init__()
@@ -56,7 +57,7 @@ class FieldWorker(QtCore.QThread):
         try:
             self.done.emit(run_job(self.job, self._progress))
         except FieldCancelled:
-            pass
+            self.cancelled_signal.emit()
         except (ValueError, ArithmeticError, np.linalg.LinAlgError) as e:
             self.failed.emit(str(e))
 
@@ -107,16 +108,21 @@ class FieldTab(QtWidgets.QWidget):
                 g.addWidget(QtWidgets.QLabel(label), r, 2 * c)
                 g.addWidget(w, r, 2 * c + 1)
         self.compute_btn = QtWidgets.QPushButton("Compute field")
+        self.cancel_btn = QtWidgets.QPushButton("Cancel")
+        self.cancel_btn.setToolTip("Stop the field being computed (the field shown stays as it was)")
+        self.cancel_btn.setVisible(False)
         self.chk_3d = QtWidgets.QCheckBox("Show in 3D view")
         self.chk_3d.setChecked(True)
         self.status = QtWidgets.QLabel("Calculate laws, then compute the field of the selected law.")
         self.bar = QtWidgets.QProgressBar()
         self.bar.setRange(0, 100)
         self.bar.setVisible(False)
+        self.bar.setMinimumWidth(120)
         self.bar.setMaximumWidth(160)
         g.addWidget(self.compute_btn, 2, 0, 1, 2)
         g.addWidget(self.chk_3d, 2, 2, 1, 2)
-        g.addWidget(self.bar, 2, 4, 1, 2)
+        g.addWidget(self.bar, 2, 4, 1, 1)
+        g.addWidget(self.cancel_btn, 2, 5, 1, 1)
         g.addWidget(self.status, 2, 6, 1, 4)
         self.note = QtWidgets.QLabel(MODEL_NOTE + ". Validated in 2D against an FE solve; 3D not separately validated.")
         self.note.setStyleSheet("color: #64748b")
@@ -134,6 +140,7 @@ class FieldTab(QtWidgets.QWidget):
         self.job = None              # the computed (or running) field
         self.worker = None
         self.compute_btn.clicked.connect(lambda: self.compute())
+        self.cancel_btn.clicked.connect(self.cancel)
         self.chk_3d.toggled.connect(lambda _: self._emit())
         self.model.currentIndexChanged.connect(self._model_changed)
         for w in (self.pulse, self.model):
@@ -243,16 +250,36 @@ class FieldTab(QtWidgets.QWidget):
         self.worker.progress.connect(lambda f: self.bar.setValue(int(100 * f)))
         self.worker.done.connect(self._done)
         self.worker.failed.connect(self._failed)
+        self.worker.cancelled_signal.connect(self._cancelled)
+        self.cancel_btn.setEnabled(True)
+        self.cancel_btn.setVisible(True)
         self.worker.start()
+
+    def cancel(self):
+        """Stop the running computation at its next block of points; the field shown stays."""
+        if self.worker is not None and self.worker.isRunning():
+            self.cancel_btn.setEnabled(False)
+            self.status.setText("Cancelling...")
+            self.worker.cancel()
+
+    def _cancelled(self):
+        self.compute_btn.setEnabled(True)
+        self.bar.setVisible(False)
+        self.cancel_btn.setVisible(False)
+        shown = ("the field shown is unchanged" if self.job is not None and self.job.get("fresh")
+                 else "the field shown is out of date" if self.job is not None else "no field computed")
+        self.status.setText(f"Cancelled: {shown}.")
 
     def _failed(self, msg):
         self.compute_btn.setEnabled(True)
         self.bar.setVisible(False)
+        self.cancel_btn.setVisible(False)
         self.status.setText(f"No field: {msg}")
 
     def _done(self, job):
         self.compute_btn.setEnabled(True)
         self.bar.setVisible(False)
+        self.cancel_btn.setVisible(False)
         # fresh only if nothing it depends on changed while it ran: law, field inputs, setup
         job["fresh"] = (job["context"] is self.context and job["values"] == self.get_values()
                         and job["setup_rev"] == self.setup_rev and not self.setup_dirty)

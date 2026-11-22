@@ -41,6 +41,41 @@ class TestGrid(unittest.TestCase):
             section_grid((0.0, 0.01), (0.05, 0.01), 0.001, 1000)
 
 
+class TestSteps(unittest.TestCase):          # no Qt needed: runs everywhere
+    """field_job in steps (the browser's progress and Cancel) gives exactly the one-call field."""
+
+    def job(self, **values):
+        import field_job
+        from session import build_solver, calculate
+        solver = build_solver({"probe_type": "Linear", "num_elements": 32, "pitch_mm": 0.6, "freq_mhz": 5},
+                              {"angle_deg": 36, "height_mm": 5, "velocity_ms": 2337, "offset_mm": 0},
+                              {"vel_long_ms": 5900, "vel_shear_ms": 3230, "thickness_mm": 30},
+                              {"start_element": 1, "num_active_elements": 0})
+        c = calculate(solver, {"focus_mode": "Constant Depth", "param_val": 20, "wave_type": "Shear",
+                               "start_angle": 50, "end_angle": 50, "step_angle": 5}, "Linear")
+        v = {"model": "2D", "pulsed": True, "cycles": 2, "grid_mm": 0.5, "element_width_mm": 0.5, "elevation_mm": 6,
+             "wedge_shear_ms": 1157, "wedge_density": 1049, "component_density": 7850}
+        v.update(values)
+        return field_job.make_job(solver, c.results[0], "Shear", 30, v)
+
+    def test_steps_give_the_one_call_field_exactly(self):
+        import field_job
+        for values in ({}, {"model": "3D", "pulsed": False, "grid_mm": 1.0}):
+            with self.subTest(**values):
+                whole = field_job.run_job(self.job(**values))
+                job = field_job.start_job(self.job(**values))
+                steps, fractions = 0, []
+                while not field_job.step_job(job, seconds=0.0):          # one block per step
+                    steps += 1
+                    fractions.append(job["done"] / job["total"])
+                field_job.finish_job(job)
+                self.assertGreater(steps, 1, "the test needs a field of several blocks")
+                self.assertEqual(fractions, sorted(fractions))
+                self.assertEqual(job["done"], job["total"])
+                for a, b in zip(whole["sections"], job["sections"]):
+                    np.testing.assert_array_equal(a["db"], b["db"])
+
+
 @unittest.skipUnless(HAVE_QT, "PySide6/qtpy/pyvistaqt not installed, or no display")
 class TestFieldTab(QtCase):
     def setup_linear(self, focus_mm=20.0):
@@ -237,6 +272,27 @@ class TestFieldTab(QtCase):
         ft._done(job)
         self.assertTrue(ft.job["fresh"], ft.status.text())
         self.assertIsNotNone(self.field3d[-1])
+
+    def test_cancel_stops_the_computation_and_keeps_the_field_shown(self):
+        from qtpy import QtWidgets
+        self.setup_linear()
+        ft = self.win.field_tab
+        ft.compute(sync=True)
+        shown = ft.job
+        self.assertTrue(shown["fresh"])
+        ft.set_values({"grid_mm": 0.05})                  # a fine grid: a computation long enough to cancel
+        ft.compute()
+        self.assertTrue(ft.worker.isRunning())
+        self.assertTrue(ft.cancel_btn.isVisibleTo(ft))
+        ft.cancel()
+        self.assertTrue(ft.worker.wait(60000))
+        for _ in range(20):
+            QtWidgets.QApplication.processEvents()
+        self.assertTrue(ft.status.text().startswith("Cancelled"), ft.status.text())
+        self.assertIs(ft.job, shown)                      # the field shown is the one computed before
+        self.assertTrue(ft.compute_btn.isEnabled())
+        self.assertFalse(ft.cancel_btn.isVisibleTo(ft))
+        self.assertFalse(ft.bar.isVisibleTo(ft))
 
     def test_closing_during_a_computation_exits_cleanly(self):
         """Review of PR #30: closing the window while the field worker ran left it running."""
