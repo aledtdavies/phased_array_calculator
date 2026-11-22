@@ -13,6 +13,8 @@ COPY web web
 COPY python python
 COPY tools/build_web.py tools/build_web.py
 COPY THIRD_PARTY_NOTICES.md .
+COPY docs/beam_field_model.html docs/beam_field_model.html
+COPY docs/plans/images/step6_beam_vs_buildfe.png docs/plans/images/step6_beam_vs_buildfe.png
 RUN python tools/build_web.py /site --offline
 
 FROM nginx:1.27-alpine
