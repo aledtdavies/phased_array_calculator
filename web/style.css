@@ -136,5 +136,5 @@ tr.sel td { background: #dbeafe; } tr.refused td { color: var(--muted); font-sty
   .plots { flex: none; align-items: start; }      /* plots as tall as their data, not the screen */
   .lawbar { margin: 6px; }
   .title { font-size: 15px; }
-  .hint { display: none; }
+  .hint:not(#fieldStatus) { display: none; }      /* the field status carries progress and errors: kept */
 }

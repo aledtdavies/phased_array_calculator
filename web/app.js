@@ -239,6 +239,7 @@ async function calculate() {
     const t0 = performance.now();
     const r = await call("calc", cfg);
     S.calc = r; S.dirty = S.edits !== edits; S.custom = false; S.pick = null; S.pickInfo = null; S.all = null; S.revision++;
+    if (S.play && r.laws.length < 2) togglePlay();     // nothing to play: stop (the button is disabled below two laws)
     $("elementInfo").textContent = ELEMENT_HINT;
     markFieldStale("the laws were recalculated");
     drawTable(); setupNav();
