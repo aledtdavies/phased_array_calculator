@@ -52,10 +52,12 @@ Both **Python** (Qt GUI + importable library) and **MATLAB** (App Designer GUI +
 
 ### In a browser (nothing to install)
 
-Open <https://aledtdavies.github.io/phased_array_calculator/> in Edge, Chrome or Firefox. The first
-visit takes about 20 s to start; the page's Help link explains the rest. The browser version is a
-first version: linear probes, laws, rays, delays and the 2D beam field. For everything else, use the
-desktop window below. Publishing and hosting on a work server: `docs/WEB_APP.md`.
+Open <https://aledtdavies.github.io/phased_array_calculator/> in a current browser, on a computer,
+tablet or phone. The first visit takes about 20 s to start; the page's Help link explains the rest.
+The browser version runs the same calculation code as the desktop window and has the same inputs,
+tabs (rays with coverage and welds, laws, delays, beam field) and files (configurations, catalogues,
+DXF welds, CSV and element-coordinate exports); only the 3D view is still desktop-only. Publishing
+and hosting on a work server: `docs/WEB_APP.md`.
 
 ### Python
 
