@@ -33,6 +33,7 @@ const S = {
   calc: null, law: null, lawIndex: 0, custom: false, all: null, pick: null, pickInfo: null,
   dirty: false, field: null, fieldFresh: false, play: null, timings: [], revision: 0, placing: false,
   edits: 0,                                         // counts input edits: a result is current only if none came in while it was computed
+  focusRev: 0,                                      // counts law and focus changes (sweep law, dragged or placed focus)
 };
 window.__pac = S;                                   // for automated checks
 
@@ -264,7 +265,7 @@ function syncSliders(l) {
 async function showLaw(i) {
   if (!S.calc || !S.calc.laws.length) return;
   i = Math.max(0, Math.min(S.calc.laws.length - 1, i));
-  S.lawIndex = i; S.custom = false;
+  S.lawIndex = i; S.custom = false; S.focusRev++;
   S.law = await call("law", { law: i });
   syncSliders(S.calc.laws[i]);
   const f = S.law.focus;
@@ -276,6 +277,8 @@ async function showLaw(i) {
 }
 
 async function showCustom(x, z) {
+  if (S.busy) { drawLawViews(); return; }           // no focus moves while Python works: put the handle back
+  S.focusRev++;
   try {
     const r = await call("custom", { x, z, from_law: S.lawIndex });
     S.law = r; S.custom = true;
@@ -358,7 +361,7 @@ async function computeField() {
   let v; try { v = values(true).beam_field; } catch (e) { toast(e.message, true); return; }
   const req = { law: S.lawIndex, custom: S.custom, values: v };
   busy(true); $("fieldStatus").textContent = "Computing the beam field…"; status("Computing the beam field…");
-  const edits = S.edits;
+  const edits = S.edits, focusRev = S.focusRev;
   try {
     const r = await call("field", req);
     const xz = r.sections[0], yz = r.sections[1];
@@ -368,7 +371,7 @@ async function computeField() {
     for (const id of ["plotField", "plotFieldYZ"]) $(id).style.opacity = 1;
     S.field = { law: req.law, custom: req.custom };
     // current only if nothing changed while it was computed (inputs, the law, a moved focus)
-    S.fieldFresh = S.edits === edits && !S.dirty && req.custom === S.custom && (req.custom || req.law === S.lawIndex);
+    S.fieldFresh = S.edits === edits && S.focusRev === focusRev && !S.dirty;
     const kind = v.pulsed ? `pulsed, ${v.cycles} cycles` : "continuous wave";
     const which = req.custom ? "dragged focus" : `law ${req.law + 1} (${S.calc.laws[req.law].angle.toFixed(1)}°)`;
     $("fieldStatus").textContent = `${which}: ${v.model}, ${kind}, ${r.points} points, grid ${r.grid_mm.toFixed(2)} mm; ${r.seconds_field.toFixed(1)} s.`;
@@ -504,7 +507,7 @@ function wirePlots() {
   // Place the focus by tapping (touch screens, where dragging a shape is awkward)
   const xz = $("plotXZ");
   xz.addEventListener("click", (e) => {
-    if (!S.placing || !S.calc) return;
+    if (!S.placing || !S.calc || S.busy) return;
     const d = V.plotToData(xz, e.clientX, e.clientY); if (!d) return;
     S.placing = false; $("placeBtn").classList.remove("primary"); showCustom(d[0], d[1]);
   }, true);
