@@ -13,7 +13,7 @@ from __future__ import annotations
 import numpy as np
 import pyvista as pv
 
-from scene_model import scene_bounds, section_y
+from scene_model import scene_bounds, section_y, solid_prims
 from weld import split_lobes
 
 from scene import (COLOR_BACKWALL, COLOR_ELEMENT_ACTIVE, COLOR_ELEMENT_INACTIVE, COLOR_ELEMENT_TX,
@@ -30,10 +30,24 @@ RAY_COLOUR = {"single": "#2563eb", "tx": "#1d4ed8", "rx": "#dc2626"}
 VIEWS = {"Iso": (-35.0, 28.0), "X-Z": (0.0, 0.0), "Y-Z": (-90.0, 0.0), "Top": (0.0, 89.9)}
 
 
-def _prism(xz, y0, y1):
-    """An X-Z polygon (N, 2) extruded across Y from y0 to y1."""
-    pts = np.c_[xz[:, 0], np.full(len(xz), y0), xz[:, 1]]
-    return pv.PolyData(pts, np.r_[len(pts), np.arange(len(pts))]).extrude((0, y1 - y0, 0), capping=True)
+def solid_mesh(solid):
+    """
+    A closed mesh of one of scene_model.solid_prims' solids: its cross-section's triangles at
+    both ends (y0, y1) and a quad per outline edge between them (the browser builds the same in
+    web/view3d.js).
+    """
+    xz = np.asarray(solid["xz"], dtype=float)
+    n = len(xz)
+    pts = np.vstack([np.c_[xz[:, 0], np.full(n, solid["y0"]), xz[:, 1]], np.c_[xz[:, 0], np.full(n, solid["y1"]), xz[:, 1]]])
+    tris = np.asarray(solid["tris"], dtype=int).reshape(-1, 3)
+    caps = np.vstack([np.c_[np.full(len(tris), 3), tris], np.c_[np.full(len(tris), 3), tris[:, ::-1] + n]])
+    # outward normals: the triangles are counter-clockwise in (x, z), whose normal is -Y (the
+    # y0 end); each side quad turns with the outline's own direction
+    a = np.arange(n)
+    b = (a + 1) % n
+    ccw = float(np.sum(xz[:, 0] * np.roll(xz[:, 1], -1) - np.roll(xz[:, 0], -1) * xz[:, 1])) > 0
+    sides = np.c_[np.full(n, 4), a, a + n, b + n, b] if ccw else np.c_[np.full(n, 4), a, b, b + n, a + n]
+    return pv.PolyData(pts, np.r_[caps.ravel(), sides.ravel()])
 
 
 def _quads(coords):
@@ -55,23 +69,28 @@ def add_setup(pl, scene, component_thickness_mm=0.0, section=False):
     def clip(mesh):
         return mesh.clip(normal=normal, origin=origin, invert=False) if section else mesh
 
-    # Component: a plate block to the backwall when its thickness is known, else the interface
-    if component_thickness_mm > 0:
-        plate = pv.Box(bounds=(lo[0], hi[0], lo[1], hi[1], 0.0, component_thickness_mm))
-        pl.add_mesh(clip(plate), color=COLOR_MATERIAL, opacity=0.10, name="setup:component",
-                    label="Component")
-        pl.add_mesh(plate.extract_feature_edges(), color=COLOR_BACKWALL, line_width=1,
-                    name="setup:component-edges")
-    else:
+    # The solids, as scene_model.solid_prims gives them to every 3D view: the component (a plate
+    # to the backwall when its thickness is known), the wedge and the weld (lobe by lobe).
+    solids = solid_prims(scene, component_thickness_mm, split_lobes)
+    style = {"component": (COLOR_MATERIAL, 0.10, COLOR_BACKWALL), "wedge": (COLOR_WEDGE_FACE, 0.15, COLOR_WEDGE_EDGE),
+             "weld": (WELD_FACE, 0.30, WELD_EDGE)}
+    for role in ("component", "wedge", "weld"):
+        parts = [solid_mesh(sd) for sd in solids if sd["role"] == role]
+        if not parts:
+            continue
+        body = pv.merge(parts) if len(parts) > 1 else parts[0]
+        if role == "wedge":
+            source = next(sd for sd in solids if sd["role"] == "wedge").get("source")
+            label = "Wedge (catalogue)" if source == "catalogue" else "Wedge (schematic)"
+        else:
+            label = role.capitalize()
+        face, opacity, edge = style[role]
+        pl.add_mesh(clip(body), color=face, opacity=opacity, name=f"setup:{role}", label=label)
+        pl.add_mesh(body.extract_feature_edges(30), color=edge, line_width=1, name=f"setup:{role}-edges")
+    if component_thickness_mm <= 0:              # no thickness: the interface plane
         quad = pv.Rectangle([[lo[0], lo[1], 0.0], [hi[0], lo[1], 0.0], [hi[0], hi[1], 0.0]])
         pl.add_mesh(quad, color=COLOR_MATERIAL, opacity=0.15, name="setup:component",
                     label="Interface")
-    for w in scene.find("wedge"):
-        body = _prism(w.coords[:, [0, 2]], w.meta["y0"], w.meta["y1"])
-        label = "Wedge (catalogue)" if w.meta["source"] == "catalogue" else "Wedge (schematic)"
-        pl.add_mesh(clip(body), color=COLOR_WEDGE_FACE, opacity=0.15, name="setup:wedge", label=label)
-        pl.add_mesh(body.extract_feature_edges(30), color=COLOR_WEDGE_EDGE, line_width=1,
-                    name="setup:wedge-edges")
 
     faces = scene.find("element-face")
     if faces:
@@ -91,20 +110,6 @@ def add_setup(pl, scene, component_thickness_mm=0.0, section=False):
             pl.add_points(p.coords, color=ELEMENT_COLOUR[p.meta["array"]] if p.meta["active"] else COLOR_ELEMENT_INACTIVE,
                           point_size=8, render_points_as_spheres=True,
                           name=f"setup:elements-{p.meta['array']}-{int(p.meta['active'])}")
-    for p in scene.find("weld"):
-        # The weld runs along Y through the component: its outline extruded across the view.
-        # A pinched outline (two lobes touching) is drawn lobe by lobe: VTK triangulates only
-        # simple polygons.
-        lobes = []
-        for xz in split_lobes(p.coords[:, [0, 2]]):
-            pts = np.c_[xz[:, 0], np.full(len(xz), lo[1]), xz[:, 1]]
-            lobes.append(pv.PolyData(pts, np.r_[len(pts), np.arange(len(pts))]).triangulate())
-        face = pv.merge(lobes) if len(lobes) > 1 else lobes[0]
-        if face.n_cells == 0:
-            raise ValueError("the weld outline could not be triangulated for 3D")
-        body = face.extrude((0, hi[1] - lo[1], 0), capping=True)
-        pl.add_mesh(clip(body), color=WELD_FACE, opacity=0.30, name="setup:weld", label="Weld")
-        pl.add_mesh(body.extract_feature_edges(30), color=WELD_EDGE, line_width=1, name="setup:weld-edges")
     for role, (col, label) in FUSION_STYLE.items():
         runs = scene.find(role)
         if not runs:
