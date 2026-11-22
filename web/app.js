@@ -32,6 +32,7 @@ const S = {
   ready: false, busy: false, error: null, schema: null, materials: null,
   calc: null, law: null, lawIndex: 0, custom: false, all: null, pick: null, pickInfo: null,
   dirty: false, field: null, fieldFresh: false, play: null, timings: [], revision: 0, placing: false,
+  edits: 0,                                         // counts input edits: a result is current only if none came in while it was computed
 };
 window.__pac = S;                                   // for automated checks
 
@@ -41,8 +42,14 @@ function toast(text, error = false, ms = 4500) {
   const t = $("toast"); t.textContent = text; t.classList.toggle("error", error); t.hidden = false;
   clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, ms);
 }
+const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+// While Python works on a request, nothing it depends on can change: every input, the coverage
+// and Show-all controls, files and the law bar are locked (as the desktop window locks its panels).
 function busy(on, text) {
   S.busy = on;
+  for (const e of document.querySelectorAll("#panels input, #panels select, #panels button, #coverage, #showAll, #placeBtn, #fileBtn"))
+    e.disabled = on;
   $("calcBtn").disabled = on || !S.ready;
   $("fieldBtn").disabled = on || !S.calc || !S.calc.laws.length || S.dirty;
   for (const id of ["prevLaw", "nextLaw", "playBtn", "angleSlider", "skewSlider"]) $(id).disabled = on || !S.calc || S.calc.laws.length < 2;
@@ -165,6 +172,7 @@ function refreshPanels() {
 }
 
 function changed(sec, key) {
+  S.edits++;
   if (key === "_material") {                         // a preset fills the speeds
     const w = W[`${sec}._material`], list = S.materials[w.f.preset] || [], m = list.find((x) => x.name === w.input.value);
     if (m) { if (sec === "wedge") W["wedge.velocity_ms"].input.value = m.vl;
@@ -206,10 +214,11 @@ async function calculate() {
   catch (e) { status(e.message, true); toast(e.message, true); return; }
   if (cfg.weld.type === "None") delete cfg.weld;
   busy(true, "Calculating…");
+  const edits = S.edits;
   try {
     const t0 = performance.now();
     const r = await call("calc", cfg);
-    S.calc = r; S.dirty = false; S.custom = false; S.pick = null; S.pickInfo = null; S.all = null; S.revision++;
+    S.calc = r; S.dirty = S.edits !== edits; S.custom = false; S.pick = null; S.pickInfo = null; S.all = null; S.revision++;
     markFieldStale("the laws were recalculated");
     drawTable(); setupNav();
     const notes = [r.notes.coverage, r.notes.weld, r.notes.weld_error ? "Weld not drawn: " + r.notes.weld_error : ""].filter(Boolean);
@@ -231,6 +240,7 @@ async function calculate() {
 function clearViews() {
   S.law = null;
   Plotly.purge($("plotXZ")); Plotly.purge($("plotYZ")); Plotly.purge($("plotDelays"));
+  for (const k of ["xz", "plotXZ", "plotYZ", "delays"]) wired.delete(k);      // purge removed their listeners
   $("lawLabel").textContent = "No valid law in this scan";
 }
 
@@ -330,9 +340,9 @@ async function pickElement(index) {
 // ---- table ----------------------------------------------------------------------------------
 function drawTable() {
   const r = S.calc;
-  $("lawTable").innerHTML = `<thead><tr>${r.headings.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>` +
+  $("lawTable").innerHTML = `<thead><tr>${r.headings.map((h) => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>` +
     r.rows.map((row) => { const idx = row[row.length - 1]; const cells = row.slice(0, -1);
-      return `<tr data-law="${idx === null ? "" : idx}" class="${idx === null ? "refused" : ""}">${cells.map((c) => `<td>${c}</td>`).join("")}</tr>`; }).join("") + "</tbody>";
+      return `<tr data-law="${idx === null ? "" : Number(idx)}" class="${idx === null ? "refused" : ""}">${cells.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`; }).join("") + "</tbody>";
   for (const tr of $("lawTable").querySelectorAll("tbody tr")) tr.onclick = () => { if (tr.dataset.law !== "") { showLaw(+tr.dataset.law); } };
 }
 
@@ -348,6 +358,7 @@ async function computeField() {
   let v; try { v = values(true).beam_field; } catch (e) { toast(e.message, true); return; }
   const req = { law: S.lawIndex, custom: S.custom, values: v };
   busy(true); $("fieldStatus").textContent = "Computing the beam field…"; status("Computing the beam field…");
+  const edits = S.edits;
   try {
     const r = await call("field", req);
     const xz = r.sections[0], yz = r.sections[1];
@@ -355,7 +366,9 @@ async function computeField() {
     await V.drawField($("plotField"), xz, r.focus, r.metrics, 0);
     if (yz) await V.drawField($("plotFieldYZ"), yz, r.focus, null, 1);
     for (const id of ["plotField", "plotFieldYZ"]) $(id).style.opacity = 1;
-    S.field = { law: req.law, custom: req.custom }; S.fieldFresh = true;
+    S.field = { law: req.law, custom: req.custom };
+    // current only if nothing changed while it was computed (inputs, the law, a moved focus)
+    S.fieldFresh = S.edits === edits && !S.dirty && req.custom === S.custom && (req.custom || req.law === S.lawIndex);
     const kind = v.pulsed ? `pulsed, ${v.cycles} cycles` : "continuous wave";
     const which = req.custom ? "dragged focus" : `law ${req.law + 1} (${S.calc.laws[req.law].angle.toFixed(1)}°)`;
     $("fieldStatus").textContent = `${which}: ${v.model}, ${kind}, ${r.points} points, grid ${r.grid_mm.toFixed(2)} mm; ${r.seconds_field.toFixed(1)} s.`;
@@ -364,6 +377,7 @@ async function computeField() {
     $("fieldNote").textContent = m + r.note;
     $("fieldNote").innerHTML = $("fieldNote").innerHTML.replace("docs/beam_field_model.html",
       '<a href="docs/beam_field_model.html" target="_blank" rel="noopener">the model note</a>');
+    if (!S.fieldFresh) { S.fieldFresh = true; markFieldStale("something changed while it was computed"); }
     status("Beam field done.");
   } catch (e) { $("fieldStatus").textContent = "No field: " + e.message; status("No field: " + e.message, true); }
   busy(false);
@@ -390,9 +404,11 @@ function modal(title, body) {
 function closeModal() { $("modal").hidden = true; }
 
 async function loadCatalogue(kind) {
-  pickFile(".json", async (file) => {
-    await putFile(file);
-    const r = await call("catalog_open", { kind, name: file.name });
+  pickFile(".json", async (file) => { await putFile(file); await cataloguePicker(kind, file.name); });
+}
+async function cataloguePicker(kind, name) {
+  {
+    const r = await call("catalog_open", { kind, name });
     const box = document.createElement("div");
     box.innerHTML = `<input type="search" placeholder="Filter ${kind}s…"><div class="pick-list"></div>`;
     const list = box.querySelector(".pick-list"), search = box.querySelector("input");
@@ -401,7 +417,10 @@ async function loadCatalogue(kind) {
       for (const e of r.entries) {
         const text = `${e.id} ${e.maker} ${e.model} ${e.family}`.toLowerCase(); if (q && !text.includes(q)) continue;
         const row = document.createElement("div"); row.className = "pick-row" + (e.usable ? "" : " unusable");
-        row.innerHTML = `<b>${e.id}</b><small>${[e.maker, e.model, e.family].filter(Boolean).join(" · ")}${e.usable ? "" : " — " + e.reason}</small>`;
+        const b = document.createElement("b"), small = document.createElement("small");      // catalogue text: never HTML
+        b.textContent = e.id;
+        small.textContent = [e.maker, e.model, e.family].filter(Boolean).join(" · ") + (e.usable ? "" : " — " + e.reason);
+        row.append(b, small);
         if (e.usable) row.onclick = async () => {
           closeModal();
           try {
@@ -419,7 +438,7 @@ async function loadCatalogue(kind) {
     search.oninput = render; render();
     modal(`Choose a ${kind} — ${r.format}, ${r.entries.length} entries`, box);
     setTimeout(() => search.focus(), 50);
-  });
+  }
 }
 
 async function menu(act) {
@@ -528,4 +547,4 @@ start();
 // For automated checks (screenshots, timings): the page's own actions, nothing more.
 window.__pacTest = { setValues, values, calculate, showTab, computeField, showLaw, showCustom, pickElement, configDict,
                      applyConfig, openSetup, closeSetup, menu,
-                     putBytes: async (name, buf) => call("put_file", { name, data: b64(buf) }), setFileValue };
+                     putBytes: async (name, buf) => call("put_file", { name, data: b64(buf) }), setFileValue, cataloguePicker };
