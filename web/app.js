@@ -462,6 +462,7 @@ async function computeField() {
       $("fieldStatus").textContent = `${pc} (${st.done} of ${st.points} points)`; status(pc);
     }
     const r = st.result;
+    cancel.hidden = true;                          // finished: drawing it can no longer be cancelled
     const xz = r.sections[0], yz = r.sections[1];
     $("plotFieldYZ").hidden = !yz; $("fieldPlots").classList.toggle("two", !!yz);
     await V.drawField($("plotField"), xz, r.focus, r.metrics, 0);
