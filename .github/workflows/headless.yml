@@ -64,7 +64,7 @@ jobs:
           check index.html text/html
           check worker.js application/javascript
           check config.js application/javascript
-          check py/session.py text/
+          check py/session.py text/plain
           check pyodide/pyodide.mjs text/javascript
           check pyodide/pyodide.asm.mjs text/javascript
           check pyodide/pyodide.asm.wasm application/wasm
