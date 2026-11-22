@@ -23,8 +23,9 @@ does not start.
 - **On demand:** Actions > **pages** > **Run workflow** (branch `main`).
 - **Check it:** Actions > pages shows each run, with the address in its deploy step. Open the
   address and wait for *Ready*.
-- **Roll back:** revert the faulty change on `main` (a new merge), which republishes. To publish an
-  older state at once, run the workflow from an older commit or tag.
+- **Roll back:** revert the faulty change on `main`, as a pull request merged like any other. The
+  merge republishes the earlier state within about two minutes. The site can only be published
+  from `main`: GitHub's `github-pages` environment accepts deployments from the default branch only.
 - **Take it offline:** Settings > Pages > **Unpublish site**. Settings > Pages > Source must stay
   "GitHub Actions" for the workflow to publish.
 - **Cost and visibility:** free because the repository is public. The site is public too: anyone
@@ -39,9 +40,12 @@ internet access once the site is built.
 ### Option A: a ready-made site folder, for any web server IT already runs
 
 1. Download the site: Actions > **headless** (any recent run on `main`) > Artifacts >
-   **pac-web-site** (a zip of about 23 MB). Alternatively, build it on any machine with Python and
-   internet access: `python tools/build_web.py site --offline`.
-2. Unzip it into a folder the web server publishes, for example `C:\inetpub\wwwroot\pac\` on IIS.
+   **pac-web-site**. GitHub wraps every artefact in its own zip, so the download is
+   `pac-web-site.zip` containing `pac-web-site.zip` (about 23 MB). Unzip the download once to get
+   the inner zip. Alternatively, build the site folder on any machine with Python and internet
+   access: `python tools/build_web.py site --offline`.
+2. Unzip the **inner** `pac-web-site.zip` into a folder the web server publishes, for example
+   `C:\inetpub\wwwroot\pac\` on IIS. `index.html` must end up directly in that folder.
 3. The server must send:
 
    | Extension | Content type |
