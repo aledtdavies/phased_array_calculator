@@ -124,10 +124,10 @@ class TestSharedCode(unittest.TestCase):
         js = _read(os.path.join(WEB, "view3d.js"))
         self.assertIn('WELD_FACE, WELD_EDGE = "#fcd34d", "#92400e"', vtk)
         self.assertIn('weld: ["#fcd34d", 0.30', js)
-        self.assertIn('color=WELD_FACE, opacity=0.30', vtk)
-        self.assertIn("COLOR_MATERIAL, opacity=0.10", vtk)
+        self.assertIn('"weld": (WELD_FACE, 0.30', vtk)
+        self.assertIn('"component": (COLOR_MATERIAL, 0.10', vtk)
         self.assertIn('component: ["#94a3b8", 0.10', js)
-        self.assertIn("COLOR_WEDGE_FACE, opacity=0.15", vtk)
+        self.assertIn('"wedge": (COLOR_WEDGE_FACE, 0.15', vtk)
         self.assertIn('wedge: ["#22c55e", 0.15', js)
 
 
