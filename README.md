@@ -16,7 +16,7 @@ Computes element-level time delays (focal laws) for ultrasonic phased array insp
 - **Interactive GUI** with Ray Tracing (X-Z / Y-Z), 3D View, Data Table, and Delays tabs (bar chart, or per-array delay map for matrix probes); in the Qt window the 2D views are live pyqtgraph (drag the focus to solve a law; click an element to select it in every view) and the 3D View is PyVista/VTK, with element picking, section and camera presets
 - **Probe and wedge catalogues**: load entries from buildFE (`catalog/*.json`, content hash verified) or the nde-knowledge export; catalogue wedges are drawn from their true outline
 - **Export**: focal laws CSV, element coordinates (CSV / MAT / MATLAB script), configuration JSON
-- **Python** (Tkinter GUI + importable library) and **MATLAB** (legacy-style GUI + classdef library) implementations with identical physics
+- **Python** (Qt GUI + importable library) and **MATLAB** (legacy-style GUI + classdef library) implementations with identical physics
 
 ---
 
@@ -28,8 +28,7 @@ Computes element-level time delays (focal laws) for ultrasonic phased array insp
 
 ```bash
 pip install -r python/requirements.txt
-python python/qt_app.py      # the Qt window
-python python/app.py         # the Tk window (kept until the Qt window is accepted)
+python python/qt_app.py      # the window
 ```
 
 Standalone executable:
@@ -142,8 +141,7 @@ disp(result.ActiveIndices)      % 1-based active element list
 phased_array_calculator/
 ├── python/
 │   ├── qt_app.py       — Qt GUI (qt_panels.py, qt_plotting.py, qt_catalog_dialog.py)
-│   ├── app.py          — Tk GUI (to be retired)
-│   ├── session.py      — Calculation, table rows, CSV and catalogue links shared by both GUIs
+│   ├── session.py      — Calculation, table rows, CSV and catalogue links behind the window
 │   ├── navigation.py   — Law navigation (sliders, step, table selection), toolkit-free
 │   ├── qt_view3d.py    — Qt 3D tab (pyvistaqt): picking, section, camera presets
 │   ├── qt_views2d.py   — Qt 2D tabs (pyqtgraph): ray tracing, delays, dragged focus
@@ -154,11 +152,8 @@ phased_array_calculator/
 │   ├── scene_model.py  — Renderer-independent scene primitives (what every view shows)
 │   ├── wedge.py        — Wedge geometry and coordinate transform
 │   ├── material.py     — Material velocities
-│   ├── panels.py       — Input panels (incl. SubAperturePanel)
 │   ├── scene.py        — Toolkit-independent drawing: projections, 3D scene, delay maps
-│   ├── plotting.py     — Ray tracing, 3D view and delay panels
-│   ├── catalog.py      — buildFE / nde-knowledge probe and wedge catalogue reader
-│   └── catalog_dialog.py — Catalogue entry picker
+│   └── catalog.py      — buildFE / nde-knowledge probe and wedge catalogue reader
 ├── matlab/
 │   ├── PhasedArrayGUI.m — GUI
 │   ├── Probe.m          — Probe class with sub-aperture support

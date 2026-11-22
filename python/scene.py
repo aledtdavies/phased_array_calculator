@@ -1,6 +1,6 @@
 """
 matplotlib renderer of the scene model (scene_model.py): the 2D X-Z / Y-Z projections and the
-3D view used by the Tk GUI panels and the standalone visualisation script, plus the aperture
+3D view used by the standalone visualisation script, plus the aperture
 delay maps. Geometry is decided in scene_model; this module only styles and draws it.
 Everything draws onto a plain matplotlib Axes or Figure, so it is toolkit-independent.
 """

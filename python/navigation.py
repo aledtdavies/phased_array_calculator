@@ -1,7 +1,6 @@
 """
 Law navigation, toolkit-free: which law the angle/skew sliders, the step buttons, a table
-row or the animation select. The Qt tabs use it (the Tk panels hold the same logic inline
-until the Tk window is retired).
+row or the animation select. The Qt tabs use it.
 
 The angle and skew sliders index the sorted distinct angles and skews of the law set. A
 slider pair picks the first law with that (angle, skew); when that pair does not exist

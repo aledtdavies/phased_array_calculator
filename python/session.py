@@ -2,8 +2,8 @@
 The calculator's work behind any window: build the solver from panel values, run a sweep into
 laws and table rows, write the focal-law CSV, and keep catalogue references with a setup.
 
-Toolkit-free: the Tk window (app.py) and the Qt window (qt_app.py) both call this, so they
-calculate, label and export identically. Panel values use the GUI's keys and units (mm, MHz,
+Toolkit-free: the Qt window (qt_app.py) calls this (as the retired Tk window did), so files and
+results stay the same. Panel values use the GUI's keys and units (mm, MHz,
 degrees, m/s); everything returned in SI unless a key says otherwise.
 """
 from __future__ import annotations
