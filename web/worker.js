@@ -21,7 +21,7 @@ const PY_FILES = ["probe.py", "wedge.py", "material.py", "delay_law.py", "focal_
                   "weld.py", "catalog.py", "pac_web.py"];
 // What the page may ask for: pac_web's functions, nothing else.
 const OPS = ["put_file", "catalog_open", "catalog_apply", "catalog_status", "config_loaded", "calc", "law",
-             "all_laws", "custom", "element", "laws_csv", "element_coords", "field"];
+             "all_laws", "custom", "element", "laws_csv", "element_coords", "field", "field_start", "field_step"];
 // DXF welds: ezdxf (a pure-Python wheel shipped with the site) and its dependencies from Pyodide.
 const EZDXF_WHEEL = "wheels/ezdxf-1.4.5-py3-none-any.whl";
 

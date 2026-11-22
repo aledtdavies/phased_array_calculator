@@ -73,6 +73,8 @@
     <section class="view" id="view-field">
       <div class="toolbar">
         <button id="fieldBtn" class="btn primary" disabled>Compute beam field</button>
+        <progress id="fieldProgress" max="1" value="0" hidden></progress>
+        <button id="fieldCancel" class="btn" hidden>Cancel</button>
         <span id="fieldStatus" class="hint">Uses the inputs under &ldquo;Beam field&rdquo; in Setup.</span>
       </div>
       <div class="plots" id="fieldPlots"><div class="plot" id="plotField"></div><div class="plot" id="plotFieldYZ" hidden></div></div>

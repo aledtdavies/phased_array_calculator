@@ -71,7 +71,7 @@ only if one is added, and `test_parity` says so. For JavaScript, the risk is pag
 | **Exit** menu entry | A browser tab is closed by the browser | None needed |
 | **Place focus** (browser only) | Dragging a small handle is awkward on a touch screen; tapping is not | Could be added to the desktop if wanted |
 | Catalogue **Usable only** box | The browser always lists unusable entries greyed, with the reason, and they cannot be chosen | None needed |
-| **Beam-field progress and Cancel** | The desktop computes in a thread with a progress bar and a Cancel button. The browser waits, which takes seconds for 2D and up to minutes for a 3D field of a matrix probe. | Next: compute in chunks and report progress; cancel by restarting the worker |
+| **Working while a beam field computes** | Both show progress and have Cancel. The desktop computes in a thread, so other tabs stay usable. The browser has one Python, so the page waits; it computes in 0.4 s steps, so Cancel acts within a step. | None planned |
 | **Look of the 3D view** | Plotly's WebGL, not VTK: lighting, legend and axis styling differ | None needed: the geometry, colours, presets and section are the same and tested |
 | **Speed** | Python in the browser runs about 1.2 to 3 times slower than on the desktop. The first visit downloads about 30 MB, about 20 s to start. | Measured in `PLAN-2026-11-web-app.md` |
 

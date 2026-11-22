@@ -12,7 +12,9 @@ from __future__ import annotations
 
 import numpy as np
 
-from beam_field import Solid, beam_field, element_sources, field_region, section_grid
+import time
+
+from beam_field import Solid, beam_field, element_sources, field_region, point_block, section_grid
 
 FLOOR_DB = -30.0
 MAX_POINTS = {2: 40000, 3: 12000}     # per section; the grid step grows to stay below
@@ -57,22 +59,61 @@ def make_job(solver, r, wave_type, thickness_mm, values):
 
 
 def run_job(job, progress=None):
-    """Compute the sections of a job (see FieldTab.job); returns the job with 'sections'."""
-    src = element_sources(job["solver"], job["delays"], job["width"], job["elevation"], job["dim"],
-                          f_max=job["f0"] * (1.5 if job["pulsed"] else 1.0))
-    secs = job["sections"]
-    total = sum(s["points"].shape[0] for s in secs)
-    done = 0
-    for s in secs:
-        n = s["points"].shape[0]
+    """Compute the sections of a job (see make_job) in one go; returns the job with 'db'.
+    progress(fraction) is called after each block of points (it may raise to stop)."""
+    start_job(job)
+    step_job(job, progress=progress)
+    return finish_job(job)
 
-        def prog(f, done=done, n=n):
+
+# The job in steps: start_job, step_job until it returns True, finish_job. A caller that cannot
+# be interrupted while Python runs (the browser) computes a step at a time, reports progress and
+# can stop between steps. Steps are whole blocks (beam_field.point_block), so the result equals
+# run_job's exactly.
+def start_job(job):
+    """Prepare a job for step_job: the element sources, and nothing computed yet."""
+    job["src"] = element_sources(job["solver"], job["delays"], job["width"], job["elevation"], job["dim"],
+                                 f_max=job["f0"] * (1.5 if job["pulsed"] else 1.0))
+    job["block"] = point_block(job["src"])
+    for s in job["sections"]:
+        s["amp_flat"] = np.empty(s["points"].shape[0])
+    job["cursor"] = [0, 0]                    # section, first point not yet computed
+    job["total"] = sum(s["points"].shape[0] for s in job["sections"])
+    job["done"] = 0
+    return job
+
+
+def step_job(job, seconds=None, progress=None):
+    """
+    Compute the next points of a started job: all of them (seconds None), or whole blocks until
+    `seconds` have passed (at least one block). Returns True when every point is computed.
+    """
+    t0 = time.perf_counter()
+    secs, block = job["sections"], job["block"]
+    while job["cursor"][0] < len(secs):
+        si, k0 = job["cursor"]
+        s = secs[si]
+        n = s["points"].shape[0]
+        k1 = n if seconds is None else min(n, k0 + block)
+        base = job["done"]
+
+        def prog(f, base=base, m=k1 - k0):
             if progress:
-                progress((done + f * n) / total)
-        amp = beam_field(src, s["points"], job["wedge"], job["part"], job["mode"], job["f0"],
-                         job["cycles"], job["pulsed"], progress=prog).amplitude
-        s["amp"] = amp.reshape(s["shape"])
-        done += n
+                progress((base + f * m) / job["total"])
+        s["amp_flat"][k0:k1] = beam_field(job["src"], s["points"][k0:k1], job["wedge"], job["part"], job["mode"],
+                                          job["f0"], job["cycles"], job["pulsed"], progress=prog).amplitude
+        job["done"] += k1 - k0
+        job["cursor"] = [si + 1, 0] if k1 >= n else [si, k1]
+        if seconds is not None and time.perf_counter() - t0 >= seconds:
+            break
+    return job["cursor"][0] >= len(secs)
+
+
+def finish_job(job):
+    """The dB maps of a fully stepped job, re the largest amplitude of its sections."""
+    secs = job["sections"]
+    for s in secs:
+        s["amp"] = s.pop("amp_flat").reshape(s["shape"])
     peak = max(np.nanmax(s["amp"]) if np.isfinite(s["amp"]).any() else np.nan for s in secs)
     if not (np.isfinite(peak) and peak > 0):
         raise ValueError("the field has no finite amplitude anywhere in the section")
