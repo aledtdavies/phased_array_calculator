@@ -443,8 +443,21 @@ async function computeField() {
   const req = { law: S.lawIndex, custom: S.custom, values: v };
   busy(true); $("fieldStatus").textContent = "Computing the beam field…"; status("Computing the beam field…");
   const edits = S.edits, focusRev = S.focusRev;
+  // Computed a step at a time (about 0.4 s each), so the page shows progress and Cancel stops it
+  // between steps; Python in the browser cannot be interrupted inside a step.
+  S.fieldCancel = false;
+  const bar = $("fieldProgress"), cancel = $("fieldCancel");
+  bar.value = 0; bar.hidden = false; cancel.hidden = false; cancel.disabled = false;
   try {
-    const r = await call("field", req);
+    let st = await call("field_start", req);
+    while (!st.finished) {
+      if (S.fieldCancel) throw Object.assign(new Error("cancelled"), { cancelled: true });
+      st = await call("field_step", { seconds: 0.4 });
+      bar.value = st.done / st.points;
+      const pc = `Computing the beam field… ${Math.floor(100 * st.done / st.points)} %`;
+      $("fieldStatus").textContent = `${pc} (${st.done} of ${st.points} points)`; status(pc);
+    }
+    const r = st.result;
     const xz = r.sections[0], yz = r.sections[1];
     $("plotFieldYZ").hidden = !yz; $("fieldPlots").classList.toggle("two", !!yz);
     await V.drawField($("plotField"), xz, r.focus, r.metrics, 0);
@@ -464,7 +477,12 @@ async function computeField() {
     if (!S.fieldFresh) { S.fieldFresh = true; markFieldStale("something changed while it was computed"); }
     if (isActive("3d")) await draw3D();            // the 3D view was opened while the field computed
     status("Beam field done.");
-  } catch (e) { $("fieldStatus").textContent = "No field: " + e.message; status("No field: " + e.message, true); }
+  } catch (e) {
+    if (e.cancelled) {
+      const was = S.field ? (S.fieldFresh ? "the field shown is unchanged." : "the field shown is still out of date.") : "no field computed.";
+      $("fieldStatus").textContent = "Cancelled: " + was; status("Beam field cancelled.");
+    } else { $("fieldStatus").textContent = "No field: " + e.message; status("No field: " + e.message, true); }
+  } finally { bar.hidden = true; cancel.hidden = true; }
   busy(false);
 }
 
@@ -619,6 +637,7 @@ async function start() {
   $("view-rays").querySelector(".toolbar").prepend(place);
   for (const b of document.querySelectorAll(".tab")) b.onclick = () => showTab(b.dataset.tab);
   $("calcBtn").onclick = calculate; $("fieldBtn").onclick = computeField;
+  $("fieldCancel").onclick = () => { S.fieldCancel = true; $("fieldCancel").disabled = true; $("fieldStatus").textContent = "Cancelling…"; };
   $("prevLaw").onclick = () => stepLaw(-1); $("nextLaw").onclick = () => stepLaw(1); $("playBtn").onclick = togglePlay;
   $("angleSlider").oninput = sliderLaw; $("skewSlider").oninput = sliderLaw;
   $("coverage").onchange = () => { if (S.calc) calculate(); };

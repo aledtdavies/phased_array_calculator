@@ -399,6 +399,12 @@ def _peak(env):
     return y1 - 0.25 * (y0 - y2) * d
 
 
+def point_block(src: Sources) -> int:
+    """Field points beam_field computes together: a block's result does not depend on the points
+    outside it, so a section computed in pieces of whole blocks equals the section in one call."""
+    return int(min(CHUNK, max(16, CHUNK_PAIRS // len(src.delays))))
+
+
 def beam_field(src: Sources, points, wedge: Solid, part: Solid, mode="shear", f0=None,
                cycles=None, pulsed=True, progress=None):
     """
@@ -427,7 +433,7 @@ def beam_field(src: Sources, points, wedge: Solid, part: Solid, mode="shear", f0
         T_pulse = cycles / f0
     out = np.empty(pts.shape[0])
     ncomp = 2 if src.dim == 2 else 3
-    chunk = int(min(CHUNK, max(16, CHUNK_PAIRS // len(src.delays))))
+    chunk = point_block(src)
     for k0 in range(0, pts.shape[0], chunk):
         P = pts[k0:k0 + chunk]
         t, A, pol, sin_w = _contributions(src, P, wedge, part, mode)

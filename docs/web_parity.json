@@ -17,6 +17,7 @@
     {"desktop": "Calculate Laws", "kind": "button", "web": "id=\"calcBtn\""},
     {"desktop": "Export CSV", "kind": "button", "web": "data-act=\"export-csv\""},
     {"desktop": "Compute field", "kind": "button", "web": "id=\"fieldBtn\""},
+    {"desktop": "Cancel", "kind": "button", "web": "id=\"fieldCancel\"", "note": "stops a beam field being computed; both show its progress"},
     {"desktop": "Play", "kind": "button", "web": "id=\"playBtn\""},
     {"desktop": "◀", "kind": "button", "web": "id=\"prevLaw\""},
     {"desktop": "▶", "kind": "button", "web": "id=\"nextLaw\""},

@@ -105,7 +105,8 @@ strongest point (0 to &minus;30 dB) with the &minus;6 dB contour in white, the f
       <b>Grid</b>: the map spacing; large areas are coarsened automatically.</li>
   <li><b>Element width</b>, <b>Elevation</b>, the wedge's <b>S-wave</b> speed and <b>density</b>, and the
       <b>component density</b> are filled from a catalogue when the probe or wedge comes from one.</li>
-  <li>It takes a few seconds (a 3D map longer); the page waits while it computes.</li>
+  <li>It takes a few seconds (a 3D map longer, up to a few minutes for a matrix probe). A bar shows the progress;
+      <b>Cancel</b> stops it and leaves the field shown as it was. The rest of the page waits while it computes.</li>
 </ul>
 <p><b>What the beam field is and is not.</b> A ray model of the <b>direct</b> beam through a <b>bonded</b> wedge: each
 element's directivity, transmission into the component and beam spread, added with the law's delays. It leaves out
@@ -145,7 +146,7 @@ the law's rays, interface points and focus (black), and every law's focus colour
 <h2>The browser and the desktop calculator</h2>
 <p>Everything in the desktop calculator is here, and the results are the same: both run the same Python, and
 automatic checks compare them on every change. The few differences: the browser has <b>Place focus</b> for touch
-screens; a long beam field shows no progress bar and cannot be cancelled (it waits); the 3D view is drawn by a
+screens; while a beam field computes, the desktop lets you carry on working and the browser waits; the 3D view is drawn by a
 different library, so shading and labels look a little different. The build shown under the status line is the
 version of the code.</p>
 

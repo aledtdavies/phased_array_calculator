@@ -146,3 +146,4 @@ tr.sel td { background: #dbeafe; } tr.refused td { color: var(--muted); font-sty
 .seg .btn:last-child { border-radius: 0 8px 8px 0; }
 .seg .btn + .btn { margin-left: -1px; }
 .build-id { color: #94a3b8; font-size: 11px; margin-top: 4px; }
+#fieldProgress { width: 140px; height: 10px; accent-color: var(--primary); }

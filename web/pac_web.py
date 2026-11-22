@@ -194,7 +194,7 @@ def calc(arg):
     thickness = float(cfg["material"].get("thickness_mm", 0.0) or 0.0)
     st = dict(solver=solver, calc=c, thickness_mm=thickness, custom=None, ptype=ptype,
               outline_mm=links.wedge_outline_mm(cfg["wedge"], ptype),
-              element_size_m=links.element_size_m(pv), coverage=None, fusion=None, weld=None)
+              element_size_m=links.element_size_m(pv), coverage=None, fusion=None, weld=None, field=None)
     _state.update(st)
     notes = {"coverage": "", "weld": "", "weld_error": ""}
     legs = int(cfg.get("view", {}).get("coverage_legs", 0))
@@ -381,15 +381,49 @@ def element_coords(arg):
 # beam field
 # ---------------------------------------------------------------------------------------------
 def field(arg):
-    """The beam field of the law shown (or the dragged focus), as the desktop Beam Field tab."""
+    """The beam field of the law shown (or the dragged focus), as the desktop Beam Field tab, in one call."""
     t0 = time.perf_counter()
     a = json.loads(arg)
-    v = a["values"]
-    r, _ = _current(None if a.get("custom") else int(a["law"]))
-    job = field_job.make_job(_state["solver"], r, _state["calc"].wave_type, _state["thickness_mm"], v)
+    job, r = _field_job(a)
     t1 = time.perf_counter()
     field_job.run_job(job)
-    t2 = time.perf_counter()
+    return _out(_field_payload(job, a, r, t1 - t0, time.perf_counter() - t1))
+
+
+def field_start(arg):
+    """Start the beam field (as field) to be computed by field_step calls; returns its point count.
+    The page calls field_step until it is finished, showing progress, and stops calling to cancel."""
+    t0 = time.perf_counter()
+    a = json.loads(arg)
+    job, r = _field_job(a)
+    field_job.start_job(job)
+    _state["field"] = {"job": job, "arg": a, "r": r, "setup_s": time.perf_counter() - t0, "compute_s": 0.0}
+    return _out({"points": job["total"], "done": 0})
+
+
+def field_step(arg):
+    """Compute the started field for about `seconds`; with the result once every point is done."""
+    a = json.loads(arg)
+    st = _state.get("field")
+    if st is None:
+        raise ValueError("no beam field is being computed")
+    t0 = time.perf_counter()
+    finished = field_job.step_job(st["job"], seconds=float(a.get("seconds", 0.5)))
+    st["compute_s"] += time.perf_counter() - t0
+    out = {"points": st["job"]["total"], "done": st["job"]["done"], "finished": finished}
+    if finished:
+        _state["field"] = None
+        job = field_job.finish_job(st["job"])
+        out["result"] = _field_payload(job, st["arg"], st["r"], st["setup_s"], st["compute_s"])
+    return _out(out)
+
+
+def _field_job(a):
+    r, _ = _current(None if a.get("custom") else int(a["law"]))
+    return field_job.make_job(_state["solver"], r, _state["calc"].wave_type, _state["thickness_mm"], a["values"]), r
+
+
+def _field_payload(job, a, r, setup_s, compute_s):
     secs = []
     metrics = None
     for s in job["sections"]:
@@ -403,8 +437,8 @@ def field(arg):
                            "width6_mm": _num(m.width6_mm[0]), "peak": [m.peak_x_mm, m.peak_z_mm]}
             except ValueError:
                 pass
-    return _out({"law": a.get("law"), "custom": bool(a.get("custom")), "sections": secs, "metrics": metrics,
-                 "focus": _list([r["fx"] * 1e3, r["fy"] * 1e3, r["fz"] * 1e3]),
-                 "grid_mm": job["step_mm"], "points": int(sum(len(s["h"]) * len(s["z"]) for s in secs)),
-                 "note": MODEL_NOTE + ". " + VALIDATION_NOTE,
-                 "seconds_field": t2 - t1, "seconds": time.perf_counter() - t0})
+    return {"law": a.get("law"), "custom": bool(a.get("custom")), "sections": secs, "metrics": metrics,
+            "focus": _list([r["fx"] * 1e3, r["fy"] * 1e3, r["fz"] * 1e3]),
+            "grid_mm": job["step_mm"], "points": int(sum(len(s["h"]) * len(s["z"]) for s in secs)),
+            "note": MODEL_NOTE + ". " + VALIDATION_NOTE,
+            "seconds_field": compute_s, "seconds": setup_s + compute_s}
