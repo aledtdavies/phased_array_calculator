@@ -221,6 +221,7 @@ async function calculate() {
     const t0 = performance.now();
     const r = await call("calc", cfg);
     S.calc = r; S.dirty = S.edits !== edits; S.custom = false; S.pick = null; S.pickInfo = null; S.all = null; S.revision++;
+    $("elementInfo").textContent = ELEMENT_HINT;
     markFieldStale("the laws were recalculated");
     drawTable(); setupNav();
     const notes = [r.notes.coverage, r.notes.weld, r.notes.weld_error ? "Weld not drawn: " + r.notes.weld_error : ""].filter(Boolean);
@@ -255,7 +256,7 @@ function setupNav() {
   $("skewRow").hidden = !S.calc.probe.matrix || navSkews.length < 2;
   $("plotYZ").hidden = !(S.calc.probe.matrix || S.calc.probe.dual);
   $("rayPlots").classList.toggle("two", !$("plotYZ").hidden);
-  busy(false);
+  // (the law bar is enabled when calculate() releases the lock)
 }
 function syncSliders(l) {
   const ai = navAngles.indexOf(l.angle), si = navSkews.indexOf(l.skew);
@@ -286,6 +287,7 @@ async function loadLaw(i) {
     (S.calc.probe.matrix ? `, skew ${(+S.calc.laws[i].skew).toFixed(1)}°` : "") + `, F = (${f[0].toFixed(1)}, ${f[1].toFixed(1)}, ${f[2].toFixed(1)}) mm`;
   for (const tr of $("lawTable").querySelectorAll("tbody tr")) tr.classList.toggle("sel", tr.dataset.law === String(i));
   if (S.field && (S.field.custom || S.field.law !== i)) markFieldStale(S.field.custom ? "it shows a dragged focus" : `it shows law ${S.field.law + 1}`);
+  await refreshPick();
   drawLawViews();
 }
 
@@ -300,6 +302,7 @@ async function loadCustom(x, z) {
     $("lawLabel").textContent = `Dragged focus (not in the sweep): F = (${r.focus[0].toFixed(1)}, ${r.focus[1].toFixed(1)}, ${r.focus[2].toFixed(1)}) mm`;
     markFieldStale("the focus was moved");
     status("Dragged focus: the table and CSV are unchanged; a slider or table row returns to the sweep.");
+    await refreshPick();
   } catch (e) { toast("No law for that focus: " + e.message, true); }
   drawLawViews();
 }
@@ -342,6 +345,18 @@ function togglePlay() {
 }
 
 // ---- elements -------------------------------------------------------------------------------
+const ELEMENT_HINT = "Tap an element (here or in Rays) for its number, delay and time of flight.";
+function elementText(info) {
+  const arr = info.array ? `${info.array} array, ` : "";
+  return `Element ${info.number} (${arr}X ${info.x_index}, Y ${info.y_index}): ` +
+    (info.active ? `delay ${info.delay_us.toFixed(4)} µs, time of flight ${info.tof_us.toFixed(3)} µs` : "inactive in this law");
+}
+// The selected element's readout follows the law shown (called inside the lock).
+async function refreshPick() {
+  if (S.pick === null || S.pick === undefined) return;
+  S.pickInfo = await call("element", { index: S.pick, law: S.lawIndex });
+  $("elementInfo").textContent = elementText(S.pickInfo);
+}
 async function pickElement(index) {
   if (!S.calc || index === null || index === undefined) return;
   let info;
