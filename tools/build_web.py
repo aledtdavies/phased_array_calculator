@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import subprocess
 import sys
 import urllib.request
 
@@ -26,7 +27,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PY = ["probe.py", "wedge.py", "material.py", "delay_law.py", "focal_rules.py", "session.py",
       "beam_field.py", "beam_metrics.py", "field_job.py", "scene_model.py", "coverage.py", "weld.py",
       "catalog.py", "materials.json"]
-WEB = ["index.html", "help.html", "style.css", "app.js", "views.js", "worker.js", "panels.json", "web.config"]
+WEB = ["index.html", "help.html", "style.css", "app.js", "views.js", "view3d.js", "worker.js", "panels.json", "web.config"]
 # Third-party files the site ships (always, whether or not Pyodide is copied in): pinned versions.
 PLOTLY_VERSION = "4.3.0"
 PLOTLY_URL = f"https://cdn.jsdelivr.net/npm/plotly.js-dist-min@{PLOTLY_VERSION}/plotly.min.js"
@@ -124,7 +125,24 @@ def build(out, offline=False):
     with open(os.path.join(out, "config.js"), "w", encoding="utf-8") as f:
         f.write("// Written by tools/build_web.py: where the page loads Pyodide from ('' = the public CDN).\n")
         f.write(f"window.PAC_PYODIDE_BASE = {json.dumps(base)};\n")
+        f.write("// The commit the site was built from: the desktop version it matches.\n")
+        f.write(f"window.PAC_BUILD = {json.dumps(build_id())};\n")
     return out
+
+
+def build_id():
+    """The source commit (short hash and date): the PAC_BUILD environment variable when set (a Docker
+    build has no .git), else from git; '' when neither is available."""
+    if os.environ.get("PAC_BUILD"):
+        return os.environ["PAC_BUILD"].strip()
+    try:
+        out = subprocess.run(["git", "-C", ROOT, "log", "-1", "--format=%h %cs"], capture_output=True, text=True,
+                             timeout=20, check=True).stdout.strip()
+        dirty = subprocess.run(["git", "-C", ROOT, "status", "--porcelain", "--untracked-files=no"],
+                               capture_output=True, text=True, timeout=20).stdout.strip()
+        return out + (" (modified)" if dirty else "")
+    except (OSError, subprocess.SubprocessError):
+        return ""
 
 
 if __name__ == "__main__":

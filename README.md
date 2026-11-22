@@ -57,8 +57,9 @@ GitHub Actions (`.github/workflows/headless.yml`) does the same on every pull re
 
 The calculator's own Python, run in the browser by Pyodide: nothing to install, and nothing a
 user enters leaves the browser. It works on phones and tablets too, and has everything the
-desktop window has except the 3D view (next). Publishing, sharing and hosting on a work server:
-`docs/WEB_APP.md`.
+desktop window has, the 3D view included. Publishing, sharing and hosting on a work server:
+`docs/WEB_APP.md`. How the two stay the same (shared code, automatic checks on every pull request):
+`docs/plans/PLAN-2026-11-web-desktop-parity.md`.
 
 ```bash
 python tools/build_web.py site            # or --offline: Pyodide copied in, no internet needed

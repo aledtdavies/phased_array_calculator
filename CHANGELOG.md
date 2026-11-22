@@ -1,5 +1,19 @@
 # Changelog
 
+## Browser version: the 3D view, and keeping it in step with the desktop — 2026-11-22
+
+- **3D view in the browser** (tab "3D"), as the desktop's 3D tab:
+  - wedge, component, weld, element footprints, coverage fans and fusion faces, drawn as solids;
+  - the law's rays, interface points and focus, the sweep's foci, and the beam field sections (while current);
+  - camera presets Iso, X-Z, Y-Z and Top, the Section cut and element picking.
+  - Plotly WebGL (`web/view3d.js`), already shipped: nothing more to download. Rotate by dragging; pinch or scroll to zoom.
+- **Shared 3D geometry:** the framing, section plane and solids moved from the VTK renderer into `scene_model.py` (`scene_bounds`, `section_y`, `solid_prims`, `triangulate_polygon`), so both 3D views use them.
+- **Parity plan** (`docs/plans/PLAN-2026-11-web-desktop-parity.md`), with checks on every pull request:
+  - `docs/web_parity.json` lists every desktop control and its browser counterpart;
+  - `python/test_parity.py` fails on an unlisted control, a missing shipped module, panels whose fields or defaults differ, or different 3D presets or styles;
+  - `tools/web_smoke.py` runs the page in headless Chromium and checks every tab at desktop and phone width, uploading the screenshots as the `web-screenshots` artefact.
+- The page shows the commit it was built from (*Build …* under the status line).
+
 ## Browser version: full functionality, phones, new look — 2026-11-22
 
 - **Every desktop feature except the 3D view:**

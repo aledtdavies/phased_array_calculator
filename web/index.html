@@ -36,6 +36,7 @@
     <div class="setup-actions">
       <button id="calcBtn" class="btn primary block" disabled>Calculate laws</button>
       <div id="status" class="status">Starting Python in your browser&hellip;</div>
+      <div id="buildId" class="build-id"></div>
     </div>
   </aside>
 
@@ -45,6 +46,7 @@
       <button class="tab" data-tab="table" role="tab">Laws</button>
       <button class="tab" data-tab="delays" role="tab">Delays</button>
       <button class="tab" data-tab="field" role="tab">Beam field</button>
+      <button class="tab" data-tab="3d" role="tab">3D</button>
     </div>
 
     <section class="view active" id="view-rays">
@@ -77,6 +79,17 @@
       <div class="notes" id="fieldNote"></div>
     </section>
 
+    <section class="view" id="view-3d">
+      <div class="toolbar">
+        <span class="seg" id="views3d"><button class="btn" data-view="Iso">Iso</button><button class="btn" data-view="X-Z">X-Z</button><button class="btn" data-view="Y-Z">Y-Z</button><button class="btn" data-view="Top">Top</button></span>
+        <label class="inline check"><input type="checkbox" id="locus3d" checked> Sweep focal points</label>
+        <label class="inline check" title="Cut the wedge and component at the active aperture's centre (X-Z plane)"><input type="checkbox" id="section3d"> Section</label>
+        <label class="inline check" title="The beam field computed in the Beam field tab, while it is current"><input type="checkbox" id="field3d" checked> Beam field</label>
+      </div>
+      <div class="plot tall" id="plot3d"></div>
+      <div class="notes" id="info3d">Drag to rotate, scroll or pinch to zoom; tap an element for its delay.</div>
+    </section>
+
     <div class="lawbar" id="lawbar">
       <button class="icon-btn" id="prevLaw" aria-label="Previous law" disabled>&#9664;</button>
       <div class="sliders">
@@ -98,6 +111,7 @@
 <script src="config.js"></script>
 <script src="vendor/plotly.min.js"></script>
 <script src="views.js"></script>
+<script src="view3d.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
