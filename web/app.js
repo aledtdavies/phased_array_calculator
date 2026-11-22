@@ -241,7 +241,7 @@ async function calculate() {
     const r = await call("calc", cfg);
     S.calc = r; S.dirty = S.edits !== edits; S.custom = false; S.pick = null; S.pickInfo = null; S.all = null; S.revision++;
     if (S.play && r.laws.length < 2) togglePlay();     // nothing to play: stop (the button is disabled below two laws)
-    $("elementInfo").textContent = ELEMENT_HINT;
+    $("elementInfo").textContent = ELEMENT_HINT; $("info3d").textContent = HINT_3D;   // the old selection is gone
     markFieldStale("the laws were recalculated");
     drawTable(); setupNav();
     const notes = [r.notes.coverage, r.notes.weld, r.notes.weld_error ? "Weld not drawn: " + r.notes.weld_error : ""].filter(Boolean);
@@ -392,6 +392,7 @@ function togglePlay() {
 }
 
 // ---- elements -------------------------------------------------------------------------------
+const HINT_3D = "Drag to rotate, scroll or pinch to zoom; tap an element for its delay.";
 const ELEMENT_HINT = "Tap an element (here or in Rays) for its number, delay and time of flight.";
 function elementText(info) {
   const arr = info.array ? `${info.array} array, ` : "";
@@ -461,6 +462,7 @@ async function computeField() {
     $("fieldNote").innerHTML = $("fieldNote").innerHTML.replace("docs/beam_field_model.html",
       '<a href="docs/beam_field_model.html" target="_blank" rel="noopener">the model note</a>');
     if (!S.fieldFresh) { S.fieldFresh = true; markFieldStale("something changed while it was computed"); }
+    if (isActive("3d")) await draw3D();            // the 3D view was opened while the field computed
     status("Beam field done.");
   } catch (e) { $("fieldStatus").textContent = "No field: " + e.message; status("No field: " + e.message, true); }
   busy(false);
@@ -560,7 +562,10 @@ function showTab(tab) {
   for (const v of document.querySelectorAll(".view")) v.classList.toggle("active", v.id === "view-" + tab);
   if (tab === "delays" && S.calc && S.law) V.drawDelays($("plotDelays"), S.calc.probe, S.law, S.calc.global_max_delay, S.pick).then(ensureListeners);
   if (tab === "3d") draw3D();
-  for (const id of ["plotXZ", "plotYZ", "plotDelays", "plotField", "plotFieldYZ", "plot3d"]) { const d = $(id); if (d && d.data) Plotly.Plots.resize(d); }
+  // only the plots now shown (a hidden one, e.g. the Y-Z field after a 2D field, cannot be resized)
+  for (const id of ["plotXZ", "plotYZ", "plotDelays", "plotField", "plotFieldYZ", "plot3d"]) {
+    const d = $(id); if (d && d.data && d.offsetParent !== null) Plotly.Plots.resize(d).catch(() => {});
+  }
 }
 function openSetup() { $("setup").classList.add("open"); }
 function closeSetup() { $("setup").classList.remove("open"); }
