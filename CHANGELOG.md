@@ -1,5 +1,12 @@
 # Changelog
 
+## Desktop 3D view: solids from the shared scene model — 2026-11-22
+
+- The desktop 3D view draws the component, wedge and weld from `scene_model.solid_prims`, as the browser does: the same cross-sections, triangles and extents. Before, it extruded the outlines itself.
+- `scene_vtk.solid_mesh` builds each closed body with outward faces.
+- Test (`test_view3d.SharedSolids`): each body is closed, and its volume and Y extent match the shared solid (component, wedge, and a pinched double-V weld drawn lobe by lobe).
+- The parity plan's gap for this is closed.
+
 ## Browser version: the 3D view, and keeping it in step with the desktop — 2026-11-22
 
 - **3D view in the browser** (tab "3D"), as the desktop's 3D tab:
