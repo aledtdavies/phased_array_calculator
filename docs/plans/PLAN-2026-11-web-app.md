@@ -106,7 +106,8 @@ the worker and fetch the modules from local files, so the site has to be served 
 ## Steps
 
 **Status 2026-11-22:** step 1 published on GitHub Pages (owner's choice); steps 2 and 3 done
-(owner: "be nice if it worked on mobile, looked a bit nicer and had full functionality"); step 4 next.
+(owner: "be nice if it worked on mobile, looked a bit nicer and had full functionality"); step 4 done
+the same day.
 The work-laptop check of step 1 is still the owner's to make.
 
 1. **Publish the prototype** on the chosen host and try it on a work laptop.
@@ -135,6 +136,11 @@ The work-laptop check of step 1 is still the owner's to make.
      (the desktop's code); the first DXF loads ezdxf in a few seconds.
 4. **3D view** in the browser (three.js or vtk.js) and the 3D beam field (continuous wave).
    - **Finish:** the 3D scene's items and the field sections match the desktop's.
+   - **Done 2026-11-22:**
+     - Plotly's WebGL scenes (already shipped) draw `scene_model`'s primitives and solids, with the desktop's camera presets, section, picking and beam-field sections.
+     - `test_web.py` checks that the bounds hold the desktop 3D tab's and that the section plane is the same.
+     - `test_parity.py` checks the presets and styles.
+     - Upkeep from here: `PLAN-2026-11-web-desktop-parity.md`.
 5. **Decide the desktop window's future** once the browser version is in use. The library stays
    one, shared by both.
 

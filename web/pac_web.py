@@ -27,7 +27,8 @@ from beam_field import MODEL_NOTE
 from beam_metrics import beam_axis
 from catalog import Catalog, CatalogError
 from coverage import MODE_ASSUMPTION, SweepCoverage
-from scene_model import build_scene, coverage_prims, user_element_numbers, weld_prims
+from scene_model import (Prim, build_scene, coverage_prims, scene_bounds, section_y, solid_prims,
+                         user_element_numbers, weld_prims)
 from session import (DUAL_PROBE_TYPES, MATRIX_PROBE_TYPES, TABLE_HEADINGS, CatalogLinks,
                      asset_message, build_solver, calculate, law_result, write_laws_csv)
 
@@ -229,6 +230,7 @@ def calc(arg):
             setup = setup + [p for p in coverage_prims(_state["coverage"]) if p.role != "central-ray"]
         if _state["weld"] is not None:
             setup = setup + weld_prims(_state["weld"], _state["fusion"])
+    view3d = _view3d(solver, c, setup, thickness) if c.focal_points else None
     elements = solver._geometry()[0]
     frame = [elements * 1e3]
     if c.focal_points:
@@ -253,10 +255,24 @@ def calc(arg):
                   "numbers": user_element_numbers(probe).tolist(),
                   "active": [int(i) for i in probe.get_active_element_indices()]},
         "setup": _prims(setup),
+        "view3d": view3d,
         "frame": {"lo": _list(frame.min(axis=0)), "hi": _list(frame.max(axis=0))},
         "thickness_mm": thickness, "wave": c.wave_type, "notes": notes,
         "global_max_delay": _num(c.global_max_delay) if c.global_max_delay is not None else None,
         "seconds": time.perf_counter() - t0})
+
+
+def _view3d(solver, c, setup, thickness_mm):
+    """What the 3D view needs beyond the setup primitives (scene_model, as the desktop 3D tab):
+    its bounds, the section plane's Y and the solids (cross-sections and their triangles)."""
+    import weld
+    act = np.asarray(solver.probe.get_active_element_indices())
+    ip = np.vstack([np.asarray(r["interface_points"])[act] for r in c.results]) * 1e3
+    framing = setup + [Prim("points", ip, "interface-point-all")]     # every law's rays lie inside
+    lo, hi = scene_bounds(framing, thickness_mm)
+    solids = [dict(role=s["role"], xz=_list(s["xz"], 3), tris=s["tris"].tolist(), y0=s["y0"], y1=s["y1"],
+                   source=s.get("source")) for s in solid_prims(framing, thickness_mm, weld.split_lobes)]
+    return {"lo": _list(lo, 3), "hi": _list(hi, 3), "section_y": section_y(setup), "solids": solids}
 
 
 def _current(idx):
@@ -328,9 +344,11 @@ def element(arg):
     r, _ = _current(None if _state["custom"] else int(a["law"]))
     delay, tof = float(r["delays_us"][idx]), float(r["tof_us"][idx])
     pos = _state["solver"]._geometry()[0][idx] * 1e3
+    active = bool(math.isfinite(delay))
     return _out({"index": idx, "number": int(user_element_numbers(probe)[idx]), "array": array,
-                 "x_index": ix + 1, "y_index": iy + 1, "active": bool(math.isfinite(delay)),
-                 "delay_us": _num(delay), "tof_us": _num(tof), "position": _list(pos, 3)})
+                 "x_index": ix + 1, "y_index": iy + 1, "active": active,
+                 "delay_us": _num(delay), "tof_us": _num(tof), "position": _list(pos, 3),
+                 "interface": _list(np.asarray(r["interface_points"][idx]) * 1e3, 3) if active else None})
 
 
 # ---------------------------------------------------------------------------------------------

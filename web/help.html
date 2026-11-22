@@ -42,7 +42,7 @@ save is downloaded from it. <b>Nothing you enter leaves your device.</b>
   <li><b>Setup</b> holds the inputs, in sections you open and close: Probe, Wedge, Component, Scan, Active aperture,
       Weld and Beam field. On a wide screen it is on the left. On a phone it slides in from the <b>&#9776;</b> button
       and closes after you press <b>Calculate laws</b>.</li>
-  <li><b>Tabs</b>: Rays, Laws, Delays and Beam field.</li>
+  <li><b>Tabs</b>: Rays, Laws, Delays, Beam field and 3D.</li>
   <li><b>The law bar</b> at the bottom: &#9664; &#9654; step through every law, the <b>Angle</b> slider (and
       <b>Skew</b> for matrix probes) picks one, &#9655; plays the sweep.</li>
   <li><b>File</b> (top right): open and save configurations, load a probe or wedge from a catalogue, export the laws or
@@ -114,6 +114,21 @@ shear beam (angle within 0.4&deg;, width within 0.6&nbsp;%); other cases, and th
 for where the beam goes and how wide it is, not for absolute amplitudes.
 <a href="docs/beam_field_model.html">The model note</a> explains it in full.</p>
 
+<h3>3D</h3>
+<p>The setup in 3D, as the desktop's 3D view: the wedge, the component (a plate to the backwall when the Thickness is
+set), the weld and its fusion faces, the element footprints (red active, grey outlines inactive), the coverage fans,
+the law's rays, interface points and focus (black), and every law's focus coloured along the sweep.</p>
+<ul>
+  <li><b>Turn and zoom</b>: drag to rotate, scroll or pinch to zoom. <b>Iso</b>, <b>X-Z</b>, <b>Y-Z</b> and
+      <b>Top</b> set the view (the three axis views have no perspective, so they read as drawings). Depth is drawn
+      downward, as in the other views.</li>
+  <li><b>Section</b> cuts the wedge, component and weld open at the active aperture's centre (Y).</li>
+  <li><b>Beam field</b> shows the field computed in the Beam field tab, as coloured planes (the X-Z section, and
+      the Y-Z section for a 3D model), while it is current. It leaves the view when the law or an input changes.</li>
+  <li><b>Tap an element</b> for its number, delay and time of flight; its ray is drawn in orange.</li>
+  <li>The 3D view needs WebGL, which current browsers have. On an old computer it may turn slowly.</li>
+</ul>
+
 <h2>Files</h2>
 <table>
 <tr><th>File menu</th><th>What it does</th></tr>
@@ -127,9 +142,12 @@ for where the beam goes and how wide it is, not for absolute amplitudes.
 <tr><td>Export element coordinates</td><td>The elements' global coordinates (mm) as CSV, a MATLAB script or a MAT file.</td></tr>
 </table>
 
-<h2>Not yet in the browser</h2>
-<p>The <b>3D view</b> (the setup and beam in 3D) is the next addition. Everything else in the desktop calculator is
-here.</p>
+<h2>The browser and the desktop calculator</h2>
+<p>Everything in the desktop calculator is here, and the results are the same: both run the same Python, and
+automatic checks compare them on every change. The few differences: the browser has <b>Place focus</b> for touch
+screens; a long beam field shows no progress bar and cannot be cancelled (it waits); the 3D view is drawn by a
+different library, so shading and labels look a little different. The build shown under the status line is the
+version of the code.</p>
 
 <h2>If it does not work</h2>
 <table>

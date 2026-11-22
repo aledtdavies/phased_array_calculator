@@ -300,4 +300,5 @@ function plotToData(div, clientX, clientY) {
   return [xa.p2l(px), ya.p2l(py)];
 }
 
-window.PacViews = { drawProjection, drawDelays, drawField, plotToData, ensureVisible, COLOURS };
+window.PacViews = { drawProjection, drawDelays, drawField, plotToData, ensureVisible, COLOURS,
+                    TURBO, COVERAGE_NAME, BASE_LAYOUT, PLOT_CONFIG, narrow };

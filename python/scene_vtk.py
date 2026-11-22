@@ -13,6 +13,7 @@ from __future__ import annotations
 import numpy as np
 import pyvista as pv
 
+from scene_model import scene_bounds, section_y
 from weld import split_lobes
 
 from scene import (COLOR_BACKWALL, COLOR_ELEMENT_ACTIVE, COLOR_ELEMENT_INACTIVE, COLOR_ELEMENT_TX,
@@ -29,21 +30,6 @@ RAY_COLOUR = {"single": "#2563eb", "tx": "#1d4ed8", "rx": "#dc2626"}
 VIEWS = {"Iso": (-35.0, 28.0), "X-Z": (0.0, 0.0), "Y-Z": (-90.0, 0.0), "Top": (0.0, 89.9)}
 
 
-def scene_bounds(scene, component_thickness_mm=0.0):
-    """(lo, hi) mm over every primitive (and the backwall), padded."""
-    pts = [p.coords for p in scene.prims if p.kind != "text"]
-    allp = np.vstack(pts)
-    lo, hi = allp.min(axis=0), allp.max(axis=0)
-    w = scene.find("wedge")
-    if w:
-        lo[1] = min(lo[1], w[0].meta["y0"])
-        hi[1] = max(hi[1], w[0].meta["y1"])
-    if component_thickness_mm > 0:
-        hi[2] = max(hi[2], component_thickness_mm)
-    pad = np.maximum(2.0, 0.06 * (hi - lo))
-    return lo - pad, hi + pad
-
-
 def _prism(xz, y0, y1):
     """An X-Z polygon (N, 2) extruded across Y from y0 to y1."""
     pts = np.c_[xz[:, 0], np.full(len(xz), y0), xz[:, 1]]
@@ -57,9 +43,7 @@ def _quads(coords):
 
 def section_plane(scene):
     """(origin, normal): the vertical X-Z plane through the active aperture's centre Y."""
-    act = [p for p in scene.find("element") if p.meta["active"]] or scene.find("element")
-    y = float(np.mean(np.vstack([p.coords for p in act])[:, 1]))
-    return (0.0, y, 0.0), (0.0, 1.0, 0.0)
+    return (0.0, section_y(scene), 0.0), (0.0, 1.0, 0.0)
 
 
 def add_setup(pl, scene, component_thickness_mm=0.0, section=False):

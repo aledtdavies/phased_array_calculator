@@ -31,7 +31,7 @@ const call = (op, arg = {}) => new Promise((resolve, reject) => {
 const S = {
   ready: false, busy: false, error: null, schema: null, materials: null,
   calc: null, law: null, lawIndex: 0, custom: false, all: null, pick: null, pickInfo: null,
-  dirty: false, field: null, fieldFresh: false, play: null, timings: [], revision: 0, placing: false,
+  dirty: false, field: null, fieldFresh: false, fieldSections: null, view3d: "Iso", camRev: 0, play: null, timings: [], revision: 0, placing: false,
   edits: 0,                                         // counts input edits: a result is current only if none came in while it was computed
   focusRev: 0,                                      // counts law and focus changes (sweep law, dragged or placed focus)
 };
@@ -262,8 +262,8 @@ async function calculate() {
 
 function clearViews() {
   S.law = null;
-  Plotly.purge($("plotXZ")); Plotly.purge($("plotYZ")); Plotly.purge($("plotDelays"));
-  for (const k of ["xz", "plotXZ", "plotYZ", "delays"]) wired.delete(k);      // purge removed their listeners
+  Plotly.purge($("plotXZ")); Plotly.purge($("plotYZ")); Plotly.purge($("plotDelays")); Plotly.purge($("plot3d"));
+  for (const k of ["xz", "plotXZ", "plotYZ", "delays", "3d"]) wired.delete(k);      // purge removed their listeners
   $("lawLabel").textContent = "No valid law in this scan";
 }
 
@@ -348,7 +348,22 @@ async function drawLawViews() {
     await V.drawProjection($("plotXZ"), 0, projectionData(0));
     if (!$("plotYZ").hidden) await V.drawProjection($("plotYZ"), 1, projectionData(1));
     if (isActive("delays")) await V.drawDelays($("plotDelays"), S.calc.probe, S.law, S.calc.global_max_delay, S.pick);
+    if (isActive("3d")) await draw3D();
   } finally { drawingLaw = false; ensureListeners(); }
+}
+
+// The 3D view (the desktop's 3D tab): drawn while its tab is shown; the beam field only while it is current.
+function draw3D() {
+  if (!S.calc || !S.calc.view3d || !S.law) return Promise.resolve();
+  const field = $("field3d").checked && S.fieldFresh ? S.fieldSections : null;
+  return V.drawScene3D($("plot3d"), { setup: S.calc.setup, law: S.law.prims, v3: S.calc.view3d, pick: S.pickInfo, focus: S.law.focus,
+    field, section: $("section3d").checked, locus: $("locus3d").checked, numbers: S.calc.probe.numbers,
+    camera: V.cameraFor(S.view3d), revision: S.camRev }).then(ensureListeners);
+}
+function setView3d(name) {
+  S.view3d = name; S.camRev++;                      // a preset replaces the camera the user turned
+  for (const b of $("views3d").querySelectorAll("button")) b.classList.toggle("primary", b.dataset.view === name);
+  if (isActive("3d")) draw3D();
 }
 
 async function drawAll() {
@@ -387,7 +402,7 @@ function elementText(info) {
 async function refreshPick() {
   if (S.pick === null || S.pick === undefined) return;
   S.pickInfo = await call("element", { index: S.pick, law: S.lawIndex });
-  $("elementInfo").textContent = elementText(S.pickInfo);
+  $("elementInfo").textContent = $("info3d").textContent = elementText(S.pickInfo);
 }
 async function pickElement(index) {
   if (!S.calc || index === null || index === undefined) return;
@@ -398,7 +413,7 @@ async function pickElement(index) {
     const arr = info.array ? `${info.array} array, ` : "";
     const txt = `Element ${info.number} (${arr}X ${info.x_index}, Y ${info.y_index}): ` +
       (info.active ? `delay ${info.delay_us.toFixed(4)} µs, time of flight ${info.tof_us.toFixed(3)} µs` : "inactive in this law");
-    $("elementInfo").textContent = txt; toast(txt, false, 3500);
+    $("elementInfo").textContent = txt; $("info3d").textContent = txt; toast(txt, false, 3500);
     drawLawViews();
   } catch (e) { toast(e.message, true); }
 }
@@ -417,6 +432,7 @@ function markFieldStale(why) {
   if (!S.field || !S.fieldFresh) return;
   S.fieldFresh = false;
   for (const id of ["plotField", "plotFieldYZ"]) $(id).style.opacity = 0.35;
+  if (isActive("3d")) draw3D();                       // a stale field leaves the 3D view
   $("fieldStatus").textContent = `Stale (${why}): compute again for the law shown.`;
 }
 async function computeField() {
@@ -433,7 +449,7 @@ async function computeField() {
     await V.drawField($("plotField"), xz, r.focus, r.metrics, 0);
     if (yz) await V.drawField($("plotFieldYZ"), yz, r.focus, null, 1);
     for (const id of ["plotField", "plotFieldYZ"]) $(id).style.opacity = 1;
-    S.field = { law: req.law, custom: req.custom };
+    S.field = { law: req.law, custom: req.custom }; S.fieldSections = r.sections;
     // current only if nothing changed while it was computed (inputs, the law, a moved focus)
     S.fieldFresh = S.edits === edits && S.focusRev === focusRev && !S.dirty;
     const kind = v.pulsed ? `pulsed, ${v.cycles} cycles` : "continuous wave";
@@ -543,7 +559,8 @@ function showTab(tab) {
   for (const b of document.querySelectorAll(".tab")) b.classList.toggle("active", b.dataset.tab === tab);
   for (const v of document.querySelectorAll(".view")) v.classList.toggle("active", v.id === "view-" + tab);
   if (tab === "delays" && S.calc && S.law) V.drawDelays($("plotDelays"), S.calc.probe, S.law, S.calc.global_max_delay, S.pick).then(ensureListeners);
-  for (const id of ["plotXZ", "plotYZ", "plotDelays", "plotField", "plotFieldYZ"]) { const d = $(id); if (d && d.data) Plotly.Plots.resize(d); }
+  if (tab === "3d") draw3D();
+  for (const id of ["plotXZ", "plotYZ", "plotDelays", "plotField", "plotFieldYZ", "plot3d"]) { const d = $(id); if (d && d.data) Plotly.Plots.resize(d); }
 }
 function openSetup() { $("setup").classList.add("open"); }
 function closeSetup() { $("setup").classList.remove("open"); }
@@ -567,6 +584,10 @@ function ensureListeners() {
     if (d.on && !wired.has(id)) { wired.add(id); d.on("plotly_click", (ev) => {
       const p = ev.points && ev.points[0]; if (p && p.data && p.data.meta === "element" && p.customdata !== undefined) pickElement(p.customdata); }); }
   }
+  const p3 = $("plot3d");
+  if (p3.on && !wired.has("3d")) { wired.add("3d"); p3.on("plotly_click", (ev) => {
+    const p = ev.points && ev.points[0]; if (!p || !p.data || p.data.meta !== "element") return;
+    const i = p.data.customdata[p.pointNumber]; if (i !== undefined && i !== null) pickElement(i); }); }
   const dl = $("plotDelays");
   if (dl.on && !wired.has("delays")) { wired.add("delays"); dl.on("plotly_click", (ev) => {
     const p = ev.points && ev.points[0]; if (p && p.customdata !== undefined && p.customdata !== null) pickElement(p.customdata); }); }
@@ -596,6 +617,9 @@ async function start() {
   $("prevLaw").onclick = () => stepLaw(-1); $("nextLaw").onclick = () => stepLaw(1); $("playBtn").onclick = togglePlay;
   $("angleSlider").oninput = sliderLaw; $("skewSlider").oninput = sliderLaw;
   $("coverage").onchange = () => { if (S.calc) calculate(); };
+  for (const b of $("views3d").querySelectorAll("button")) b.onclick = () => setView3d(b.dataset.view);
+  $("views3d").querySelector('[data-view="Iso"]').classList.add("primary");
+  for (const id of ["locus3d", "section3d", "field3d"]) $(id).onchange = () => { if (isActive("3d")) draw3D(); };
   $("showAll").onchange = async () => { if ($("showAll").checked) await drawAll(); else drawLawViews(); };
   $("setupToggle").onclick = openSetup; $("setupClose").onclick = closeSetup;
   $("fileBtn").onclick = (e) => { e.stopPropagation(); $("fileMenu").classList.toggle("open"); };
@@ -613,6 +637,7 @@ async function start() {
     if (S.pendingConfig) { await call("config_loaded", { config: S.pendingConfig }); S.pendingConfig = null; }
     S.ready = true; busy(false);
     status(`Ready (Python ${r.python}, ${S.timings[3][1].toFixed(0)} s). Inputs never leave this browser.`);
+    if (window.PAC_BUILD) $("buildId").textContent = "Build " + window.PAC_BUILD;
   } catch (e) { S.error = e.message; status("Could not start Python: " + e.message, true); }
 }
 start();

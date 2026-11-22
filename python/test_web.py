@@ -144,6 +144,31 @@ class TestWebLayer(unittest.TestCase):
                     self.assertLessEqual(lo[1], p["meta"]["y0"] + 1e-3)
                     self.assertGreaterEqual(hi[1], p["meta"]["y1"] - 1e-3)
 
+    def test_the_3d_view_frames_and_fills_as_the_desktop(self):
+        """The 3D view's bounds, section plane and solids come from scene_model, as the desktop's:
+        its bounds hold the desktop 3D tab's for any law, and the element readout gives the ray."""
+        from scene_model import build_scene, scene_bounds, section_y
+        r = call("calc", cfg(weld={"type": "Single-V", "centre_x_mm": 40, "bevel_deg": 30, "root_gap_mm": 2,
+                                   "root_face_mm": 1.5}, view={"coverage_legs": 1}))
+        v3 = r["view3d"]
+        self.assertEqual([s["role"] for s in v3["solids"]], ["component", "wedge", "weld"])
+        for s in v3["solids"]:
+            self.assertEqual(len(s["tris"]), len(s["xz"]) - 2, s["role"])
+        st = pac_web._state
+        solver, c = st["solver"], st["calc"]
+        lo, hi = np.array(v3["lo"]), np.array(v3["hi"])
+        for i in (0, len(c.results) - 1):
+            get = lambda k: (c.results[k]["interface_points"] * 1e3, np.asarray(c.focal_points[k]) * 1e3)  # noqa: E731
+            sc = build_scene(solver, get, [i], current=i, sweep_focal_mm=np.asarray(c.focal_points) * 1e3)
+            dlo, dhi = scene_bounds(sc, 25)
+            self.assertTrue((lo <= dlo + 1e-3).all() and (hi >= dhi - 1e-3).all(), f"law {i}")
+            self.assertAlmostEqual(v3["section_y"], section_y(sc))
+        call("law", {"law": 2})
+        e = call("element", {"index": 5, "law": 2})
+        self.assertTrue(e["active"])
+        np.testing.assert_allclose(e["interface"], c.results[2]["interface_points"][5] * 1e3, atol=1e-3)
+        self.assertIsNone(call("element", {"index": 40, "law": 2})["interface"])      # outside the aperture
+
     def test_a_dragged_focus_is_solved_and_refused_above_the_surface(self):
         call("calc", cfg())
         r = call("custom", {"x": 30, "z": 18, "from_law": 1})
@@ -218,9 +243,9 @@ class TestBuild(unittest.TestCase):
                 self.assertIn(f, build_web.PY, f)
         self.assertIn("materials.json", build_web.PY)
         page = open(os.path.join(ROOT, "web", "index.html"), encoding="utf-8").read()
-        for f in ("style.css", "views.js", "app.js", "config.js", "vendor/plotly.min.js"):
+        for f in ("style.css", "views.js", "view3d.js", "app.js", "config.js", "vendor/plotly.min.js"):
             self.assertIn(f, page)
-        for f in ("style.css", "views.js", "app.js", "worker.js", "panels.json", "help.html", "web.config"):
+        for f in ("style.css", "views.js", "view3d.js", "app.js", "worker.js", "panels.json", "help.html", "web.config"):
             self.assertIn(f, build_web.WEB)
         self.assertIn(build_web.EZDXF_WHEEL, worker)
 
