@@ -54,6 +54,7 @@ class ProjectionPlot(pg.PlotWidget):
 
     element_clicked = QtCore.Signal(int)
     focus_dragged = QtCore.Signal(float, float)     # X (mm), Z (mm); X-Z view only
+    focus_released = QtCore.Signal()                # the end of a focus drag
 
     def __init__(self, dim):
         super().__init__()
@@ -81,6 +82,7 @@ class ProjectionPlot(pg.PlotWidget):
         self.addItem(self.focus)
         self._placing_focus = False
         self.focus.sigPositionChanged.connect(self._focus_moved)
+        self.focus.sigPositionChangeFinished.connect(lambda *_: self.focus_released.emit())
         self.pick = pg.ScatterPlotItem(size=13, brush=pg.mkBrush(PICK_COLOUR), pen=pg.mkPen("k"))
         self.pick.setZValue(7)
         self.addItem(self.pick)
@@ -256,6 +258,36 @@ class ProjectionPlot(pg.PlotWidget):
         else:
             self.central.setData(path_mm[:, self.dim], path_mm[:, 2])
 
+    REFRAME_MARGIN = 0.1     # a reframed view keeps the law this fraction of its size inside the edges
+
+    def law_points(self):
+        """(n, 2) view coordinates of the drawn law: its rays, central ray and focus."""
+        pts = [np.array([[self.focus.pos().x(), self.focus.pos().y()]])]
+        for it in list(self.env_items.values()) + [self.central]:
+            x, y = it.getData()
+            if x is not None and len(x):
+                pts.append(np.column_stack([x, y]))
+        p = np.vstack(pts)
+        return p[np.all(np.isfinite(p), axis=1)]
+
+    def ensure_visible(self, points):
+        """
+        Widen the view (never narrow it) so the points lie at least REFRAME_MARGIN of the view's
+        size inside its edges; a view that already holds them is left as the user set it.
+        """
+        lo, hi = points.min(axis=0), points.max(axis=0)
+        changed = False
+        for _ in range(6):          # widening grows the margin too (and the locked aspect): repeat
+            r = self.getViewBox().viewRect()
+            x0, x1, y0, y1 = r.left(), r.right(), r.top(), r.bottom()
+            mx, my = self.REFRAME_MARGIN * (x1 - x0), self.REFRAME_MARGIN * (y1 - y0)
+            if lo[0] >= x0 + mx and hi[0] <= x1 - mx and lo[1] >= y0 + my and hi[1] <= y1 - my:
+                break
+            self.setRange(xRange=(min(x0, lo[0] - 2 * mx), max(x1, hi[0] + 2 * mx)),
+                          yRange=(min(y0, lo[1] - 2 * my), max(y1, hi[1] + 2 * my)), padding=0)
+            changed = True
+        return changed
+
     def set_pick(self, point_mm):
         if point_mm is None:
             self.pick.setData([], [])
@@ -298,6 +330,7 @@ class RayTab(PlayMixin, LawTab):
         for p in (self.xz, self.yz):
             p.element_clicked.connect(self._element_clicked)
         self.xz.focus_dragged.connect(lambda x, z: self.focus_dragged.emit(x * 1e-3, z * 1e-3))
+        self.xz.focus_released.connect(self.reframe_law)
 
     def plots(self):
         return [self.xz] + ([self.yz] if self.yz.isVisibleTo(self) else [])
@@ -321,6 +354,12 @@ class RayTab(PlayMixin, LawTab):
     def _coverage_changed(self):
         self._setup_drawn = False
         self._all_drawn = False
+
+    def reframe_law(self):
+        """At the end of a focus drag: widen each view that does not show the law's rays and
+        focus with a margin, so the focus can be dragged on from there."""
+        for p in self.plots():
+            p.ensure_visible(p.law_points())
 
     def reset_focus_marker(self):
         """Put the X-Z marker back on the focus shown (after a refused drag); no solve follows."""
