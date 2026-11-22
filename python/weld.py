@@ -39,6 +39,7 @@ import numpy as np
 FLATTEN_MM = 0.002        # largest chord deviation when an arc or curve is flattened
 WALL_TOL_MM = 1e-6        # a vertex this close to Z = 0 or Z = T lies on that wall
 JOIN_TOL_MM = 1e-3        # DXF entity ends this close together are joined
+PLANAR_TOL_MM = 1e-6      # DXF outline points must share one Z (the drawing plane) to this
 SAMPLE_MM = 0.05          # fusion faces are tested for coverage at this spacing
 EDGE_TOL_MM = 1e-6        # a face point this close to a fan's edge is inside the fan
 TEMPLATES = ("single-V", "double-V", "single-J")
@@ -350,30 +351,66 @@ def _dxf_pieces(path, layer, units=None):
         layers.add(lay)
         if layer is not None and lay != layer:
             continue
-        for pts in _entity_points(e, FLATTEN_MM / scale):
-            if len(pts) >= 2:
-                pieces.append((lay, pts * scale))
+        # A polyline is judged part by part (its lines by their points, its arcs by their plane).
+        parts = ([s for s in e.virtual_entities() if s.dxftype() in ("LINE", "ARC")]
+                 if e.dxftype() in ("LWPOLYLINE", "POLYLINE") else [e])
+        for part in parts:
+            tilted, z_extra = _entity_plane(part)
+            for pts in _entity_points(part, FLATTEN_MM / scale):
+                if len(pts) >= 2:
+                    z = np.concatenate([pts[:, 2], z_extra]) * scale
+                    pieces.append((lay, pts[:, :2] * scale, (float(z.min()), float(z.max()), tilted)))
     return pieces, sorted(layers), units, scale
+
+
+def _entity_plane(e):
+    """
+    (tilted, extra Z values) of an entity, in drawing units: tilted when its own plane (the
+    extrusion of an arc, circle or ellipse, including a polyline's arcs) is not parallel to X-Y,
+    whatever its sampled vertices show (a straight line is judged by its end points); extra Z from a spline's control and fit points, which its flattened
+    vertices may not reach.
+    """
+    t = e.dxftype()
+    tilted = False
+    if t in ("ARC", "CIRCLE", "ELLIPSE"):
+        ext = np.asarray(tuple(e.dxf.get("extrusion", (0.0, 0.0, 1.0))), dtype=float)
+        n = np.linalg.norm(ext)
+        tilted = not (n > 0 and abs(abs(ext[2]) / n - 1.0) <= 1e-12)
+    z = []
+    if t == "SPLINE":
+        z = [p[2] for p in e.control_points] + [p[2] for p in e.fit_points]
+    return tilted, np.asarray(z, dtype=float)
+
+
+def _outline_is_flat(name, zinfo):
+    """Refuse an outline (its entities' (zmin, zmax, tilted)) that is not in one X-Y plane."""
+    if any(t for _, _, t in zinfo):
+        raise ValueError(f"{name}: the outline is not drawn in one X-Y plane (an entity lies in a tilted "
+                         "plane); draw the cross-section flat")
+    lo, hi = min(z for z, _, _ in zinfo), max(z for _, z, _ in zinfo)
+    if hi - lo > PLANAR_TOL_MM:
+        raise ValueError(f"{name}: the outline is not drawn in one X-Y plane (Z spans {lo:g} to {hi:g} mm); "
+                         "draw the cross-section flat")
 
 
 def _entity_points(e, tol):
     """
-    Polylines (drawing units) of one entity, every vertex on the exact curve: lines by their
+    Polylines (drawing units, world X, Y, Z) of one entity, every vertex on the exact curve: lines by their
     ends, arcs, circles, ellipses and splines by ezdxf's own curve flattening (chord deviation
     <= tol), polylines split into their lines and arcs (bulges) first. Not through ezdxf.path,
     whose cubic approximation of arcs adds an error the tolerance would not bound.
     """
     t = e.dxftype()
     if t == "LINE":
-        return [np.array([(e.dxf.start.x, e.dxf.start.y), (e.dxf.end.x, e.dxf.end.y)], dtype=float)]
+        return [np.array([tuple(e.dxf.start), tuple(e.dxf.end)], dtype=float)]
     if t in ("LWPOLYLINE", "POLYLINE"):
         out = []
         for sub in e.virtual_entities():
             if sub.dxftype() in ("LINE", "ARC"):     # a 2D/3D polyline's parts; nothing else is an outline
                 out += _entity_points(sub, tol)
         return out
-    pts = list(e.flattening(tol))                # ARC, CIRCLE, ELLIPSE, SPLINE: exact-curve vertices
-    return [np.array([(v.x, v.y) for v in pts], dtype=float)]
+    pts = list(e.flattening(tol))                # ARC, CIRCLE, ELLIPSE, SPLINE: exact-curve vertices (WCS)
+    return [np.array([(v.x, v.y, v.z) for v in pts], dtype=float)]
 
 
 def _dedupe(poly, tol):
@@ -421,12 +458,17 @@ def _join_touching(loops, tol=JOIN_TOL_MM):
     return loops
 
 
-def _chain(pieces, tol=JOIN_TOL_MM):
-    """Join polylines end to end into closed loops; returns (loops, open chains)."""
+def _chain(pieces, tol=JOIN_TOL_MM, members=None):
+    """
+    Join polylines end to end into closed loops; returns (loops, open chains). If members is a
+    list, the indices (into pieces) of the polylines in each closed loop are appended to it.
+    """
     todo = [p for p in pieces]
+    ids = list(range(len(pieces)))
     loops, open_ = [], []
     while todo:
         cur = todo.pop(0)
+        used = [ids.pop(0)]
         grown = True
         while grown and np.hypot(*(cur[0] - cur[-1])) > tol:
             grown = False
@@ -442,10 +484,13 @@ def _chain(pieces, tol=JOIN_TOL_MM):
                 else:
                     continue
                 todo.pop(i)
+                used.append(ids.pop(i))
                 grown = True
                 break
         if np.hypot(*(cur[0] - cur[-1])) <= tol and len(cur) > 3:
             loops.append(cur[:-1])          # closed: the end point repeats the start
+            if members is not None:
+                members.append(used)
         else:
             open_.append(cur)
     return loops, open_
@@ -464,7 +509,8 @@ def dxf_profile(path, thickness_mm, centre_x_mm=0.0, datum="surface", layer=None
     if layer is not None and layer not in layers:
         raise ValueError(f"{name} has no layer {layer!r} with outline entities "
                          f"(layers: {', '.join(layers) or 'none'})")
-    loops, open_ = _chain([p for _, p in pieces])
+    members = []
+    loops, open_ = _chain([p for _, p, _ in pieces], members=members)
     loops = _join_touching(loops)
     if not loops:
         if open_:
@@ -476,6 +522,10 @@ def dxf_profile(path, thickness_mm, centre_x_mm=0.0, datum="surface", layer=None
         raise ValueError(f"{name} has {len(loops)} closed outlines" +
                          (f" on layer {layer!r}" if layer else "") +
                          f"; put the weld region alone on one layer and name it (layers: {', '.join(layers)})")
+    # The cross-section is read in the drawing's X-Y plane: the entities that make the outline
+    # (every closed loop, joined into the one outline) must lie in one such plane; open entities
+    # elsewhere in the file do not matter.
+    _outline_is_flat(name, [pieces[i][2] for m in members for i in m])
     xy = loops[0]
     z = -xy[:, 1] if datum == "surface" else T - xy[:, 1]
     poly = np.c_[xy[:, 0] + centre_x_mm, z]

@@ -157,6 +157,74 @@ class TemplateMatchesDXF(unittest.TestCase):
         below = h.polygon[h.polygon[:, 1] > 1e-9]
         np.testing.assert_allclose(np.hypot(below[:, 0], below[:, 1]), 50, atol=1e-9)
 
+    def test_an_outline_not_in_one_xy_plane_is_refused(self):
+        """Review of PR #29 (MINOR): DXF Z was ignored, so 3D or tilted outlines were read flattened."""
+        sq = [(-5, -1, 5, -1), (5, -1, 5, -10), (5, -10, -5, -10), (-5, -10, -5, -1)]
+        cases = {
+            "a corner lifted": lambda m: [m.add_line((a, b, 0), (c, d, 3.0 if (c, d) == (5, -10) else 0))
+                                          for a, b, c, d in sq],
+            "a tilted arc": lambda m: m.add_arc((0, -5), 3, 0, 360, dxfattribs={"extrusion": (0, 0.6, 0.8)}),
+            "a 3D polyline": lambda m: m.add_polyline3d([(-5, -1, 0), (5, -1, 0), (5, -10, 2), (-5, -10, 0)], close=True),
+        }
+        for name, draw in cases.items():
+            with self.subTest(name):
+                doc = ezdxf.new()
+                doc.header["$INSUNITS"] = 4
+                draw(doc.modelspace())
+                p = os.path.join(self.dir, "z.dxf")
+                doc.saveas(p)
+                with self.assertRaisesRegex(ValueError, "one X-Y plane"):
+                    dxf_profile(p, 25.0)
+        # Review of PR #33: a short tilted arc whose sampled vertices share one Z is still refused
+        doc = ezdxf.new()
+        doc.header["$INSUNITS"] = 4
+        m = doc.modelspace()
+        arc = m.add_arc((0, -5), 3, 89, 91, dxfattribs={"extrusion": (0, 0.6, 0.8)})
+        s0, s1 = arc.start_point, arc.end_point             # WCS ends, at one Z
+        apex = ((s0.x + s1.x) / 2, (s0.y + s1.y) / 2 - 2.0, s0.z)
+        m.add_line(s1, apex)                                 # two lines at that Z close it
+        m.add_line(apex, s0)
+        p = os.path.join(self.dir, "short_tilted_arc.dxf")
+        doc.saveas(p)
+        a = [e for e in ezdxf.readfile(p).modelspace()][0]
+        zs = [v.z for v in a.flattening(weld.FLATTEN_MM)]
+        self.assertLessEqual(max(zs) - min(zs), 1e-9)          # what the sampling alone would see
+        with self.assertRaisesRegex(ValueError, "one X-Y plane"):
+            dxf_profile(p, 25.0)
+        # ... and an unrelated open entity at another Z does not block a flat outline
+        doc = ezdxf.new()
+        doc.header["$INSUNITS"] = 4
+        for a_, b_, c_, d_ in sq:
+            doc.modelspace().add_line((a_, b_, 0), (c_, d_, 0))
+        doc.modelspace().add_line((20, -1, 7.5), (30, -1, 7.5))
+        p = os.path.join(self.dir, "flat_plus_stray.dxf")
+        doc.saveas(p)
+        prof = dxf_profile(p, 25.0)
+        self.assertAlmostEqual(abs(polygon_area(prof.polygon)), 90.0, places=9)
+        self.assertTrue(any("open" in n for n in prof.notes))
+        # ... and a straight polyline segment with a tilted extrusion but flat in X-Y is accepted
+        doc = ezdxf.new()
+        doc.header["$INSUNITS"] = 4
+        m = doc.modelspace()
+        pl = m.add_lwpolyline([(-5, 3), (5, 3)], dxfattribs={"extrusion": (0, 0.6, 0.8)})   # WCS y -2.4
+        w0, w1 = [v for v in pl.vertices_in_wcs()]
+        far = (w1.x, w1.y - 9, w1.z)
+        m.add_line(w1, far)
+        m.add_line(far, (w0.x, w0.y - 9, w0.z))
+        m.add_line((w0.x, w0.y - 9, w0.z), w0)
+        p = os.path.join(self.dir, "tilted_straight_polyline.dxf")
+        doc.saveas(p)
+        self.assertAlmostEqual(abs(w0.z - w1.z), 0.0, places=12)
+        self.assertAlmostEqual(abs(polygon_area(dxf_profile(p, 25.0).polygon)), 90.0, places=6)
+        # a flat outline at a constant elevation is a cross-section like any other
+        doc = ezdxf.new()
+        doc.header["$INSUNITS"] = 4
+        for a, b, c, d in sq:
+            doc.modelspace().add_line((a, b, 7.5), (c, d, 7.5))
+        p = os.path.join(self.dir, "elevated.dxf")
+        doc.saveas(p)
+        self.assertAlmostEqual(abs(polygon_area(dxf_profile(p, 25.0).polygon)), 90.0, places=9)
+
     def test_self_crossing_outline_is_refused(self):
         p = os.path.join(self.dir, "cross.dxf")
         pts = [(0, 0), (10, -20), (0, -20), (20, 0)]

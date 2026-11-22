@@ -44,7 +44,7 @@ The Phased Array Focal Law Calculator computes the element-level time delays (fo
 | **Dual Linear** | Two parallel linear sub-arrays separated in Y |
 | **Dual Matrix** | Two parallel matrix sub-arrays separated in Y |
 
-Both **Python** (Tkinter GUI + importable library) and **MATLAB** (App Designer GUI + classdef library) implementations are provided with identical physics, parameter conventions, and export formats.
+Both **Python** (Qt GUI + importable library) and **MATLAB** (App Designer GUI + classdef library) implementations are provided with identical physics, parameter conventions, and export formats.
 
 ---
 
@@ -52,12 +52,11 @@ Both **Python** (Tkinter GUI + importable library) and **MATLAB** (App Designer 
 
 ### Python
 
-**Requirements:** Python 3.9+, `numpy`, `scipy`, `matplotlib`, `tkinter`
+**Requirements:** Python 3.9+ and `python/requirements.txt` (numpy, scipy, matplotlib, PySide6, qtpy, pyvista, pyvistaqt, pyqtgraph, ezdxf)
 
 ```bash
-pip install numpy scipy matplotlib
-python python/qt_app.py      # the Qt window
-python python/app.py         # the Tk window (kept until the Qt window is accepted)
+pip install -r python/requirements.txt
+python python/qt_app.py      # the window
 ```
 
 To build a standalone executable:
@@ -211,13 +210,12 @@ The **angle/skew sliders** below each plot navigate the computed law set without
 
 Drag to rotate, scroll to zoom. **Iso**, **X-Z**, **Y-Z** and **Top** set the camera, with depth always downward; the axis views are drawn in parallel projection. **Section** cuts the wedge and component at the active aperture's centre (an X-Z plane). Click near an element to inspect it: the readout gives its number in the chosen numbering convention, its array (Tx/Rx), its X/Y grid position, its delay and its time of flight, and its ray is drawn in orange.
 
-**Tk window (matplotlib).** A rotatable 3D scene of the selected law (mm, global frame, depth drawn downward): the wedge body (catalogue outline or schematic silhouette, extruded across the element footprint), the interface plane and optional backwall, active and inactive elements (Tx/Rx coloured for dual probes), rays element → interface → focus for the active elements (an even subset of at most 48 for large apertures, ends kept), the interface points, and the focal points of the whole sweep coloured by law index. Camera presets **Iso**, **X-Z**, **Y-Z** and **Top** give the projections from within the 3D view; drag to rotate. Roof angles tilt the drawn elements but not the wedge body.
 
 ### Qt window: live 2D views
 
 In the Qt window the Ray Tracing and Delays tabs are pyqtgraph views:
 - **Navigation:** scroll to zoom, drag to pan; right-click for the view menu. The law shown is shared: moving the slider, stepping or playing in any tab (or selecting a table row) moves every tab to that law.
-- **Drag the focus:** drag the focal-point marker in the X-Z view to move the focus. The law for that point is solved as you drag and shown in every tab (rays, delays, 3D), with the readout "Dragged focus (not in the sweep)". The focus keeps the current law's Y. It isn't added to the sweep, the table or the CSV, and a slider, step or table selection returns to the sweep. A focus above the surface is refused.
+- **Drag the focus:** drag the focal-point marker in the X-Z view to move the focus. The law for that point is solved as you drag and shown in every tab (rays, delays, 3D), with the readout "Dragged focus (not in the sweep)". The focus keeps the current law's Y. It isn't added to the sweep, the table or the CSV, and a slider, step or table selection returns to the sweep. A focus above the surface is refused. When you release the marker, a view that no longer shows the law's rays and focus with some room around them widens to do so (it never zooms in), so you can drag on from there.
 - **Coverage (toolbar):** Off, Direct, Direct + 1st skip, or Direct + 2 skips.
   - Each law's central ray starts at the active aperture's centre, refracts at the surface, and reflects at the backwall and surface of a flat plate of the component **Thickness**, which must be set.
   - The sweep's central rays sweep out fans, drawn per leg (blue direct, purple 1st skip, pink 2nd skip), one fan per skew.
@@ -225,7 +223,7 @@ In the Qt window the Ray Tracing and Delays tabs are pyqtgraph views:
   - Assumption: each reflection keeps the wave mode (no mode conversion), and only central rays are shown, not the beam's spread.
 - **Weld (Setup panel):** None, Single-V, Double-V, Single-J or DXF file, placed at **Weld Centre X** (global X) through the component **Thickness**, which must be set.
   - Templates: bevel angle from the vertical, root gap and root face. Double-V also takes a lower bevel and the root depth (0 = mid-thickness). Single-J takes the J radius and the plate the J is cut in (near = −X, far = +X). Cap and root are flush.
-  - DXF: the closed outline of the weld region, with x = 0 at the weld centreline and y up. **DXF y = 0 at** says whether y = 0 is the surface (part drawn below) or the backwall (part drawn above). **DXF Units** overrides the file's stated units. Name the **DXF Layer** when the file holds more than one closed outline, for example a plate as well as the weld.
+  - DXF: the closed outline of the weld region, with x = 0 at the weld centreline and y up. **DXF y = 0 at** says whether y = 0 is the surface (part drawn below) or the backwall (part drawn above). **DXF Units** overrides the file's stated units. Name the **DXF Layer** when the file holds more than one closed outline, for example a plate as well as the weld. The outline must be drawn flat, in one X-Y plane: an outline whose points have different Z (drawn in 3D or in a tilted plane) is refused rather than read flattened.
   - The weld is read when the laws are calculated. It is drawn in X-Z and in 3D.
   - With Coverage on, each fusion face is green where a fan of the selected legs reaches it and red at gaps, and the toolbar gives the covered share and the gap length. "Covered" means a central-ray fan reaches the face; the incidence angle on the face is not judged.
 - **Select an element:** click an element marker (X-Z or Y-Z), a delay bar, a delay-map cell or an element in the 3D view. It is selected in every tab: orange in the projections and the 3D view, outlined in the delay map, and reported in the 3D readout.
@@ -611,17 +609,13 @@ Pitch (Y-axis rotation by θ):          Roll (X-axis rotation by φ):
 | `scene_model.py` | `build_scene`: the geometry every view draws, as primitives in the global frame |
 | `qt_app.py` | Qt GUI (qtpy/PySide6): main window, menus, table, dialogs |
 | `qt_panels.py`, `qt_plotting.py`, `qt_catalog_dialog.py` | Qt input panels, plot tabs and catalogue picker |
-| `app.py` | Tkinter GUI (to be retired once the Qt window is accepted) |
-| `session.py` | Solver from panel values, sweep into laws and table rows, focal-law CSV, catalogue links (shared by both GUIs) |
+| `session.py` | Solver from panel values, sweep into laws and table rows, focal-law CSV, catalogue links (behind the window) |
 | `navigation.py` | Law navigation: angle/skew sliders, step buttons, table selection |
 | `qt_view3d.py` | Qt 3D tab (pyvistaqt): picking, section, camera presets |
 | `qt_views2d.py` | Qt Ray Tracing and Delays tabs (pyqtgraph): dragged focus, linked element selection |
 | `scene_vtk.py` | PyVista renderer of the scene model; off-screen rendering for tests and exports |
-| `panels.py` | Input panels (Probe, Wedge, Material, Scan, SubAperture) |
-| `plotting.py` | Ray tracing, 3D view and delay GUI panels |
-| `scene.py` | Toolkit-independent scene drawing (2D projections, 3D scene, aperture delay maps) shared by the GUI and scripts |
+| `scene.py` | Toolkit-independent scene drawing (2D projections, 3D scene, aperture delay maps) used by the scripts; its colours by the window |
 | `catalog.py` | buildFE / nde-knowledge catalogue reader, buildFE content hash, frame mapping |
-| `catalog_dialog.py` | Catalogue entry picker |
 | `materials.json` | Built-in material velocity database |
 | `verify_delays.py` | Standalone verification script |
 

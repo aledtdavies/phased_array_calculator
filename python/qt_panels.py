@@ -1,9 +1,9 @@
 """
 Qt input panels: probe, wedge, component, scan and sub-aperture settings.
 
-Same keys, units, defaults and visibility rules as the Tk panels (panels.py), so a configuration
-saved by either window loads in the other. Numbers are typed text, read exactly (no spin-box
-rounding); a field that is not a number is refused by name when its panel is read.
+Same keys, units, defaults and visibility rules as the retired Tk panels, so a configuration
+saved by the Tk window loads here unchanged (tests/fixtures/tk_saved_configs.json). Numbers
+are typed text, read exactly (no spin-box rounding); a field that is not a number is refused by name when its panel is read.
 """
 from __future__ import annotations
 
