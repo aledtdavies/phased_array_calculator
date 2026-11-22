@@ -20,13 +20,10 @@ in the same pull request, or be recorded as a known gap. Nothing should drift un
    - desktop: `qt_views2d.py`, `scene_vtk.py`;
    - browser: `web/views.js`, `web/view3d.js`.
 
-   This pull request moved the 3D view's framing and section plane into `scene_model`
-   (`scene_bounds`, `section_y`), and both 3D views use them. The solids are shared only in part:
-   - the browser fills them from `solid_prims` and `triangulate_polygon`;
-   - the desktop still extrudes the same outlines itself, with PyVista;
-   - `test_parity.py` checks that the colours and opacities match.
-
-   Moving the desktop onto `solid_prims` is a small follow-on, listed under known differences.
+   The 3D view's framing, section plane and solids are in `scene_model` (`scene_bounds`,
+   `section_y`, `solid_prims`, `triangulate_polygon`), and both 3D views draw from them: each
+   solid is the same cross-section, triangles and extent in both (`scene_vtk.solid_mesh` and
+   `web/view3d.js` build the same closed body).
 3. **Thin front ends.** Desktop and browser code (`qt_*.py`, `web/app.js`) handles only inputs,
    layout and events. When both need the same logic, it moves down into `python/`, as was done for:
    - the scan and the law table: `session.py`;
@@ -75,7 +72,6 @@ only if one is added, and `test_parity` says so. For JavaScript, the risk is pag
 | **Place focus** (browser only) | Dragging a small handle is awkward on a touch screen; tapping is not | Could be added to the desktop if wanted |
 | Catalogue **Usable only** box | The browser always lists unusable entries greyed, with the reason, and they cannot be chosen | None needed |
 | **Beam-field progress and Cancel** | The desktop computes in a thread with a progress bar and a Cancel button. The browser waits, which takes seconds for 2D and up to minutes for a 3D field of a matrix probe. | Next: compute in chunks and report progress; cancel by restarting the worker |
-| **Desktop 3D solids not yet from `solid_prims`** | The desktop extrudes the wedge, component and weld outlines itself (same outlines, same extents) | Follow-on: `scene_vtk.add_setup` draws `solid_prims` |
 | **Look of the 3D view** | Plotly's WebGL, not VTK: lighting, legend and axis styling differ | None needed: the geometry, colours, presets and section are the same and tested |
 | **Speed** | Python in the browser runs about 1.2 to 3 times slower than on the desktop. The first visit downloads about 30 MB, about 20 s to start. | Measured in `PLAN-2026-11-web-app.md` |
 
