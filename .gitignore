@@ -18,3 +18,4 @@ focal_laws*.csv
 visual_check.png
 curvature_check.png
 validation/beam_field/out/
+site/
