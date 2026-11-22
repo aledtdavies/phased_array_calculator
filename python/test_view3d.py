@@ -298,3 +298,38 @@ class WeldRendering(unittest.TestCase):
                                            delta=1e-6 * abs(polygon_area(prof.polygon)))
                 finally:
                     pl.close()
+
+
+@unittest.skipUnless(HAVE_PV, "pyvista not available")
+class SharedSolids(unittest.TestCase):
+    """The desktop draws scene_model.solid_prims' solids (as the browser does): closed bodies with
+    each solid's cross-section and extent."""
+
+    def test_the_desktop_draws_the_shared_solids(self):
+        from scene_model import solid_prims, weld_prims
+        from scene_vtk import add_setup, solid_mesh
+        from weld import polygon_area, split_lobes, template_profile
+        solver = build_solver({"probe_type": "Linear", "num_elements": 32, "pitch_mm": 0.6, "freq_mhz": 5},
+                              {"angle_deg": 36, "height_mm": 10, "velocity_ms": 2330, "offset_mm": 0},
+                              dict(MAT, thickness_mm=25), {"start_element": 1, "num_active_elements": 0})
+        c = calculate(solver, dict(SV, wave_type="Shear", param_val=15), "Linear")
+        scene = build_scene(solver, lambda i: None, [], sweep_focal_mm=np.asarray(c.focal_points) * 1e3)
+        prof = template_profile("double-V", 25, 40, bevel_deg=30, root_gap_mm=0, root_face_mm=0)   # two lobes
+        scene.prims += weld_prims(prof)
+        solids = solid_prims(scene, 25.0, split_lobes)
+        pl = pv.Plotter(off_screen=True, window_size=(200, 150))
+        try:
+            add_setup(pl, scene, 25.0)
+            for role in ("component", "wedge", "weld"):
+                with self.subTest(role):
+                    mine = [s for s in solids if s["role"] == role]
+                    body = pl.actors[f"setup:{role}"].mapper.dataset
+                    for sd in mine:                       # each closed (a pinched weld's lobes touch on a line)
+                        self.assertEqual(solid_mesh(sd).clean().n_open_edges, 0, "a closed body")
+                    want = sum(abs(polygon_area(s["xz"])) * (s["y1"] - s["y0"]) for s in mine)
+                    self.assertAlmostEqual(body.triangulate().volume, want, delta=1e-6 * want)
+                    b = body.bounds
+                    self.assertAlmostEqual(b[2], min(s["y0"] for s in mine))
+                    self.assertAlmostEqual(b[3], max(s["y1"] for s in mine))
+        finally:
+            pl.close()
