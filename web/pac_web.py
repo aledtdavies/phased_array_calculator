@@ -235,6 +235,9 @@ def calc(arg):
         frame.append(np.asarray(c.focal_points) * 1e3)
     if _state["coverage"] is not None:
         frame += [np.asarray(p) * 1e3 for p in _state["coverage"].paths]
+    if _state["weld"] is not None:                   # the weld is drawn: frame it too (X-Z, Y = 0)
+        poly = np.asarray(_state["weld"].polygon, dtype=float)
+        frame.append(np.column_stack([poly[:, 0], np.zeros(len(poly)), poly[:, 1]]))
     frame = np.vstack(frame)
     return _out({
         "headings": list(TABLE_HEADINGS),

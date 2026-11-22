@@ -198,7 +198,13 @@ async function configDict() {
   if (S.ready) { const refs = await call("catalog_status", { probe: v.probe, wedge: v.wedge }); if (Object.keys(refs).length) config.catalog = refs; }
   return config;
 }
+// Loading a configuration changes inputs: it waits for (and is refused during) a request, and
+// counts as an edit, so a calculation finishing later cannot present its laws as current.
 async function applyConfig(config) {
+  if (!(await exclusive(() => applyConfigNow(config)))) throw new Error("Wait for the calculation to finish, then open the file again.");
+}
+async function applyConfigNow(config) {
+  S.edits++;
   for (const sec of ["probe", "wedge", "material", "scan", "sub_aperture"]) if (config[sec]) setValues(sec, config[sec]);
   setValues("weld", config.weld || { type: "None" });
   setValues("beam_field", config.beam_field || FIELD_DEFAULTS());
@@ -459,11 +465,15 @@ async function cataloguePicker(kind, name) {
         if (e.usable) row.onclick = async () => {
           closeModal();
           try {
-            const a = await call("catalog_apply", { kind, id: e.id });
-            setValues(kind, a.values);
-            if (kind === "wedge") W["wedge._material"].input.value = "Custom";
-            setValues("beam_field", a.field);
-            changed(kind, "");
+            let a;
+            const ok = await exclusive(async () => {
+              a = await call("catalog_apply", { kind, id: e.id });
+              setValues(kind, a.values);
+              if (kind === "wedge") W["wedge._material"].input.value = "Custom";
+              setValues("beam_field", a.field);
+              changed(kind, "");                     // counts as an edit; marks laws and field out of date
+            });
+            if (!ok) { toast("Wait for the calculation to finish, then choose the entry again.", true); return; }
             modal(`Catalogue ${kind}: ${a.id}`, Object.assign(document.createElement("pre"), { textContent: a.message, style: "white-space:pre-wrap;margin:0" }));
           } catch (err) { toast(err.message, true); }
         };

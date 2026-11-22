@@ -116,6 +116,19 @@ class TestWebLayer(unittest.TestCase):
         self.assertIn("DXF", bad["notes"]["weld_error"])
         self.assertTrue(bad["laws"])
 
+    def test_the_initial_frame_holds_the_weld(self):
+        """Review of PR #39: a weld away from the foci was outside the initial view."""
+        c0 = cfg(probe={"probe_type": "Linear", "num_elements": 16, "pitch_mm": 0.6, "freq_mhz": 5},
+                 sub_aperture={"start_element": 1, "num_active_elements": 0},
+                 scan={"wave_type": "Shear", "focus_mode": "Constant Depth", "param_val": 20,
+                       "start_angle": 40, "end_angle": 45, "step_angle": 5},
+                 weld={"type": "Single-V", "centre_x_mm": 65, "bevel_deg": 30, "root_gap_mm": 2, "root_face_mm": 1.5})
+        r = call("calc", c0)
+        weld = [p for p in r["setup"] if p["role"] == "weld"][0]
+        xs = [c[0] for c in weld["coords"]]
+        self.assertLessEqual(r["frame"]["lo"][0], min(xs) + 1e-3)       # coordinates are rounded to 0.001 mm
+        self.assertGreaterEqual(r["frame"]["hi"][0], max(xs) - 1e-3)
+
     def test_a_dragged_focus_is_solved_and_refused_above_the_surface(self):
         call("calc", cfg())
         r = call("custom", {"x": 30, "z": 18, "from_law": 1})
