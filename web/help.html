@@ -3,101 +3,151 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Phased Array Focal Law Calculator: browser version, help</title>
+<title>Focal Law Calculator: help</title>
 <style>
-  body { font-family: "Segoe UI", Arial, sans-serif; max-width: 860px; margin: 2em auto; padding: 0 1.2em;
-         color: #1e293b; line-height: 1.5; }
-  h1 { font-size: 1.6em; margin-bottom: 0.2em; } h2 { font-size: 1.2em; margin-top: 1.8em; border-bottom: 2px solid #e2e8f0; }
+  body { font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; max-width: 860px; margin: 0 auto;
+         padding: 1.2em; color: #0f172a; }
+  h1 { font-size: 1.6em; margin: .2em 0; } h2 { font-size: 1.2em; margin-top: 1.8em; border-bottom: 2px solid #e2e8f0; padding-bottom: .2em; }
+  h3 { font-size: 1.02em; margin: 1.2em 0 .3em; }
   .sub { color: #64748b; margin-top: 0; }
-  table { border-collapse: collapse; width: 100%; margin: 0.6em 0; }
-  th, td { border: 1px solid #cbd5e1; padding: 0.3em 0.6em; text-align: left; vertical-align: top; }
+  table { border-collapse: collapse; width: 100%; margin: .6em 0; font-size: .95em; }
+  th, td { border: 1px solid #cbd5e1; padding: .35em .6em; text-align: left; vertical-align: top; }
   th { background: #f1f5f9; }
-  code { background: #f1f5f9; padding: 0 0.25em; border-radius: 3px; }
-  .box { background: #f0fdf4; border: 1px solid #bbf7d0; padding: 0.6em 1em; border-radius: 4px; }
+  code { background: #f1f5f9; padding: 0 .25em; border-radius: 3px; }
+  .box { background: #f0fdf4; border: 1px solid #bbf7d0; padding: .7em 1em; border-radius: 8px; }
+  a { color: #1d4ed8; }
 </style>
 </head>
 <body>
-<h1>Phased Array Focal Law Calculator in the browser</h1>
-<p class="sub">Help for the browser version. <a href="./">Open the calculator</a></p>
+<h1>Focal Law Calculator in the browser</h1>
+<p class="sub">Help. <a href="./">Open the calculator</a></p>
 
 <div class="box">
-<b>Nothing to install.</b> The page runs the calculator's own Python inside your browser
-(through <a href="https://pyodide.org">Pyodide</a>). <b>Nothing you type leaves your computer</b>: the website only
-supplies the program's files, and all the calculation happens on your machine.
+<b>Nothing to install, nothing sent.</b> The page runs the calculator's own Python inside your browser (through
+<a href="https://pyodide.org">Pyodide</a>): the same code as the desktop calculator. The website only supplies the
+program's files; the files you open (configurations, catalogues, DXF drawings) are read in your browser, and what you
+save is downloaded from it. <b>Nothing you enter leaves your device.</b>
 </div>
 
 <h2>Opening it</h2>
 <ul>
-  <li>Use a current <b>Microsoft Edge</b>, <b>Google Chrome</b> or <b>Firefox</b>.</li>
-  <li><b>The first visit takes about 20 seconds</b> while the browser downloads and starts Python (about 30 MB). The
-      status line under the buttons says <i>Ready</i> when it is done. Later visits are usually quicker, because the
-      browser keeps the files.</li>
-  <li>It works only from the website. A copy of the files opened from a drive (<code>file://</code>) will not start;
-      browsers do not allow it.</li>
+  <li>Use a current <b>Edge</b>, <b>Chrome</b>, <b>Safari</b> or <b>Firefox</b>, on a computer, tablet or phone.</li>
+  <li><b>The first visit takes about 20 seconds</b> while the browser downloads and starts Python (about 30 MB; less
+      on later visits, which use the browser's cache). The line under <b>Calculate laws</b> says <i>Ready</i> when done.</li>
+  <li>It works only from the website. A copy of the files opened from a drive (<code>file://</code>) will not start.</li>
 </ul>
 
-<h2>Using it</h2>
-<ol>
-  <li><b>Set up the probe, aperture, wedge, component and scan</b> on the left. The defaults are the Evident
-      2.25L64-A2 probe on an SA2-N55S wedge, elements 1&ndash;32, in steel. Lengths are in mm, speeds in m/s.
-      <ul>
-        <li><b>Height at el. 1</b> is the height of element 1's centre above the wedge's contact face.</li>
-        <li><b>Offset X el. 1</b> is element 1's X position.</li>
-        <li><b>Depth / path / X</b> is the focal depth, the sound path or the vertical line's X, depending on <b>Focus</b>.</li>
-      </ul></li>
-  <li>Press <b>Calculate laws</b>. The table lists every law: its angle, focus and delay range. A law that cannot
-      be made (beyond a critical angle, or a focus above the surface) is listed with its reason instead of numbers.</li>
-  <li><b>Choose a law</b> with the slider or by clicking its row. The <b>Ray tracing X-Z</b> view shows the
-      elements (red: active), rays to the focus (+) and the other laws' foci (light blue). <b>Delays</b> shows each
-      active element's delay in microseconds.</li>
-  <li>Press <b>Beam field</b> for the selected law's beam in the component: a map in dB below its strongest point,
-      0 to &minus;30 dB, with the &minus;6 dB contour in white.
-      <ul>
-        <li><b>Pulse:</b> a Hann burst of <b>Cycles</b> (whole cycles, 2 or more), or <b>Continuous wave</b>, which is faster.</li>
-        <li><b>Grid:</b> the map's spacing. A large area is coarsened automatically to 40&nbsp;000 points.</li>
-        <li>It takes a few seconds; the page waits while it computes.</li>
-      </ul></li>
-  <li>If you change an input, the laws or the map no longer match it. The map fades and says it is <b>stale</b>;
-      press <b>Calculate laws</b> (for setup changes) or <b>Beam field</b> again.</li>
-</ol>
-
-<h2>The beam field: what it is and is not</h2>
-<p>A ray model of the <b>direct</b> beam through a <b>bonded</b> wedge: each element's directivity, transmission
-into the component, and beam spread, added with the law's delays. It leaves out reflections (back wall,
-surface), mode conversion, attenuation and a couplant layer. It was checked against a finite-element solve
-(a 45&deg; shear beam: angle within 0.4&deg;, width within 0.6&nbsp;%); other cases are not yet checked. Use it for
-where the beam goes and how wide it is, not for absolute amplitudes.
-<a href="docs/beam_field_model.html">The full model note</a> says how it is computed and where it can be trusted.</p>
-
-<h2>What the browser version does not do yet</h2>
-<p>It is a first version. Use the desktop window (or ask) for:</p>
+<h2>Layout</h2>
 <ul>
-  <li>matrix and dual probes, skew and Y sweeps, roof angles;</li>
-  <li>opening probe and wedge catalogues;</li>
-  <li>saving or loading configurations, and CSV export of the laws;</li>
-  <li>coverage fans and skips, welds and DXF files;</li>
-  <li>the 3D view and the 3D beam field.</li>
+  <li><b>Setup</b> holds the inputs, in sections you open and close: Probe, Wedge, Component, Scan, Active aperture,
+      Weld and Beam field. On a wide screen it is on the left. On a phone it slides in from the <b>&#9776;</b> button
+      and closes after you press <b>Calculate laws</b>.</li>
+  <li><b>Tabs</b>: Rays, Laws, Delays and Beam field.</li>
+  <li><b>The law bar</b> at the bottom: &#9664; &#9654; step through every law, the <b>Angle</b> slider (and
+      <b>Skew</b> for matrix probes) picks one, &#9655; plays the sweep.</li>
+  <li><b>File</b> (top right): open and save configurations, load a probe or wedge from a catalogue, export the laws or
+      the element coordinates.</li>
+  <li>Plots: drag to pan, scroll or pinch to zoom, double-click (double-tap) to reset.</li>
 </ul>
+
+<h2>Setup</h2>
+<p>The inputs are the desktop calculator's, with the same names, units and rules (lengths in mm, speeds in m/s). Fields
+appear only when they apply: the passive (Y) elements and pitch, the skew range, Y focus modes and element order for
+<b>matrix</b> probes; the array separation and roof angle for <b>dual</b> probes; each weld type's own dimensions.</p>
+<ul>
+  <li><b>Material</b> (wedge and component) fills the speeds from a short list; choose Custom to type your own.</li>
+  <li><b>Height at el. 1</b> is the height of element 1's centre above the contact face; <b>Probe offset X</b> is
+      element 1's X position.</li>
+  <li><b>Scan</b>: the focus type sets the meaning of the last field (target depth, the vertical line's X, or the
+      focal distance along the beam). Matrix probes add skew and the Y focus mode (from skew, a fixed Y, or a Y sweep);
+      a fixed Y is not offered with a constant sound path.</li>
+  <li><b>Active aperture</b>: the first element and how many (0 = all); for matrix probes, whether element numbers run
+      column-first or row-first.</li>
+  <li><b>Weld</b>: none, a Single-V, Double-V or Single-J preparation, or a <b>DXF file</b> of the weld's
+      cross-section (x = 0 at the weld centreline, y up; say whether y = 0 is the surface or the backwall; units from
+      the file or set here; a layer name when the file holds more than one outline). The component Thickness must be
+      set. A DXF file is read in your browser; the first one takes a few extra seconds while the DXF reader loads.</li>
+  <li><b>Beam field</b>: the inputs for the Beam field tab (see below).</li>
+</ul>
+<p>If you change an input after calculating, press <b>Calculate laws</b> again; the views and a computed beam field
+are marked out of date until you do.</p>
+
+<h2>The tabs</h2>
+<h3>Rays</h3>
+<ul>
+  <li>The <b>X-Z</b> section (and <b>Y-Z</b> for matrix and dual probes): wedge, elements (red active, grey inactive;
+      Tx blue and Rx red for dual probes), the selected law's rays and interface points, its focus (red +) and every
+      law's focus (light blue).</li>
+  <li><b>Move the focus</b>: drag the red circle on the X-Z view, or press <b>Place focus</b> and tap where the focus
+      should be (easier on a phone). The law for that point is solved and shown everywhere; it is not added to the table
+      or the CSV. The sliders, steps or a table row return to the sweep.</li>
+  <li><b>Tap an element</b> for its number, delay and time of flight (also shown in Delays).</li>
+  <li><b>Coverage</b>: the sweep's central rays through a flat plate of the component Thickness with skips (Direct,
+      + 1st skip, + 2 skips), drawn as fans, and the current law's central ray dashed. Each reflection keeps the wave
+      mode and only central rays are shown, not the beam's spread. With a weld, its fusion faces are green where a fan
+      reaches them and red at gaps, and the note under the plot gives the share covered.</li>
+  <li><b>Show all laws</b> overlays every law's outer rays, coloured by angle.</li>
+</ul>
+<h3>Laws</h3>
+<p>Every law: angle, skew, focus (X, Y, Z) and its delay range. A law that cannot be made (beyond a critical angle, a
+focus above the surface, a beam parallel to the target line, a Y out of reach) is listed with its reason. Tap a row to
+show that law.</p>
+<h3>Delays</h3>
+<p>Each element's delay for the law shown: bars for linear and dual linear probes (inactive elements marked &times;), a
+map per array for matrix probes. Tap a bar or cell for that element.</p>
+<h3>Beam field</h3>
+<p>Press <b>Compute beam field</b> for the beam of the law shown (or of a moved focus), as a map in dB below its
+strongest point (0 to &minus;30 dB) with the &minus;6 dB contour in white, the focus (+) and the fitted beam axis.</p>
+<ul>
+  <li><b>Model</b>: <b>2D</b> treats each element as an infinitely long strip and maps the X-Z section (single linear
+      arrays). <b>3D</b> uses each element's width and elevation and also maps the Y-Z section through the focus.</li>
+  <li><b>Pulse</b>: a Hann burst of whole <b>Cycles</b> (2 or more), or a continuous wave (faster).
+      <b>Grid</b>: the map spacing; large areas are coarsened automatically.</li>
+  <li><b>Element width</b>, <b>Elevation</b>, the wedge's <b>S-wave</b> speed and <b>density</b>, and the
+      <b>component density</b> are filled from a catalogue when the probe or wedge comes from one.</li>
+  <li>It takes a few seconds (a 3D map longer); the page waits while it computes.</li>
+</ul>
+<p><b>What the beam field is and is not.</b> A ray model of the <b>direct</b> beam through a <b>bonded</b> wedge: each
+element's directivity, transmission into the component and beam spread, added with the law's delays. It leaves out
+reflections, mode conversion, attenuation and a couplant layer. Checked against a finite-element solve for a 45&deg;
+shear beam (angle within 0.4&deg;, width within 0.6&nbsp;%); other cases, and the 3D mode, are not yet checked. Use it
+for where the beam goes and how wide it is, not for absolute amplitudes.
+<a href="docs/beam_field_model.html">The model note</a> explains it in full.</p>
+
+<h2>Files</h2>
+<table>
+<tr><th>File menu</th><th>What it does</th></tr>
+<tr><td>Open / Save configuration</td><td>The desktop calculator's configuration files (JSON): a file saved here opens in the
+    desktop calculator and the other way round. Catalogue references travel with it. A DXF weld's file is not stored in
+    the configuration: open it again (Setup &gt; Weld) after loading.</td></tr>
+<tr><td>Load probe / wedge from catalogue</td><td>Open a buildFE or nde-knowledge catalogue file (JSON), pick an entry; its values
+    fill the panels and a summary says what came from where and what is missing.</td></tr>
+<tr><td>Export laws (CSV)</td><td>The focal-law CSV, as the desktop calculator writes it: one row per law, each element's delay
+    in &micro;s.</td></tr>
+<tr><td>Export element coordinates</td><td>The elements' global coordinates (mm) as CSV, a MATLAB script or a MAT file.</td></tr>
+</table>
+
+<h2>Not yet in the browser</h2>
+<p>The <b>3D view</b> (the setup and beam in 3D) is the next addition. Everything else in the desktop calculator is
+here.</p>
 
 <h2>If it does not work</h2>
 <table>
 <tr><th>What you see</th><th>Likely cause</th><th>What to do</th></tr>
-<tr><td>Stuck on <i>Loading Python in the browser&hellip;</i></td>
+<tr><td>Stuck on <i>Starting Python&hellip;</i></td>
     <td>The download is slow or blocked, or the browser is old</td>
-    <td>Wait a minute on a slow network; reload. Try Edge or Chrome. If it never loads at work, the network may block
-        the site: tell the owner, who can host it on the work network instead.</td></tr>
+    <td>Wait a minute on a slow connection, then reload. Try another current browser. If it never loads at work, the
+        network may block the site: tell the owner, who can host it on the work network instead.</td></tr>
 <tr><td><i>Could not start Python: &hellip;</i></td>
-    <td>Usually the browser's policy disables WebAssembly, or the page was opened from a drive</td>
-    <td>Open it from the website address. If the message mentions WebAssembly, the browser policy blocks it:
-        tell the owner.</td></tr>
-<tr><td><i>Error: &hellip;</i> after Calculate</td><td>An input the calculation refuses (for example a speed of 0)</td>
-    <td>Read the message; it names the problem. Correct the input and calculate again.</td></tr>
+    <td>Usually the browser's policy blocks WebAssembly, or the page was opened from a drive</td>
+    <td>Open it from the website address. If it mentions WebAssembly, the browser policy blocks it: tell the owner.</td></tr>
+<tr><td><i>Not a number: &hellip;</i> or <i>Error: &hellip;</i></td><td>An input the calculation refuses</td>
+    <td>The message names it, and the field turns red. Correct it and calculate again.</td></tr>
 </table>
 
 <h2>About</h2>
-<p>The browser version uses the same calculation code as the desktop calculator. Source code, desktop
-version and documentation are in the project's repository,
-<a href="https://github.com/aledtdavies/phased_array_calculator">github.com/aledtdavies/phased_array_calculator</a>. Third-party code and licences are listed in
-<a href="THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a>.</p>
+<p>Source code, the desktop calculator and documentation:
+<a href="https://github.com/aledtdavies/phased_array_calculator">github.com/aledtdavies/phased_array_calculator</a>.
+Third-party software and licences: <a href="THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a>.</p>
 </body>
 </html>

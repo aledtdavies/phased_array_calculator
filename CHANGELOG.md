@@ -1,5 +1,19 @@
 # Changelog
 
+## Browser version: full functionality, phones, new look — 2026-11-22
+
+- **Every desktop feature except the 3D view:**
+  - linear, matrix, dual linear and dual matrix probes, with skew, Y focus modes, roof and element order;
+  - coverage fans and skips, and welds (templates and DXF, with fusion-face gaps);
+  - Show all laws, Play, the dragged focus (drag, or tap with "Place focus"), and element picking in rays and delays;
+  - delay bars and per-array delay maps, and the beam field in 2D or 3D sections;
+  - configurations (the desktop's file format, both ways), probe and wedge catalogues, laws CSV and element coordinates (CSV, .m, .mat).
+- **One source of truth:** the views draw the desktop's own scene primitives (`scene_model.py`). The panels (`web/panels.json`) carry the desktop's fields, defaults and rules, and `test_web.py` checks the defaults. The beam field runs the desktop's job, now in a Qt-free `python/field_job.py` that `qt_field.py` also uses.
+- **Layout:** responsive. On a phone the setup slides in and the views fill the screen; on wider screens the setup is a side panel. The charts are Plotly (`vendor/plotly.min.js`, MIT), which pan and zoom by touch.
+- **DXF in the browser:** the site ships the ezdxf wheel (SHA-256 checked at build) and Pyodide's micropip, pyparsing, typing-extensions and fonttools.
+- **Tests:** `test_web.py` gives the desktop's tables and delays on every shared scan case, the desktop's CSV, and the desktop's beam field.
+- **Notices:** `THIRD_PARTY_NOTICES.md` lists the browser version's third-party files and licences.
+
 ## Browser version published on GitHub Pages — 2026-11-22
 
 - Published at <https://aledtdavies.github.io/phased_array_calculator/>; the `pages` workflow publishes every merge to `main` (owner, 2026-11-22).

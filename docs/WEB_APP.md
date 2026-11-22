@@ -10,9 +10,10 @@ The plan, the measurements and the comparison of hosting options are in
 
 ## For colleagues
 
-Send them the address. They need a current Edge, Chrome or Firefox and nothing else; the first
-visit takes about 20 s to start. The Help link on the page covers using it and what to do if it
-does not start.
+Send them the address. They need a current browser (Edge, Chrome, Safari or Firefox; phones and
+tablets work too) and nothing else; the first visit takes about 20 s to start. The Help link on the
+page covers using it and what to do if it does not start. It has the desktop window's inputs, tabs
+and files, except the 3D view.
 
 ## Publishing (GitHub Pages)
 

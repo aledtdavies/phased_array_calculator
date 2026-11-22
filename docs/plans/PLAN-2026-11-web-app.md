@@ -103,7 +103,11 @@ the worker and fetch the modules from local files, so the site has to be served 
 - **The network:** whether `github.io` (or Netlify) is reachable from work. UNKNOWN until tried.
   The work-server route avoids the question.
 
-## Steps (proposed; each needs the owner's go-ahead)
+## Steps
+
+**Status 2026-11-22:** step 1 published on GitHub Pages (owner's choice); steps 2 and 3 done
+(owner: "be nice if it worked on mobile, looked a bit nicer and had full functionality"); step 4 next.
+The work-laptop check of step 1 is still the owner's to make.
 
 1. **Publish the prototype** on the chosen host and try it on a work laptop.
    - **Finish:** the page loads on a work laptop with nothing installed, and the timings are
@@ -118,10 +122,17 @@ the worker and fetch the modules from local files, so the site has to be served 
    - welds from templates.
    - **Finish:** the browser's law tables equal the desktop's on the shared scan cases (a test,
      like `test_web.py`), and every item works on a work laptop.
+   - **Done 2026-11-22** (except the work-laptop check): `test_web.py` gives the desktop's table and
+     delays on every case of `test_qt_gui.SCAN_CASES` (linear, matrix with skew, Y sweeps, refusals);
+     the views draw the desktop's own scene primitives (`scene_model.py`); configurations save and
+     reload unchanged in the browser; layout for phones (setup slides in) and wider screens.
 3. **DXF welds:** ezdxf 1.4.5 has a pure-Python wheel (`py3-none-any`), and so do its
    dependencies, so Pyodide can install it; the self-contained build would copy it in.
    Expected, not yet tried.
    - **Finish:** a DXF weld opened in the browser equals the desktop's profile to 0.01 mm.
+   - **Done 2026-11-22:** in the browser, the single-V drawn as a DXF gives the template's fusion
+     result exactly (80 % covered, gaps 11.2 mm of 57.3 mm), through `weld.dxf_profile` itself
+     (the desktop's code); the first DXF loads ezdxf in a few seconds.
 4. **3D view** in the browser (three.js or vtk.js) and the 3D beam field (continuous wave).
    - **Finish:** the 3D scene's items and the field sections match the desktop's.
 5. **Decide the desktop window's future** once the browser version is in use. The library stays
