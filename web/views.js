@@ -272,6 +272,24 @@ function drawField(div, sec, focus, metrics, dim) {
   return Plotly.react(div, traces, layout, PLOT_CONFIG);
 }
 
+// After a focus moves: widen (never narrow) a projection so the law's rays and focus lie at least
+// `margin` of the view's size inside its edges; a view that already shows them is left alone
+// (the desktop's reframe_law). Returns true if the view changed.
+function ensureVisible(div, dim, prims, margin = 0.1) {
+  const fl = div._fullLayout; if (!fl || !fl.xaxis || !prims) return Promise.resolve(false);
+  const hs = [], zs = [];
+  for (const p of prims) for (const c of p.coords) { hs.push(c[dim]); zs.push(c[2]); }
+  if (!hs.length) return Promise.resolve(false);
+  const lo = [Math.min(...hs), Math.min(...zs)], hi = [Math.max(...hs), Math.max(...zs)];
+  let [x0, x1] = fl.xaxis.range, [zb, zt] = fl.yaxis.range;       // y reversed: [bottom (deep), top]
+  const z0 = Math.min(zb, zt), z1 = Math.max(zb, zt);
+  const mx = margin * (x1 - x0), mz = margin * (z1 - z0);
+  if (lo[0] >= x0 + mx && hi[0] <= x1 - mx && lo[1] >= z0 + mz && hi[1] <= z1 - mz) return Promise.resolve(false);
+  const nx0 = Math.min(x0, lo[0] - 2 * mx), nx1 = Math.max(x1, hi[0] + 2 * mx);
+  const nz0 = Math.min(z0, lo[1] - 2 * mz), nz1 = Math.max(z1, hi[1] + 2 * mz);
+  return Plotly.relayout(div, { "xaxis.range": [nx0, nx1], "yaxis.range": [nz1, nz0] }).then(() => true);
+}
+
 // Pixel position on a Plotly 2D plot -> data coordinates (for tap-to-place on touch screens).
 function plotToData(div, clientX, clientY) {
   const fl = div._fullLayout; if (!fl || !fl.xaxis) return null;
@@ -281,4 +299,4 @@ function plotToData(div, clientX, clientY) {
   return [xa.p2l(px), ya.p2l(py)];
 }
 
-window.PacViews = { drawProjection, drawDelays, drawField, plotToData, COLOURS };
+window.PacViews = { drawProjection, drawDelays, drawField, plotToData, ensureVisible, COLOURS };

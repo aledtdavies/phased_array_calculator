@@ -322,7 +322,15 @@ async function loadCustom(x, z) {
     status("Dragged focus: the table and CSV are unchanged; a slider or table row returns to the sweep.");
     await refreshPick();
   } catch (e) { toast("No law for that focus: " + e.message, true); }
-  drawLawViews();
+  await drawLawViews();
+  // the views widen to keep the moved focus and its rays in sight (as the desktop on release)
+  if (S.custom && S.law) {
+    drawingLaw = true;
+    try {
+      await V.ensureVisible($("plotXZ"), 0, S.law.prims);
+      if (!$("plotYZ").hidden) await V.ensureVisible($("plotYZ"), 1, S.law.prims);
+    } finally { drawingLaw = false; }
+  }
 }
 
 function projectionData(dim) {
