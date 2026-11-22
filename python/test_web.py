@@ -129,6 +129,21 @@ class TestWebLayer(unittest.TestCase):
         self.assertLessEqual(r["frame"]["lo"][0], min(xs) + 1e-3)       # coordinates are rounded to 0.001 mm
         self.assertGreaterEqual(r["frame"]["hi"][0], max(xs) - 1e-3)
 
+    def test_the_initial_frame_holds_the_wedge_and_probe(self):
+        """Review of PR #39: a shallow single law framed the elements but clipped the wedge."""
+        with open(FIXTURE) as f:
+            base = json.load(f)["defaults"]
+        c0 = dict(base, scan=dict(base["scan"], wave_type="Shear", param_val=5, start_angle=40, end_angle=40))
+        r = call("calc", c0)
+        lo, hi = np.array(r["frame"]["lo"]), np.array(r["frame"]["hi"])
+        for p in r["setup"]:
+            if p["role"] in ("wedge", "probe-body"):
+                c = np.array(p["coords"])
+                self.assertTrue(np.all(c >= lo - 1e-3) and np.all(c <= hi + 1e-3), p["role"])
+                if "y0" in p["meta"]:
+                    self.assertLessEqual(lo[1], p["meta"]["y0"] + 1e-3)
+                    self.assertGreaterEqual(hi[1], p["meta"]["y1"] - 1e-3)
+
     def test_a_dragged_focus_is_solved_and_refused_above_the_surface(self):
         call("calc", cfg())
         r = call("custom", {"x": 30, "z": 18, "from_law": 1})
