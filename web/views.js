@@ -234,7 +234,7 @@ function drawDelays(div, probe, law, vmax, pick) {
     const ax = b === 0 ? "" : String(b + 1);
     traces.push({ type: "heatmap", z, text, customdata: cd, x: [...Array(probe.nx).keys()].map((k) => k + 1), y: [...Array(probe.ny).keys()].map((k) => k + 1),
                   colorscale: "Viridis", zmin: 0, zmax: vmax || 1, xaxis: "x" + ax, yaxis: "y" + ax, showscale: b === arrays - 1,
-                  colorbar: { title: { text: "µs" } }, hovertemplate: "%{text}<br>X %{x}, Y %{y}<br>%{z:.4f} µs<extra></extra>", hoverongaps: false });
+                  colorbar: { title: { text: "µs" } }, hovertemplate: "%{text}<br>X %{x}, Y %{y}<br>%{z:.4f} µs<extra></extra>", hoverongaps: true });   // inactive (empty) cells stay selectable
     const w = 1 / arrays;
     // fixed ranges, square cells: the axes shrink to fit ('domain') instead of widening their ranges
     layout["xaxis" + ax] = { domain: [b * w + 0.02, (b + 1) * w - 0.04], title: { text: `${names[b]}: X index` },
