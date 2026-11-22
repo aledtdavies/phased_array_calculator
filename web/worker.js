@@ -54,6 +54,7 @@ function ensureEzdxf() {
       const micropip = pyodide.pyimport("micropip");
       await micropip.install(new URL(EZDXF_WHEEL, self.location.href).href, { deps: false });
     })();
+    ezdxfReady.catch(() => { ezdxfReady = null; });   // a failed load is tried again next time
   }
   return ezdxfReady;
 }
