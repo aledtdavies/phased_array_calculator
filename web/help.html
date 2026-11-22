@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phased Array Focal Law Calculator: browser version, help</title>
+<style>
+  body { font-family: "Segoe UI", Arial, sans-serif; max-width: 860px; margin: 2em auto; padding: 0 1.2em;
+         color: #1e293b; line-height: 1.5; }
+  h1 { font-size: 1.6em; margin-bottom: 0.2em; } h2 { font-size: 1.2em; margin-top: 1.8em; border-bottom: 2px solid #e2e8f0; }
+  .sub { color: #64748b; margin-top: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 0.6em 0; }
+  th, td { border: 1px solid #cbd5e1; padding: 0.3em 0.6em; text-align: left; vertical-align: top; }
+  th { background: #f1f5f9; }
+  code { background: #f1f5f9; padding: 0 0.25em; border-radius: 3px; }
+  .box { background: #f0fdf4; border: 1px solid #bbf7d0; padding: 0.6em 1em; border-radius: 4px; }
+</style>
+</head>
+<body>
+<h1>Phased Array Focal Law Calculator in the browser</h1>
+<p class="sub">Help for the browser version. <a href="./">Open the calculator</a></p>
+
+<div class="box">
+<b>Nothing to install.</b> The page runs the calculator's own Python inside your browser
+(through <a href="https://pyodide.org">Pyodide</a>). <b>Nothing you type leaves your computer</b>: the website only
+supplies the program's files, and all the calculation happens on your machine.
+</div>
+
+<h2>Opening it</h2>
+<ul>
+  <li>Use a current <b>Microsoft Edge</b>, <b>Google Chrome</b> or <b>Firefox</b>.</li>
+  <li><b>The first visit takes about 20 seconds</b> while the browser downloads and starts Python (about 30 MB). The
+      status line under the buttons says <i>Ready</i> when it is done. Later visits are usually quicker, because the
+      browser keeps the files.</li>
+  <li>It works only from the website. A copy of the files opened from a drive (<code>file://</code>) will not start;
+      browsers do not allow it.</li>
+</ul>
+
+<h2>Using it</h2>
+<ol>
+  <li><b>Set up the probe, aperture, wedge, component and scan</b> on the left. The defaults are the Evident
+      2.25L64-A2 probe on an SA2-N55S wedge, elements 1&ndash;32, in steel. Lengths are in mm, speeds in m/s.
+      <ul>
+        <li><b>Height at el. 1</b> is the height of element 1's centre above the wedge's contact face.</li>
+        <li><b>Offset X el. 1</b> is element 1's X position.</li>
+        <li><b>Depth / path / X</b> is the focal depth, the sound path or the vertical line's X, depending on <b>Focus</b>.</li>
+      </ul></li>
+  <li>Press <b>Calculate laws</b>. The table lists every law: its angle, focus and delay range. A law that cannot
+      be made (beyond a critical angle, or a focus above the surface) is listed with its reason instead of numbers.</li>
+  <li><b>Choose a law</b> with the slider or by clicking its row. The <b>Ray tracing X-Z</b> view shows the
+      elements (red: active), rays to the focus (+) and the other laws' foci (light blue). <b>Delays</b> shows each
+      active element's delay in microseconds.</li>
+  <li>Press <b>Beam field</b> for the selected law's beam in the component: a map in dB below its strongest point,
+      0 to &minus;30 dB, with the &minus;6 dB contour in white.
+      <ul>
+        <li><b>Pulse:</b> a Hann burst of <b>Cycles</b> (whole cycles, 2 or more), or <b>Continuous wave</b>, which is faster.</li>
+        <li><b>Grid:</b> the map's spacing. A large area is coarsened automatically to 40&nbsp;000 points.</li>
+        <li>It takes a few seconds; the page waits while it computes.</li>
+      </ul></li>
+  <li>If you change an input, the laws or the map no longer match it. The map fades and says it is <b>stale</b>;
+      press <b>Calculate laws</b> (for setup changes) or <b>Beam field</b> again.</li>
+</ol>
+
+<h2>The beam field: what it is and is not</h2>
+<p>A ray model of the <b>direct</b> beam through a <b>bonded</b> wedge: each element's directivity, transmission
+into the component, and beam spread, added with the law's delays. It leaves out reflections (back wall,
+surface), mode conversion, attenuation and a couplant layer. It was checked against a finite-element solve
+(a 45&deg; shear beam: angle within 0.4&deg;, width within 0.6&nbsp;%); other cases are not yet checked. Use it for
+where the beam goes and how wide it is, not for absolute amplitudes.
+<a href="docs/beam_field_model.html">The full model note</a> says how it is computed and where it can be trusted.</p>
+
+<h2>What the browser version does not do yet</h2>
+<p>It is a first version. Use the desktop window (or ask) for:</p>
+<ul>
+  <li>matrix and dual probes, skew and Y sweeps, roof angles;</li>
+  <li>opening probe and wedge catalogues;</li>
+  <li>saving or loading configurations, and CSV export of the laws;</li>
+  <li>coverage fans and skips, welds and DXF files;</li>
+  <li>the 3D view and the 3D beam field.</li>
+</ul>
+
+<h2>If it does not work</h2>
+<table>
+<tr><th>What you see</th><th>Likely cause</th><th>What to do</th></tr>
+<tr><td>Stuck on <i>Loading Python in the browser&hellip;</i></td>
+    <td>The download is slow or blocked, or the browser is old</td>
+    <td>Wait a minute on a slow network; reload. Try Edge or Chrome. If it never loads at work, the network may block
+        the site: tell the owner, who can host it on the work network instead.</td></tr>
+<tr><td><i>Could not start Python: &hellip;</i></td>
+    <td>Usually the browser's policy disables WebAssembly, or the page was opened from a drive</td>
+    <td>Open it from the website address. If the message mentions WebAssembly, the browser policy blocks it:
+        tell the owner.</td></tr>
+<tr><td><i>Error: &hellip;</i> after Calculate</td><td>An input the calculation refuses (for example a speed of 0)</td>
+    <td>Read the message; it names the problem. Correct the input and calculate again.</td></tr>
+</table>
+
+<h2>About</h2>
+<p>The browser version uses the same calculation code as the desktop calculator. Source code, desktop
+version and documentation are in the project's repository,
+<a href="https://github.com/aledtdavies/phased_array_calculator">github.com/aledtdavies/phased_array_calculator</a>. Third-party code and licences are listed in
+<a href="THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a>.</p>
+</body>
+</html>

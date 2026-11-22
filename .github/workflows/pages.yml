@@ -1,10 +1,12 @@
-# GitHub Pages (plan: web app, hosting option). Manual for now: it publishes the browser
-# version to https://aledtdavies.github.io/phased_array_calculator/ once the owner has set
-# Settings > Pages > Source to "GitHub Actions". Change `on:` to `push: branches: [main]` to
-# publish every merge.
+# GitHub Pages: publishes the browser version to
+# https://aledtdavies.github.io/phased_array_calculator/ on every merge to main (owner,
+# 2026-11-22), and on demand (Actions > pages > Run workflow). Settings > Pages > Source is
+# "GitHub Actions". See docs/WEB_APP.md.
 name: pages
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
