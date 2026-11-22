@@ -50,6 +50,13 @@ Both **Python** (Qt GUI + importable library) and **MATLAB** (App Designer GUI +
 
 ## 2. Installation & Launch
 
+### In a browser (nothing to install)
+
+Open <https://aledtdavies.github.io/phased_array_calculator/> in Edge, Chrome or Firefox. The first
+visit takes about 20 s to start; the page's Help link explains the rest. The browser version is a
+first version: linear probes, laws, rays, delays and the 2D beam field. For everything else, use the
+desktop window below. Publishing and hosting on a work server: `docs/WEB_APP.md`.
+
 ### Python
 
 **Requirements:** Python 3.9+ and `python/requirements.txt` (numpy, scipy, matplotlib, PySide6, qtpy, pyvista, pyvistaqt, pyqtgraph, ezdxf)
