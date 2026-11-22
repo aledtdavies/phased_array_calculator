@@ -152,13 +152,27 @@ function drawScene3D(div, data) {
       traces.push(lineTrace([[pick.position, pick.interface, data.focus]], { color: COLOURS.pick, width: 6 }, { showlegend: false }));
   }
   // axes over the bounds; Y and Z plotted negated, so their ticks are labelled with the true values
+  // The view's extent: the setup's bounds (calc), widened to whatever the law shown and the field
+  // reach (a dragged focus, a 3D field's Y-Z section), padded as scene_model.scene_bounds pads.
+  const vlo = lo.slice(), vhi = hi.slice(), grew = [false, false, false];
+  const take = (q) => { for (let d = 0; d < 3; d++) { const v = q[d]; if (v === null || v === undefined || !isFinite(v)) continue;
+    if (v < vlo[d]) { vlo[d] = v; grew[d] = true; } if (v > vhi[d]) { vhi[d] = v; grew[d] = true; } } };
+  for (const p of law || []) for (const q of p.coords) take(q);
+  if (data.focus) take(data.focus);
+  if (pick) { take(pick.position); if (pick.interface) take(pick.interface); }
+  for (const s of field || []) {
+    const xz = s.name === "X-Z", h = [s.h[0], s.h[s.h.length - 1]], z = [s.z[0], s.z[s.z.length - 1]];
+    for (const hh of h) for (const zz of z) take(xz ? [hh, s.fixed[1], zz] : [s.fixed[1], hh, zz]);
+  }
+  for (let d = 0; d < 3; d++) if (grew[d]) { const pad = Math.max(2, 0.06 * (vhi[d] - vlo[d]));
+    if (vlo[d] < lo[d]) vlo[d] -= pad; if (vhi[d] > hi[d]) vhi[d] += pad; }
   const ax = (t, a, b, flip) => {
     const o = { title: { text: t }, range: flip ? [-b, -a] : [a, b], showbackground: false, gridcolor: "#e2e8f0", zeroline: false, tickfont: { size: 10 } };
     if (flip) { const v = niceTicks(a, b); o.tickvals = v.map((t) => -t); o.ticktext = v.map((t) => String(+t.toFixed(6))); }
     return o;
   };
-  const span = [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]], big = Math.max(...span);
-  const scene = { xaxis: ax("X (mm)", lo[0], hi[0]), yaxis: ax("Y (mm)", lo[1], hi[1], true), zaxis: ax("Z depth (mm)", lo[2], hi[2], true),
+  const span = [vhi[0] - vlo[0], vhi[1] - vlo[1], vhi[2] - vlo[2]], big = Math.max(...span);
+  const scene = { xaxis: ax("X (mm)", vlo[0], vhi[0]), yaxis: ax("Y (mm)", vlo[1], vhi[1], true), zaxis: ax("Z depth (mm)", vlo[2], vhi[2], true),
                   aspectmode: "manual", aspectratio: { x: 1.6 * span[0] / big, y: 1.6 * span[1] / big, z: 1.6 * span[2] / big },
                   dragmode: "turntable", uirevision: data.revision };
   if (narrow()) scene.domain = { x: [0, 1], y: [0, 1] };   // phones: the colour bar lies over the scene, not beside it
