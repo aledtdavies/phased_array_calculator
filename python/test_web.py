@@ -235,6 +235,18 @@ class TestBuild(unittest.TestCase):
                 build_web._check_destination(d)         # not empty, not a built site
             self.assertTrue(os.path.exists(precious))
 
+    def test_the_build_label_comes_from_the_environment_or_git(self):
+        import build_web
+        old = os.environ.get("PAC_BUILD")
+        try:
+            os.environ["PAC_BUILD"] = "abc1234 2026-11-22"
+            self.assertEqual(build_web.build_id(), "abc1234 2026-11-22")      # a Docker build (no .git)
+            del os.environ["PAC_BUILD"]
+            self.assertRegex(build_web.build_id(), r"^[0-9a-f]{7,} \d{4}-\d{2}-\d{2}")   # this checkout
+        finally:
+            if old is not None:
+                os.environ["PAC_BUILD"] = old
+
     def test_every_file_the_page_and_worker_load_is_shipped(self):
         import build_web
         worker = open(os.path.join(ROOT, "web", "worker.js"), encoding="utf-8").read()

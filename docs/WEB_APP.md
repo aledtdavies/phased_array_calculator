@@ -68,9 +68,12 @@ internet access once the site is built.
 On the server, with the repository checked out (the build needs internet access once):
 
 ```
-docker build -t pac-web -f docker/web.Dockerfile .
+docker build -t pac-web -f docker/web.Dockerfile --build-arg PAC_BUILD="$(git log -1 --format='%h %cs')" .
 docker run -d --name pac-web --restart unless-stopped -p 8080:80 pac-web
 ```
+
+`PAC_BUILD` is the commit the page shows under its status line, so users can tell which version
+they have. Without it the page shows no build.
 
 Then browse to `http://<server>:8080/`. The image is nginx with the self-contained site, and its
 content types are set and checked in CI (the `web` job of `headless.yml`). To update, pull the
