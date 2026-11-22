@@ -2,7 +2,8 @@
 // and draws the table, the X-Z ray view, the delays and the beam field. No libraries.
 "use strict";
 const $ = (id) => document.getElementById(id);
-const pyParam = new URL(location.href).searchParams.get("pyodide") || window.PAC_PYODIDE_BASE || "";
+// Where Pyodide comes from is set by the site's own config.js (build time), never by the page's URL.
+const pyParam = window.PAC_PYODIDE_BASE || "";
 const worker = new Worker("worker.js" + (pyParam ? "?pyodide=" + encodeURIComponent(pyParam) : ""), { type: "module" });
 let nextId = 0;
 const pending = new Map();
