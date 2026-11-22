@@ -21,6 +21,7 @@
     {"desktop": "◀", "kind": "button", "web": "id=\"prevLaw\""},
     {"desktop": "▶", "kind": "button", "web": "id=\"nextLaw\""},
     {"desktop": "...", "kind": "button", "web": "pickFile(", "note": "the DXF file chooser of the Weld panel"},
+    {"desktop": "qt_view3d.py: name", "kind": "dynamic", "web": "data-view=\"Top\"", "note": "one camera button per scene_vtk.VIEWS preset; test_parity compares the presets"},
 
     {"desktop": "Show All", "kind": "check", "web": "id=\"showAll\""},
     {"desktop": "Sweep focal points", "kind": "check", "web": "id=\"locus3d\""},

@@ -35,6 +35,8 @@ def desktop_controls():
         out |= {("tab", m) for m in re.findall(r'addTab\([^,]+,\s*"([^"]+)"', s)}
         out |= {("button", m) for m in re.findall(r'QPushButton\("([^"]+)"', s)}
         out |= {("check", m) for m in re.findall(r'QCheckBox\("([^"]+)"', s)}
+        # controls labelled from a variable (e.g. one button per camera preset): by file and argument
+        out |= {("dynamic", f"{name}: {m.strip()}") for m in re.findall(r'Q(?:PushButton|CheckBox)\(([^")][^)]*)\)', s)}
         out |= {("choice", m) for m in re.findall(r'add_combo\("([^"]+)"', s)}
         # a combo box laid out with a label: ("Label:", self.combo)
         for attr in re.findall(r'self\.(\w+) = QtWidgets\.QComboBox\(\)', s):
@@ -63,8 +65,12 @@ class TestRegister(unittest.TestCase):
 
     def test_registered_controls_still_exist_on_the_desktop(self):
         src = "\n".join(desktop_sources().values())
+        found = desktop_controls()
         for c in self.reg["controls"]:
-            self.assertIn('"' + c["desktop"].rstrip(":"), src, f"{c['desktop']}: not in the desktop window any more")
+            if c["kind"] == "dynamic":
+                self.assertIn(("dynamic", c["desktop"]), found, f"{c['desktop']}: not in the desktop window any more")
+            else:
+                self.assertIn('"' + c["desktop"].rstrip(":"), src, f"{c['desktop']}: not in the desktop window any more")
 
     def test_every_counterpart_is_on_the_page(self):
         for c in self.reg["controls"] + self.reg["interactions"]:
