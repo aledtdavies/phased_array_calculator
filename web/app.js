@@ -223,7 +223,8 @@ async function applyConfigNow(config) {
   for (const [sec, vals] of plan) setValues(sec, vals);
   for (const k of ["wedge._material", "material._material"]) W[k].input.value = "Custom";
   refreshPanels();
-  if (S.ready) await call("config_loaded", { config });
+  // its catalogue references: given to Python now, or once it is ready (a file opened while it starts)
+  if (S.ready) await call("config_loaded", { config }); else S.pendingConfig = config;
 }
 
 // ---- calculation and laws -------------------------------------------------------------------
@@ -609,6 +610,7 @@ async function start() {
     const r = await call("init");
     S.timings = [["Pyodide", r.timings.pyodide], ["numpy, scipy", r.timings.packages], ["modules", r.timings.modules],
                  ["ready", (performance.now() - t0) / 1e3]];
+    if (S.pendingConfig) { await call("config_loaded", { config: S.pendingConfig }); S.pendingConfig = null; }
     S.ready = true; busy(false);
     status(`Ready (Python ${r.python}, ${S.timings[3][1].toFixed(0)} s). Inputs never leave this browser.`);
   } catch (e) { S.error = e.message; status("Could not start Python: " + e.message, true); }
