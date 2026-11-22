@@ -3,7 +3,8 @@
 #   docker build -t pac-web -f docker/web.Dockerfile .
 #   docker run -d --restart unless-stopped -p 8080:80 pac-web     # then browse to http://<server>:8080/
 #
-# Stage 1 builds the static site with Pyodide copied in (tools/build_web.py --offline): the
+# Stage 1 builds the static site with Pyodide, Plotly and the DXF reader copied in
+# (tools/build_web.py --offline): the
 # build needs internet access once; the running container and the browsers using it do not.
 # Stage 2 serves it with nginx. The calculation runs in each user's browser; the server only
 # hands out files, and nothing a user enters is sent to it.

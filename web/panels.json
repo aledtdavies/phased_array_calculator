@@ -1,0 +1,77 @@
+{
+  "_note": "The browser's input panels: the desktop panels' keys, labels, defaults and visibility rules (python/qt_panels.py, python/qt_field.py). python/test_web.py checks the defaults against the desktop's.",
+  "matrix": ["Matrix", "Dual Matrix"],
+  "dual": ["Dual Linear", "Dual Matrix"],
+  "sections": [
+    {"id": "probe", "title": "Probe", "open": true, "fields": [
+      {"key": "probe_type", "label": "Probe type", "type": "select", "options": ["Linear", "Matrix", "Dual Linear", "Dual Matrix"], "default": "Linear"},
+      {"key": "num_elements", "label": "Primary elements (X)", "type": "number", "default": 16},
+      {"key": "pitch_mm", "label": "Primary pitch (mm)", "type": "number", "default": 0.5},
+      {"key": "num_elements_y", "label": "Passive elements (Y)", "type": "number", "default": 1, "show": "matrix"},
+      {"key": "pitch_y_mm", "label": "Passive pitch (mm)", "type": "number", "default": 0.0, "show": "matrix"},
+      {"key": "freq_mhz", "label": "Frequency (MHz)", "type": "number", "default": 5.0}
+    ]},
+    {"id": "wedge", "title": "Wedge", "open": true, "fields": [
+      {"key": "_material", "label": "Material", "type": "preset", "preset": "wedges", "default": "Custom"},
+      {"key": "angle_deg", "label": "Wedge angle (deg)", "type": "number", "default": 36.0},
+      {"key": "height_mm", "label": "Height at el. 1 (mm)", "type": "number", "default": 15.0},
+      {"key": "velocity_ms", "label": "Velocity (m/s)", "type": "number", "default": 2330.0},
+      {"key": "offset_mm", "label": "Probe offset X (mm)", "type": "number", "default": 0.0},
+      {"key": "array_sep_mm", "label": "Array separation (mm)", "type": "number", "default": 0.0, "show": "dual"},
+      {"key": "roof_angle_deg", "label": "Roof angle (deg)", "type": "number", "default": 0.0, "show": "dual"}
+    ]},
+    {"id": "material", "title": "Component", "open": true, "fields": [
+      {"key": "_material", "label": "Material", "type": "preset", "preset": "components", "default": "Custom"},
+      {"key": "vel_long_ms", "label": "L-wave velocity (m/s)", "type": "number", "default": 5920.0},
+      {"key": "vel_shear_ms", "label": "S-wave velocity (m/s)", "type": "number", "default": 3240.0},
+      {"key": "thickness_mm", "label": "Thickness (mm, 0 = auto)", "type": "number", "default": 0.0}
+    ]},
+    {"id": "scan", "title": "Scan", "open": true, "fields": [
+      {"key": "focus_mode", "label": "Focus type", "type": "select", "options": ["Constant Depth", "Vertical Line", "Constant Sound Path"], "default": "Constant Depth"},
+      {"key": "wave_type", "label": "Wave type", "type": "select", "options": ["Longitudinal", "Shear"], "default": "Longitudinal"},
+      {"key": "start_angle", "label": "Start angle (deg)", "type": "number", "default": 40.0},
+      {"key": "end_angle", "label": "End angle (deg)", "type": "number", "default": 70.0},
+      {"key": "step_angle", "label": "Step (deg)", "type": "number", "default": 1.0},
+      {"key": "start_skew", "label": "Start skew (deg)", "type": "number", "default": 0.0, "show": "matrix"},
+      {"key": "end_skew", "label": "End skew (deg)", "type": "number", "default": 0.0, "show": "matrix"},
+      {"key": "step_skew", "label": "Skew step (deg)", "type": "number", "default": 1.0, "show": "matrix"},
+      {"key": "y_focus_mode", "label": "Y focus mode", "type": "select", "options": ["Derived from Skew", "Fixed Y", "Y Sweep"], "default": "Derived from Skew", "show": "matrix"},
+      {"key": "target_y_mm", "label": "Target Y (mm)", "type": "number", "default": 0.0, "show": "matrix+fixedY"},
+      {"key": "y_start_mm", "label": "Y start (mm)", "type": "number", "default": 0.0, "show": "matrix+ysweep"},
+      {"key": "y_end_mm", "label": "Y end (mm)", "type": "number", "default": 0.0, "show": "matrix+ysweep"},
+      {"key": "y_step_mm", "label": "Y step (mm)", "type": "number", "default": 1.0, "show": "matrix+ysweep"},
+      {"key": "param_val", "label": "Target depth (mm)", "type": "number", "default": 50.0, "labels": {"Constant Depth": "Target depth (mm)", "Vertical Line": "Target X (global, mm)", "Constant Sound Path": "Focal distance (mm)"}}
+    ]},
+    {"id": "sub_aperture", "title": "Active aperture", "open": false, "fields": [
+      {"key": "start_element", "label": "Start element", "type": "int", "default": 1},
+      {"key": "num_active_elements", "label": "Active elements (0 = all)", "type": "int", "default": 0},
+      {"key": "element_order", "label": "Element order", "type": "select", "options": ["column-first", "row-first"], "labels": ["Column-first", "Row-first"], "default": "column-first", "show": "matrix"}
+    ]},
+    {"id": "weld", "title": "Weld", "open": false, "fields": [
+      {"key": "type", "label": "Weld", "type": "select", "options": ["None", "Single-V", "Double-V", "Single-J", "DXF file"], "default": "None"},
+      {"key": "centre_x_mm", "label": "Weld centre X (mm)", "type": "number", "default": 40.0, "show": "weld"},
+      {"key": "bevel_deg", "label": "Bevel angle (deg)", "type": "number", "default": 30.0, "show": "weld:Single-V,Double-V,Single-J"},
+      {"key": "bevel2_deg", "label": "Lower bevel (deg)", "type": "number", "default": 30.0, "show": "weld:Double-V"},
+      {"key": "root_gap_mm", "label": "Root gap (mm)", "type": "number", "default": 2.0, "show": "weld:Single-V,Double-V,Single-J"},
+      {"key": "root_face_mm", "label": "Root face (mm)", "type": "number", "default": 1.5, "show": "weld:Single-V,Double-V,Single-J"},
+      {"key": "root_depth_mm", "label": "Root depth (mm, 0 = mid)", "type": "number", "default": 0.0, "show": "weld:Double-V"},
+      {"key": "root_radius_mm", "label": "J radius (mm)", "type": "number", "default": 6.0, "show": "weld:Single-J"},
+      {"key": "j_side", "label": "J side", "type": "select", "options": ["near", "far"], "labels": ["Near (−X plate)", "Far (+X plate)"], "default": "near", "show": "weld:Single-J"},
+      {"key": "dxf_path", "label": "DXF file", "type": "file", "accept": ".dxf", "default": "", "show": "weld:DXF file"},
+      {"key": "dxf_datum", "label": "DXF y = 0 at", "type": "select", "options": ["surface", "backwall"], "labels": ["Surface (part below)", "Backwall (part above)"], "default": "surface", "show": "weld:DXF file"},
+      {"key": "dxf_units", "label": "DXF units", "type": "select", "options": ["", "mm", "inch", "m"], "labels": ["From file", "mm", "inch", "m"], "default": "", "show": "weld:DXF file"},
+      {"key": "dxf_layer", "label": "DXF layer (blank = all)", "type": "text", "default": "", "show": "weld:DXF file"}
+    ]},
+    {"id": "beam_field", "title": "Beam field", "open": false, "fields": [
+      {"key": "model", "label": "Model", "type": "select", "options": ["2D", "3D"], "labels": ["2D: line elements (X-Z)", "3D: elements (X-Z and Y-Z)"], "default": "2D"},
+      {"key": "pulsed", "label": "Pulse", "type": "bool", "options": [true, false], "labels": ["Pulsed (Hann burst)", "Continuous wave"], "default": true},
+      {"key": "cycles", "label": "Cycles (whole, ≥ 2)", "type": "number", "default": 3.0},
+      {"key": "grid_mm", "label": "Grid (mm)", "type": "number", "default": 0.5},
+      {"key": "element_width_mm", "label": "Element width (mm)", "type": "number", "default": 0.5},
+      {"key": "elevation_mm", "label": "Elevation (mm)", "type": "number", "default": 10.0, "show": "field3d"},
+      {"key": "wedge_shear_ms", "label": "Wedge S-wave (m/s)", "type": "number", "default": 1157.0},
+      {"key": "wedge_density", "label": "Wedge density (kg/m³)", "type": "number", "default": 1049.0},
+      {"key": "component_density", "label": "Component density (kg/m³)", "type": "number", "default": 7850.0}
+    ]}
+  ]
+}

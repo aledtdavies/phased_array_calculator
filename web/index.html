@@ -2,104 +2,102 @@
 <html lang="en-GB">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Phased Array Focal Law Calculator (browser prototype)</title>
-<style>
-  :root { --ink: #1e293b; --muted: #64748b; --line: #cbd5e1; --panel: #f8fafc; }
-  * { box-sizing: border-box; }
-  body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; color: var(--ink); font-size: 13px; }
-  header { padding: 8px 14px; border-bottom: 1px solid var(--line); display: flex; gap: 16px; align-items: baseline; }
-  header h1 { font-size: 16px; margin: 0; }
-  header .note { color: var(--muted); }
-  main { display: grid; grid-template-columns: 290px 1fr; height: calc(100vh - 38px); }
-  aside { border-right: 1px solid var(--line); padding: 8px 10px; overflow-y: auto; background: var(--panel); }
-  fieldset { border: 1px solid var(--line); border-radius: 4px; margin: 0 0 8px; padding: 4px 8px 6px; }
-  legend { font-weight: 600; padding: 0 4px; }
-  label { display: grid; grid-template-columns: 1fr 96px; align-items: center; gap: 6px; margin: 3px 0; }
-  input, select { width: 100%; padding: 2px 4px; font: inherit; }
-  button { font: inherit; padding: 5px 10px; cursor: pointer; }
-  button:disabled { cursor: default; }
-  #status { color: var(--muted); margin: 6px 0; min-height: 2.6em; }
-  section { padding: 8px 12px; overflow: auto; }
-  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .card { border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; margin-bottom: 10px; }
-  .card h2 { font-size: 13px; margin: 0 0 4px; }
-  svg { width: 100%; height: auto; background: #fff; }
-  table { border-collapse: collapse; width: 100%; font-size: 12px; }
-  th, td { border-bottom: 1px solid #e2e8f0; padding: 2px 6px; text-align: right; }
-  th { background: #f1f5f9; position: sticky; top: 0; }
-  tr.sel td { background: #fef3c7; }
-  tbody tr { cursor: pointer; }
-  #tableWrap { max-height: 260px; overflow-y: auto; }
-  #timings td:first-child { text-align: left; }
-  .lawnav { display: flex; gap: 8px; align-items: center; margin: 4px 0; }
-  .lawnav input { flex: 1; }
-  canvas { width: 100%; image-rendering: auto; border: 1px solid #e2e8f0; }
-  .legend { color: var(--muted); font-size: 12px; }
-</style>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>Phased Array Focal Law Calculator</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header><h1>Phased Array Focal Law Calculator</h1>
-  <span class="note">The calculator's own Python, run in your browser. Nothing is installed or sent anywhere.</span>
-  <a href="help.html" target="_blank" rel="noopener" style="margin-left:auto">Help</a></header>
-<main>
-<aside>
-  <fieldset><legend>Probe</legend>
-    <label>Elements <input id="num_elements" type="number" value="64"></label>
-    <label>Pitch (mm) <input id="pitch_mm" type="number" step="0.01" value="0.75"></label>
-    <label>Frequency (MHz) <input id="freq_mhz" type="number" step="0.01" value="2.25"></label>
-    <label>Element width (mm) <input id="element_width_mm" type="number" step="0.01" value="0.55"></label>
-  </fieldset>
-  <fieldset><legend>Active aperture</legend>
-    <label>Start element <input id="start_element" type="number" value="1"></label>
-    <label>Active (0 = all) <input id="num_active_elements" type="number" value="32"></label>
-  </fieldset>
-  <fieldset><legend>Wedge</legend>
-    <label>Angle (deg) <input id="angle_deg" type="number" step="0.1" value="36"></label>
-    <label>Height at el. 1 (mm) <input id="height_mm" type="number" step="0.1" value="5"></label>
-    <label>L velocity (m/s) <input id="velocity_ms" type="number" value="2337"></label>
-    <label>S velocity (m/s) <input id="wedge_shear_ms" type="number" value="1157"></label>
-    <label>Density (kg/m³) <input id="wedge_density" type="number" value="1049"></label>
-    <label>Offset X el. 1 (mm) <input id="offset_mm" type="number" step="0.1" value="4"></label>
-  </fieldset>
-  <fieldset><legend>Component</legend>
-    <label>L velocity (m/s) <input id="vel_long_ms" type="number" value="5900"></label>
-    <label>S velocity (m/s) <input id="vel_shear_ms" type="number" value="3230"></label>
-    <label>Density (kg/m³) <input id="component_density" type="number" value="7900"></label>
-    <label>Thickness (mm) <input id="thickness_mm" type="number" step="0.1" value="40"></label>
-  </fieldset>
-  <fieldset><legend>Scan</legend>
-    <label>Wave <select id="wave_type"><option>Shear</option><option>Longitudinal</option></select></label>
-    <label>Focus <select id="focus_mode"><option>Constant Depth</option><option>Constant Sound Path</option><option>Vertical Line</option></select></label>
-    <label>Depth / path / X (mm) <input id="param_val" type="number" step="0.1" value="25"></label>
-    <label>Start angle (deg) <input id="start_angle" type="number" value="40"></label>
-    <label>End angle (deg) <input id="end_angle" type="number" value="70"></label>
-    <label>Step (deg) <input id="step_angle" type="number" value="5"></label>
-  </fieldset>
-  <fieldset><legend>Beam field (2D)</legend>
-    <label>Pulse <select id="pulse"><option value="1">Hann burst</option><option value="0">Continuous wave</option></select></label>
-    <label>Cycles <input id="cycles" type="number" min="2" step="1" value="3"></label>
-    <label>Grid (mm) <input id="grid_mm" type="number" step="0.05" value="0.5"></label>
-  </fieldset>
-  <button id="calc" disabled>Calculate laws</button>
-  <button id="fieldBtn" disabled>Beam field</button>
-  <div id="status">Loading Python in the browser…</div>
-</aside>
-<section>
-  <div class="card"><h2>Laws</h2><div id="tableWrap"><table id="laws"></table></div></div>
-  <div class="lawnav"><span id="lawLabel">Law –</span><input id="lawSlider" type="range" min="0" max="0" value="0" disabled></div>
-  <div class="row">
-    <div class="card"><h2>Ray tracing X-Z</h2><svg id="xz" viewBox="0 0 600 420"></svg>
-      <div class="legend">Red: active elements; blue: rays to the focus (+); grey: inactive elements.</div></div>
-    <div class="card"><h2>Delays</h2><svg id="delays" viewBox="0 0 600 420"></svg></div>
-  </div>
-  <div class="card"><h2>Beam field, X-Z section (dB re maximum, 0 to −30)</h2>
-    <canvas id="field" width="10" height="10"></canvas><div id="fieldNote" class="legend">Press “Beam field”.</div>
-    <div id="fieldModel" class="legend">Ray model of the direct beam through a bonded wedge: no reflections, mode conversion or attenuation.</div></div>
-  <div class="card"><h2>Timings (this browser)</h2><table id="timings"></table></div>
-</section>
-</main>
+<header class="bar">
+  <button id="setupToggle" class="icon-btn only-narrow" aria-label="Setup" title="Setup">&#9776;</button>
+  <div class="brand"><span class="logo" aria-hidden="true">&#9673;</span><span class="title">Focal Law Calculator</span></div>
+  <nav class="menu">
+    <div class="dropdown">
+      <button class="btn ghost" id="fileBtn" aria-haspopup="true" aria-expanded="false">File &#9662;</button>
+      <div class="dropdown-menu" id="fileMenu" role="menu">
+        <button role="menuitem" data-act="open-config">Open configuration&hellip;</button>
+        <button role="menuitem" data-act="save-config">Save configuration</button>
+        <hr>
+        <button role="menuitem" data-act="cat-probe">Load probe from catalogue&hellip;</button>
+        <button role="menuitem" data-act="cat-wedge">Load wedge from catalogue&hellip;</button>
+        <hr>
+        <button role="menuitem" data-act="export-csv">Export laws (CSV)</button>
+        <button role="menuitem" data-act="export-coords">Export element coordinates&hellip;</button>
+      </div>
+    </div>
+    <a class="btn ghost" href="help.html" target="_blank" rel="noopener">Help</a>
+  </nav>
+</header>
+
+<div class="layout">
+  <aside id="setup" class="setup">
+    <div class="setup-head only-narrow"><b>Setup</b><button class="icon-btn" id="setupClose" aria-label="Close">&times;</button></div>
+    <div id="panels" class="panels"></div>
+    <div class="setup-actions">
+      <button id="calcBtn" class="btn primary block" disabled>Calculate laws</button>
+      <div id="status" class="status">Starting Python in your browser&hellip;</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="tabs" role="tablist">
+      <button class="tab active" data-tab="rays" role="tab">Rays</button>
+      <button class="tab" data-tab="table" role="tab">Laws</button>
+      <button class="tab" data-tab="delays" role="tab">Delays</button>
+      <button class="tab" data-tab="field" role="tab">Beam field</button>
+    </div>
+
+    <section class="view active" id="view-rays">
+      <div class="toolbar">
+        <label class="inline">Coverage
+          <select id="coverage"><option value="0">Off</option><option value="1">Direct</option>
+            <option value="2">Direct + 1st skip</option><option value="3">Direct + 2 skips</option></select></label>
+        <label class="inline check"><input type="checkbox" id="showAll"> Show all laws</label>
+        <span class="hint">Drag the red focus to solve a law there; tap an element for its delay.</span>
+      </div>
+      <div class="plots" id="rayPlots"><div class="plot" id="plotXZ"></div><div class="plot" id="plotYZ" hidden></div></div>
+      <div class="notes" id="notes"></div>
+    </section>
+
+    <section class="view" id="view-table">
+      <div class="card table-card"><div class="table-wrap"><table id="lawTable"></table></div></div>
+    </section>
+
+    <section class="view" id="view-delays">
+      <div class="plot tall" id="plotDelays"></div>
+      <div class="notes" id="elementInfo">Tap an element (here or in Rays) for its number, delay and time of flight.</div>
+    </section>
+
+    <section class="view" id="view-field">
+      <div class="toolbar">
+        <button id="fieldBtn" class="btn primary" disabled>Compute beam field</button>
+        <span id="fieldStatus" class="hint">Uses the inputs under &ldquo;Beam field&rdquo; in Setup.</span>
+      </div>
+      <div class="plots" id="fieldPlots"><div class="plot" id="plotField"></div><div class="plot" id="plotFieldYZ" hidden></div></div>
+      <div class="notes" id="fieldNote"></div>
+    </section>
+
+    <div class="lawbar" id="lawbar">
+      <button class="icon-btn" id="prevLaw" aria-label="Previous law" disabled>&#9664;</button>
+      <div class="sliders">
+        <label class="slider"><span id="angleLabel">Angle –</span><input type="range" id="angleSlider" min="0" max="0" value="0" disabled></label>
+        <label class="slider" id="skewRow" hidden><span id="skewLabel">Skew –</span><input type="range" id="skewSlider" min="0" max="0" value="0"></label>
+      </div>
+      <button class="icon-btn" id="nextLaw" aria-label="Next law" disabled>&#9654;</button>
+      <button class="icon-btn" id="playBtn" aria-label="Play" disabled>&#9655;</button>
+      <div class="lawlabel" id="lawLabel">No laws yet</div>
+    </div>
+  </main>
+</div>
+
+<div class="modal" id="modal" hidden><div class="modal-box"><div class="modal-head"><b id="modalTitle"></b>
+  <button class="icon-btn" id="modalClose" aria-label="Close">&times;</button></div><div id="modalBody"></div></div></div>
+<div class="toast" id="toast" hidden></div>
+<input type="file" id="fileInput" hidden>
+
 <script src="config.js"></script>
+<script src="vendor/plotly.min.js"></script>
+<script src="views.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
