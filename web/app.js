@@ -449,10 +449,14 @@ async function computeField() {
   const bar = $("fieldProgress"), cancel = $("fieldCancel");
   bar.value = 0; bar.hidden = false; cancel.hidden = false; cancel.disabled = false;
   try {
+    // Cancel is honoured after every reply, the last included: a field cancelled while its final
+    // step ran is not shown (review of #41)
+    const stop = () => { if (S.fieldCancel) throw Object.assign(new Error("cancelled"), { cancelled: true }); };
     let st = await call("field_start", req);
+    stop();
     while (!st.finished) {
-      if (S.fieldCancel) throw Object.assign(new Error("cancelled"), { cancelled: true });
       st = await call("field_step", { seconds: 0.4 });
+      stop();
       bar.value = st.done / st.points;
       const pc = `Computing the beam field… ${Math.floor(100 * st.done / st.points)} %`;
       $("fieldStatus").textContent = `${pc} (${st.done} of ${st.points} points)`; status(pc);
