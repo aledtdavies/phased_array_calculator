@@ -93,6 +93,10 @@ class TestWebLayer(unittest.TestCase):
             build_web.build(site)                        # rebuilt in place
             self.assertTrue(os.path.isfile(os.path.join(site, "py", "session.py")))
             self.assertTrue(os.path.isfile(os.path.join(site, build_web.MARKER)))
+            # the model note the page links to, with the figure it shows (review of PR #37)
+            note = open(os.path.join(site, "docs", "beam_field_model.html"), encoding="utf-8").read()
+            self.assertIn('src="plans/images/step6_beam_vs_buildfe.png"', note)
+            self.assertTrue(os.path.isfile(os.path.join(site, "docs", "plans", "images", "step6_beam_vs_buildfe.png")))
 
     def test_bad_input_is_refused_with_a_reason(self):
         bad = json.loads(json.dumps(CFG))
