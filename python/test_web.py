@@ -45,6 +45,55 @@ class TestWebLayer(unittest.TestCase):
         self.assertEqual(r["points"], db.size)
         self.assertTrue(all(0 < z <= 40 + 1e-9 for z in r["z"]))
 
+    def test_a_tiny_grid_step_never_allocates_more_than_the_limit(self):
+        """Review of PR #37: section_grid made the full arrays before coarsening them."""
+        from unittest import mock
+        import beam_field
+        real = np.arange
+        sizes = []
+
+        def spy(n, *a, **k):
+            sizes.append(n)
+            return real(n, *a, **k)
+        pac_web.calc(json.dumps(CFG))
+        with mock.patch.object(beam_field.np, "arange", side_effect=spy):
+            (x, z), step = beam_field.section_grid((0.0, 1e-9), (0.1, 0.04), 1e-12, pac_web.MAX_POINTS)
+        self.assertLessEqual(x.size * z.size, pac_web.MAX_POINTS)
+        self.assertTrue(all(n <= pac_web.MAX_POINTS for n in sizes), sizes)
+        for bad in (0.0, -1.0, float("nan")):
+            with self.assertRaises(ValueError):
+                beam_field.section_grid((0.0, 0.0), (0.1, 0.04), bad, 100)
+
+    def test_the_field_reply_names_its_law_and_the_model(self):
+        pac_web.calc(json.dumps(CFG))
+        r = json.loads(pac_web.field(json.dumps({
+            "law": 2, "pulsed": False, "cycles": 3, "grid_mm": 1e-9, "element_width_mm": 0.55,
+            "wedge_shear_ms": 1157, "wedge_density": 1049, "component_density": 7900})))
+        self.assertEqual(r["law"], 2)
+        self.assertLessEqual(r["points"], pac_web.MAX_POINTS)
+        self.assertIn("direct beam only", r["note"])
+
+    def test_the_build_empties_only_a_folder_it_built(self):
+        """Review of PR #37: the build emptied whatever folder it was given."""
+        import tempfile
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools"))
+        import build_web
+        for bad in (build_web.ROOT, os.path.dirname(build_web.ROOT), os.path.join(build_web.ROOT, "python"),
+                    os.path.join(build_web.ROOT, "docs", "plans")):
+            with self.assertRaises(SystemExit):
+                build_web.build(bad)
+        with tempfile.TemporaryDirectory() as d:
+            precious = os.path.join(d, "keep.txt")
+            open(precious, "w").close()
+            with self.assertRaises(SystemExit):
+                build_web.build(d)                       # not empty, not a built site
+            self.assertTrue(os.path.exists(precious))
+            site = os.path.join(d, "site")
+            build_web.build(site)                        # new folder: built and marked
+            build_web.build(site)                        # rebuilt in place
+            self.assertTrue(os.path.isfile(os.path.join(site, "py", "session.py")))
+            self.assertTrue(os.path.isfile(os.path.join(site, build_web.MARKER)))
+
     def test_bad_input_is_refused_with_a_reason(self):
         bad = json.loads(json.dumps(CFG))
         bad["material"]["vel_shear_ms"] = 0

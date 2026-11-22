@@ -21,13 +21,38 @@ const call = (op, arg) => new Promise((resolve, reject) => {
   const id = nextId++; pending.set(id, { resolve, reject }); worker.postMessage({ id, op, arg });
 });
 
-const state = { ready: false, calc: null, law: 0, timings: [], busy: false, error: null, fieldDone: false };
+const state = { ready: false, calc: null, law: 0, timings: [], busy: false, error: null, fieldDone: false,
+                calcDirty: false, field: null };
 window.__pac = state;                       // for automated checks (screenshots, timings)
 const num = (id) => parseFloat($(id).value);
 const status = (t) => { $("status").textContent = t; };
 function timing(name, s) {
   state.timings.push([name, s]);
   $("timings").innerHTML = state.timings.map(([n, v]) => `<tr><td>${n}</td><td>${v.toFixed(2)} s</td></tr>`).join("");
+}
+
+// Inputs the laws depend on, and inputs only the beam field depends on.
+const FIELD_IDS = ["pulse", "cycles", "grid_mm", "element_width_mm", "wedge_shear_ms", "wedge_density", "component_density"];
+const SETUP_IDS = [...document.querySelectorAll("aside input, aside select")].map((e) => e.id).filter((id) => !FIELD_IDS.includes(id));
+
+function lock(on) {                          // nothing changes while Python works on a request
+  state.busy = on;
+  for (const e of document.querySelectorAll("aside input, aside select, aside button")) e.disabled = on;
+  $("lawSlider").disabled = on || !state.calc || state.calc.laws.length < 2;
+  if (!on) $("fieldBtn").disabled = !state.calc || !state.calc.laws.length || state.calcDirty;
+}
+
+function fieldParams() {
+  return { law: state.law, pulsed: $("pulse").value === "1", cycles: num("cycles"), grid_mm: num("grid_mm"),
+           element_width_mm: num("element_width_mm"), wedge_shear_ms: num("wedge_shear_ms"),
+           wedge_density: num("wedge_density"), component_density: num("component_density") };
+}
+
+function markStale(why) {                    // a shown field no longer matches what is selected
+  if (!state.field || !state.field.fresh) return;
+  state.field.fresh = false;
+  $("field").style.opacity = 0.35;
+  $("fieldNote").textContent = `Stale (${why}): press “Beam field” again. ` + state.field.text;
 }
 
 function config() {
@@ -42,45 +67,65 @@ function config() {
 }
 
 async function calculate() {
-  state.busy = true; state.error = null; $("calc").disabled = $("fieldBtn").disabled = true;
+  state.error = null; lock(true);
   status("Calculating…");
   try {
     const r = await call("calc", config());
-    state.calc = r; state.law = 0; state.fieldDone = false;
+    state.calc = r; state.law = 0; state.calcDirty = false;
+    markStale("the laws were recalculated");
     timing(`Calculate ${r.laws.length} laws`, r.wall);
     drawTable(); setupSlider(); drawLaw();
     status(`${r.laws.length} laws calculated in ${r.seconds.toFixed(2)} s.`);
   } catch (err) { state.error = err.message; status("Error: " + err.message); }
-  state.busy = false; $("calc").disabled = false; $("fieldBtn").disabled = !state.calc || !state.calc.laws.length;
+  lock(false);
 }
 
 async function beamField() {
-  state.busy = true; state.error = null; $("calc").disabled = $("fieldBtn").disabled = true;
+  if (state.calcDirty) { status("The inputs changed: press “Calculate laws” first."); return; }
+  const req = fieldParams();                 // the request as made: the result is labelled with it
+  const angle = state.calc.laws[req.law].angle;
+  state.error = null; state.fieldDone = false; lock(true);
   status("Computing the beam field…");
   try {
-    const r = await call("field", { law: state.law, pulsed: $("pulse").value === "1", cycles: num("cycles"),
-      grid_mm: num("grid_mm"), element_width_mm: num("element_width_mm"), wedge_shear_ms: num("wedge_shear_ms"),
-      wedge_density: num("wedge_density"), component_density: num("component_density") });
+    const r = await call("field", req);
     drawField(r);
-    const kind = $("pulse").value === "1" ? `pulsed, ${num("cycles")} cycles` : "continuous wave";
-    timing(`Beam field, law ${state.law + 1}: ${r.points} points (${kind}, grid ${r.grid_mm.toFixed(2)} mm)`, r.wall);
-    $("fieldNote").textContent = `Law ${state.law + 1} (${state.calc.laws[state.law].angle.toFixed(1)}°): ${r.points} points, grid ${r.grid_mm.toFixed(2)} mm, ${kind}; computed in ${r.seconds_field.toFixed(1)} s. White: −6 dB.`;
+    const kind = req.pulsed ? `pulsed, ${req.cycles} cycles` : "continuous wave";
+    timing(`Beam field, law ${r.law + 1}: ${r.points} points (${kind}, grid ${r.grid_mm.toFixed(2)} mm)`, r.wall);
+    const text = `Law ${r.law + 1} (${angle.toFixed(1)}°): ${r.points} points, grid ${r.grid_mm.toFixed(2)} mm, ${kind}; computed in ${r.seconds_field.toFixed(1)} s. White: −6 dB.`;
+    state.field = { law: r.law, params: JSON.stringify(req), fresh: true, text };
+    $("field").style.opacity = 1;
+    $("fieldNote").textContent = text;
+    $("fieldModel").textContent = r.note;
     status("Beam field done."); state.fieldDone = true;
   } catch (err) { state.error = err.message; status("Error: " + err.message); }
-  state.busy = false; $("calc").disabled = false; $("fieldBtn").disabled = false;
+  lock(false);
 }
+
+function selectLaw(i) {
+  if (state.busy) return;
+  state.law = i; $("lawSlider").value = i; drawLaw();
+  if (state.field && state.field.law !== i) markStale(`it shows law ${state.field.law + 1}`);
+}
+
+for (const id of SETUP_IDS) $(id).addEventListener("input", () => {
+  if (!state.calc) return;
+  state.calcDirty = true; $("fieldBtn").disabled = true;
+  markStale("the inputs changed");
+  status("The inputs changed: press “Calculate laws” to update the laws.");
+});
+for (const id of FIELD_IDS) $(id).addEventListener("input", () => markStale("the field settings changed"));
 
 function drawTable() {
   const r = state.calc;
   $("laws").innerHTML = `<thead><tr>${r.headings.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>` +
     r.rows.map((row) => `<tr data-law="${row[0] === "-" ? "" : Number(row[0]) - 1}">${row.map((v) => `<td>${v}</td>`).join("")}</tr>`).join("") + "</tbody>";
   for (const tr of $("laws").querySelectorAll("tbody tr")) {
-    tr.onclick = () => { if (tr.dataset.law !== "") { state.law = Number(tr.dataset.law); $("lawSlider").value = state.law; drawLaw(); } };
+    tr.onclick = () => { if (tr.dataset.law !== "") selectLaw(Number(tr.dataset.law)); };
   }
 }
 function setupSlider() {
   const s = $("lawSlider"); s.max = Math.max(0, state.calc.laws.length - 1); s.value = 0; s.disabled = state.calc.laws.length < 2;
-  s.oninput = () => { state.law = Number(s.value); drawLaw(); };
+  s.oninput = () => selectLaw(Number(s.value));
 }
 
 // ---- drawing helpers --------------------------------------------------------------------

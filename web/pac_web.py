@@ -10,11 +10,13 @@ import time
 
 import numpy as np
 
-from beam_field import Solid, beam_field, element_sources, field_region, section_grid
+from beam_field import MODEL_NOTE, Solid, beam_field, element_sources, field_region, section_grid
 from session import TABLE_HEADINGS, build_solver, calculate
 
 FLOOR_DB = -30.0
 MAX_POINTS = 40000
+VALIDATION_NOTE = ("Validated in 2D against an FE solve (buildFE Task 125: a steered 45 degree shear beam); "
+                   "see docs/beam_field_model.html for where the model can be trusted.")
 _state = {}
 
 
@@ -68,4 +70,5 @@ def field(cfg_text):
     with np.errstate(divide="ignore"):
         db = np.maximum(20 * np.log10(amp / np.nanmax(amp)), FLOOR_DB)
     return json.dumps({"x": _mm(X), "z": _mm(Z), "db": np.round(db, 2).tolist(), "grid_mm": used * 1e3,
+                       "law": int(cfg["law"]), "note": MODEL_NOTE + ". " + VALIDATION_NOTE,
                        "points": int(GX.size), "seconds_field": t2 - t1, "seconds": time.perf_counter() - t0})

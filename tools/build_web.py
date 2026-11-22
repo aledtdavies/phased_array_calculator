@@ -29,6 +29,7 @@ PYODIDE_VERSION = "314.0.8"
 PYODIDE_CDN = f"https://cdn.jsdelivr.net/pyodide/v{PYODIDE_VERSION}/full/"
 PYODIDE_CORE = ["pyodide.mjs", "pyodide.asm.mjs", "pyodide.asm.wasm", "python_stdlib.zip", "pyodide-lock.json"]
 PACKAGES = ["numpy", "scipy"]
+MARKER = ".pac-web-site"      # written into every built site: only such a folder is ever emptied
 
 
 def _fetch(url, path):
@@ -54,11 +55,30 @@ def vendor_pyodide(dest):
     return sorted(need)
 
 
+def _check_destination(out):
+    """
+    Refuse a destination that is not a site this script built: the repository, any folder
+    holding it, its source folders, or an existing folder that is neither empty nor marked.
+    """
+    out = os.path.realpath(out)
+    root = os.path.realpath(ROOT)
+    if os.path.commonpath([out, root]) == out:
+        raise SystemExit(f"refusing to build into {out}: it is the repository or holds it")
+    for d in ("python", "web", "tools", "docs", "matlab", "docker", "tests", "validation", ".git", ".github"):
+        if os.path.commonpath([out, os.path.join(root, d)]) == os.path.join(root, d):
+            raise SystemExit(f"refusing to build into {out}: it is inside the repository's {d}/")
+    if os.path.isdir(out) and os.listdir(out) and not os.path.isfile(os.path.join(out, MARKER)):
+        raise SystemExit(f"refusing to empty {out}: it is not empty and was not built by this script")
+    return out
+
+
 def build(out, offline=False):
+    out = _check_destination(out)
     os.makedirs(out, exist_ok=True)
     for name in os.listdir(out):            # empty it (a server may hold the folder itself open)
         p = os.path.join(out, name)
         shutil.rmtree(p) if os.path.isdir(p) else os.remove(p)
+    open(os.path.join(out, MARKER), "w").close()
     os.makedirs(os.path.join(out, "py"))
     for f in ("index.html", "app.js", "worker.js"):
         shutil.copy2(os.path.join(ROOT, "web", f), os.path.join(out, f))
