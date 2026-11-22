@@ -1,6 +1,6 @@
 """
-The Qt window (qt_app.py), off-screen: parity with the Tk window (panel keys and defaults, data
-table, configuration files both ways) and the GUI regressions of test_gui.py, ported.
+The Qt window (qt_app.py), off-screen: files saved by the retired Tk window load unchanged, the data
+table is the session calculation, and the GUI regressions once ported from the Tk tests.
 Skipped where PySide6 is not installed.
 """
 import json
@@ -76,67 +76,42 @@ class QtCase(unittest.TestCase):
         return (self.win.plot_tab, self.win.hist_tab, self.win.scene3d_tab)
 
 
-class TkCase(QtCase):
-    """A Qt window and a Tk window side by side (skipped where Tk cannot open)."""
-
-    def setUp(self):
-        super().setUp()
-        from tkinter import TclError, messagebox
-        import app as tk_app
-        self._saved = (messagebox.showinfo, messagebox.showwarning, messagebox.showerror)
-        messagebox.showinfo = messagebox.showwarning = lambda *a, **k: None
-        messagebox.showerror = lambda *a, **k: self.dialogs.append(("tk-error",) + a)
-        try:
-            self.tk = tk_app.App()
-        except TclError as e:
-            self.skipTest(f"Tk unavailable: {e}")
-        self.tk.withdraw()
-
-    def tearDown(self):
-        from tkinter import messagebox
-        messagebox.showinfo, messagebox.showwarning, messagebox.showerror = self._saved
-        if hasattr(self, "tk"):
-            self.tk.destroy()
-        super().tearDown()
+FIXTURE = os.path.join(HERE, "..", "tests", "fixtures", "tk_saved_configs.json")
 
 
-class TestParityWithTk(TkCase):
-    def test_panel_keys_and_defaults(self):
-        for name in ("probe_panel", "wedge_panel", "mat_panel", "scan_panel", "sub_aperture_panel"):
-            self.assertEqual(getattr(self.win, name).get_values(), getattr(self.tk, name).get_values(), name)
+class TestTkConfigurationFiles(QtCase):
+    """Files saved by the retired Tk window (python/app.py, retired 2026-11-21) load unchanged."""
 
-    def test_same_table_for_every_scan_case(self):
-        for name, (pv, sv) in SCAN_CASES.items():
-            with self.subTest(name):
-                for w in (self.win, self.tk):
-                    if pv:
-                        w.probe_panel.set_values(pv)
-                    w.scan_panel.set_values(sv)
-                    w.run_calculation()
-                tk_rows = [[str(v) for v in self.tk.tree.item(r, "values")] for r in self.tk.tree.get_children()]
-                self.assertEqual(self.win.table_rows(), tk_rows)
-                self.assertGreater(len(tk_rows), 0)
+    def test_tk_saved_files_load_unchanged(self):
+        with open(FIXTURE) as f:
+            saved = json.load(f)
+        for name in ("defaults", "dual_matrix"):
+            with self.subTest(name), tempfile.TemporaryDirectory() as d:
+                path = os.path.join(d, "tk.json")
+                with open(path, "w") as f:
+                    json.dump(saved[name], f)
+                self.win.ask_open = lambda *a, p=path, **k: p
+                self.win.load_config()
+                self.assertEqual(self.win.config_dict(), saved[name])
         self.assertEqual(self.errors(), [])
 
-    def test_configuration_files_both_ways(self):
-        self.tk.probe_panel.set_values({"probe_type": "Dual Matrix", "num_elements": 6, "num_elements_y": 3,
-                                        "pitch_mm": 0.8, "pitch_y_mm": 1.1})
-        self.tk.wedge_panel.set_values({"angle_deg": 18.95, "height_mm": 8.65, "array_sep_mm": 12,
-                                        "roof_angle_deg": 4})
-        self.tk.scan_panel.set_values({"focus_mode": "Vertical Line", "y_focus_mode": "Fixed Y",
-                                       "target_y_mm": 2.5, "param_val": 33.3})
-        self.tk.sub_aperture_panel.set_values({"start_element": 4, "num_active_elements": 9,
-                                               "element_order": "row-first"})
-        with tempfile.TemporaryDirectory() as d:
-            path = os.path.join(d, "tk.json")
-            with open(path, "w") as f:
-                json.dump(self.tk.config_dict(), f)
-            self.win.ask_open = lambda *a, **k: path
-            self.win.load_config()
-            self.assertEqual(self.win.config_dict(), self.tk.config_dict())
-            self.win.scan_panel.set_values({"param_val": 21.5})
-            self.tk.apply_config(json.loads(json.dumps(self.win.config_dict())))
-            self.assertEqual(self.tk.config_dict(), self.win.config_dict())
+    def test_qt_defaults_are_the_tk_defaults(self):
+        with open(FIXTURE) as f:
+            self.assertEqual(self.win.config_dict(), json.load(f)["defaults"])
+
+    def test_the_table_is_the_session_calculation(self):
+        """The Data Table shows session.calculate's rows (which the Tk window showed too)."""
+        from session import calculate
+        for name, (pv, sv) in SCAN_CASES.items():
+            with self.subTest(name):
+                if pv:
+                    self.win.probe_panel.set_values(pv)
+                self.win.scan_panel.set_values(sv)
+                self.win.run_calculation()
+                calc = calculate(self.win.get_solver(), self.win.scan_panel.get_values(),
+                                 self.win.probe_panel.get_values()["probe_type"])
+                self.assertEqual(self.win.table_rows(), [[str(v) for v in values] for values, _ in calc.rows])
+                self.assertGreater(len(calc.rows), 0)
         self.assertEqual(self.errors(), [])
 
 

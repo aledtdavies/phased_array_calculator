@@ -44,7 +44,7 @@ The Phased Array Focal Law Calculator computes the element-level time delays (fo
 | **Dual Linear** | Two parallel linear sub-arrays separated in Y |
 | **Dual Matrix** | Two parallel matrix sub-arrays separated in Y |
 
-Both **Python** (Tkinter GUI + importable library) and **MATLAB** (App Designer GUI + classdef library) implementations are provided with identical physics, parameter conventions, and export formats.
+Both **Python** (Qt GUI + importable library) and **MATLAB** (App Designer GUI + classdef library) implementations are provided with identical physics, parameter conventions, and export formats.
 
 ---
 
@@ -52,12 +52,11 @@ Both **Python** (Tkinter GUI + importable library) and **MATLAB** (App Designer 
 
 ### Python
 
-**Requirements:** Python 3.9+, `numpy`, `scipy`, `matplotlib`, `tkinter`
+**Requirements:** Python 3.9+ and `python/requirements.txt` (numpy, scipy, matplotlib, PySide6, qtpy, pyvista, pyvistaqt, pyqtgraph, ezdxf)
 
 ```bash
-pip install numpy scipy matplotlib
-python python/qt_app.py      # the Qt window
-python python/app.py         # the Tk window (kept until the Qt window is accepted)
+pip install -r python/requirements.txt
+python python/qt_app.py      # the window
 ```
 
 To build a standalone executable:
@@ -211,7 +210,6 @@ The **angle/skew sliders** below each plot navigate the computed law set without
 
 Drag to rotate, scroll to zoom. **Iso**, **X-Z**, **Y-Z** and **Top** set the camera, with depth always downward; the axis views are drawn in parallel projection. **Section** cuts the wedge and component at the active aperture's centre (an X-Z plane). Click near an element to inspect it: the readout gives its number in the chosen numbering convention, its array (Tx/Rx), its X/Y grid position, its delay and its time of flight, and its ray is drawn in orange.
 
-**Tk window (matplotlib).** A rotatable 3D scene of the selected law (mm, global frame, depth drawn downward): the wedge body (catalogue outline or schematic silhouette, extruded across the element footprint), the interface plane and optional backwall, active and inactive elements (Tx/Rx coloured for dual probes), rays element → interface → focus for the active elements (an even subset of at most 48 for large apertures, ends kept), the interface points, and the focal points of the whole sweep coloured by law index. Camera presets **Iso**, **X-Z**, **Y-Z** and **Top** give the projections from within the 3D view; drag to rotate. Roof angles tilt the drawn elements but not the wedge body.
 
 ### Qt window: live 2D views
 
@@ -611,17 +609,13 @@ Pitch (Y-axis rotation by θ):          Roll (X-axis rotation by φ):
 | `scene_model.py` | `build_scene`: the geometry every view draws, as primitives in the global frame |
 | `qt_app.py` | Qt GUI (qtpy/PySide6): main window, menus, table, dialogs |
 | `qt_panels.py`, `qt_plotting.py`, `qt_catalog_dialog.py` | Qt input panels, plot tabs and catalogue picker |
-| `app.py` | Tkinter GUI (to be retired once the Qt window is accepted) |
-| `session.py` | Solver from panel values, sweep into laws and table rows, focal-law CSV, catalogue links (shared by both GUIs) |
+| `session.py` | Solver from panel values, sweep into laws and table rows, focal-law CSV, catalogue links (behind the window) |
 | `navigation.py` | Law navigation: angle/skew sliders, step buttons, table selection |
 | `qt_view3d.py` | Qt 3D tab (pyvistaqt): picking, section, camera presets |
 | `qt_views2d.py` | Qt Ray Tracing and Delays tabs (pyqtgraph): dragged focus, linked element selection |
 | `scene_vtk.py` | PyVista renderer of the scene model; off-screen rendering for tests and exports |
-| `panels.py` | Input panels (Probe, Wedge, Material, Scan, SubAperture) |
-| `plotting.py` | Ray tracing, 3D view and delay GUI panels |
-| `scene.py` | Toolkit-independent scene drawing (2D projections, 3D scene, aperture delay maps) shared by the GUI and scripts |
+| `scene.py` | Toolkit-independent scene drawing (2D projections, 3D scene, aperture delay maps) used by the scripts; its colours by the window |
 | `catalog.py` | buildFE / nde-knowledge catalogue reader, buildFE content hash, frame mapping |
-| `catalog_dialog.py` | Catalogue entry picker |
 | `materials.json` | Built-in material velocity database |
 | `verify_delays.py` | Standalone verification script |
 
