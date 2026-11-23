@@ -19,7 +19,7 @@ Model (each piece is classified):
 * At the interface the wedge's L wave converts into the component's chosen mode with the plane-
   wave displacement transmission coefficient of a WELDED (bonded) solid-solid interface
   (``interface_coefficients``: continuity of displacement and normal and shear traction).
-  ASSUMPTION: bonded contact, as buildFE's FE reference; a fluid couplant (no shear) is not
+  ASSUMPTION: bonded contact, as the FE reference; a fluid couplant (no shear) is not
   modelled. APPROXIMATION: plane-wave coefficients applied ray by ray.
 * Geometric spreading through the interface (Schmerr, Fundamentals of Ultrasonic Phased Arrays,
   2015, ch. 2; arim ``beamspread_2d_for_path``): 2D (line sources)
@@ -34,7 +34,7 @@ Model (each piece is classified):
   stated with the views).
 
 2D mode (``dim=2``) treats each element as an infinitely long strip (plane strain), which is
-what buildFE's 2D FE reference solves; 3D mode (``dim=3``) splits each element into point
+what the 2D FE reference solves; 3D mode (``dim=3``) splits each element into point
 sources across its elevation and width.
 """
 from __future__ import annotations

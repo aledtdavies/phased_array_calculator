@@ -11,7 +11,7 @@ Two file formats are read, detected from their content:
   sorted keys, numbers as ``%.17g``, a wedge's ``nominal`` block left out), so an entry is
   reported ``ok``, ``changed`` or ``unstamped`` as ``buildfe.asset.check`` would report it.
 * ``nde-knowledge-1``: the values-only export ``exports/catalog/{probes,wedges}.json`` of
-  nde-knowledge (``catalogVersion`` "1"), the source buildFE copies in (buildFE Task 167).
+  nde-knowledge (``catalogVersion`` "1"), the source buildFE copies in.
   Plain SI values, no per-value provenance, no content hash; the file's own SHA-256 identifies
   the copy that was read.
 

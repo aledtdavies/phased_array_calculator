@@ -2,9 +2,9 @@
 Beam dimensions measured on a time-flattened field map: the beam axis, its exit point, and the
 -6 / -12 dB widths across the axis at chosen depths.
 
-Ported from buildFE ``examples/fe-ref-field/make_field_figures.m`` (functions ``beamAxis``,
-``widestRun`` and ``band``; buildFE commit at the time of the port: see the step 6 entry in
-CHANGELOG.md), so that a calculator field map and a buildFE FE map are measured by the same rule.
+Ported from buildFE's beam-map measurement (functions ``beamAxis``, ``widestRun`` and ``band``,
+ported at buildFE commit 9febff0; the same code is now in buildFE ``examples/shared/beamMap.m``,
+commit 7656834), so that a calculator field map and an FE field map are measured by the same rule.
 The rule, as buildFE states it (APPROXIMATION):
 
 * the map is median-filtered (5 points along X, then along Z, NaN-aware) to remove specks;
