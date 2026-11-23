@@ -164,7 +164,7 @@ through the rows within 12 dB of the maximum. <span class="tag APPROXIMATION">AP
 </ul>
 
 <h3>3.2 Comparison with a full-wave FE solve</h3>
-<p>Reference: buildFE Task 125's Pogo FE solve (case <code>(case ID withheld)</code>): 2.25L64-A2 on SA2-N55S, all 64
+<p>Reference: a full-wave finite-element solve (Pogo) of the same beam: 2.25L64-A2 on SA2-N55S, all 64
 elements, a 45° shear steer, 3-cycle Hann burst at 2.25 MHz, 2D plane strain, wedge bonded to the steel, steel
 5900/3230 m/s, Rexolite 2337/1157 m/s. Both maps were measured by the same rule, and the tolerances were committed
 before the comparison was run.</p>
@@ -175,8 +175,6 @@ before the comparison was run.</p>
 <tr><td>−6 dB width at Z = 10/20/30/40 mm</td><td>37.89 / 37.67 / 37.45 / 37.02 mm</td><td>37.91 / 37.69 / 37.26 / 37.04 mm</td><td>within 0.6 %</td><td>± 10 %</td></tr>
 <tr><td>Level on the axis at those depths</td><td>−0.49 / −0.61 / −0.55 / −0.40 dB</td><td>−0.46 / −0.23 / −0.10 / −0.04 dB</td><td>within 0.44 dB</td><td>± 1.5 dB</td></tr>
 </table>
-<figure><img src="plans/images/step6_beam_vs_buildfe.png" alt="FE map above, calculator map below">
-<figcaption>FE (top) and calculator (bottom), dB re each map's maximum, −6 dB (solid) and −12 dB (dashed) contours, fitted axis dotted.</figcaption></figure>
 <p><b>What this case shows and what it does not.</b> A steered, unfocused 64-element beam tests the geometry, the delays,
 refraction, and the beam's direction, position and width closely. It tests the amplitude physics (directivity,
 transmission across angles, spreading) only weakly, because these vary slowly across a wide, collimated 45° beam.
@@ -223,15 +221,15 @@ really falls, and the effect of aperture size and steering on the main lobe.</li
 <li class="care">With care: side lobes and levels below −12 dB, anything near a critical angle, 3D and matrix
 patterns.</li>
 <li class="no">Not for: absolute sensitivity, echo amplitudes, attenuation, couplant effects, near-surface
-fields, or anything after a reflection. Use buildFE (full-wave FE) for those.</li>
+fields, or anything after a reflection. Use a full-wave model (FE) for those.</li>
 </ul>
 
 <h2>6. Next checks that would widen the validated range</h2>
 <ol>
 <li>A focused law (for example 55° shear focused at 25 mm) against an FE solve of the same wedge: focal position and size.</li>
 <li>A longitudinal law, including a ray set near the first critical angle.</li>
-<li>A 3D case against CIVA or a 3D buildFE solve (buildFE Task 189), for elevation focusing.</li>
-<li>The same 45° case with a couplant layer (buildFE Task 128, rung 3), to measure the effect of bonded contact.</li>
+<li>A 3D case against CIVA or a 3D FE solve, for elevation focusing.</li>
+<li>The same 45° case with a couplant layer, to measure the effect of bonded contact.</li>
 </ol>
 
 <h2>References</h2>
@@ -240,7 +238,7 @@ fields, or anything after a reflection. Use buildFE (full-wave FE) for those.</l
 <li>Drinkwater B W and Wilcox P D (2006), Ultrasonic arrays for non-destructive evaluation: a review, <i>NDT&amp;E Int.</i> 39, 525–541.</li>
 <li>Schmerr L W (2015), <i>Fundamentals of Ultrasonic Phased Arrays</i>, Springer, ch. 2 (ray spreading through an interface).</li>
 <li>arim, University of Bristol, MIT licence, <code>src/arim/model.py</code> at commit 0cee9de.</li>
-<li>buildFE Task 125 and <code>examples/fe-ref-field/make_field_figures.m</code> (FE reference and beam-measurement rule).</li>
+<li>buildFE <code>examples/shared/beamMap.m</code> (the beam-measurement rule, ported in <code>beam_metrics.py</code>).</li>
 </ul>
 </body>
 </html>

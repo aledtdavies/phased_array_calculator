@@ -95,8 +95,8 @@ Plan step 6 (approved by the owner on 2026-11-20).
   - Plane-wave displacement coefficients of a welded solid–solid interface (4 × 4 boundary conditions), tabulated against slowness.
   - Geometric spreading through the interface, 2D (line sources) and 3D (point sources).
   - Pulsed (Hann burst, broadband sum, envelope peak) or continuous wave; displacement summed as a vector.
-- **`beam_metrics.py`:** buildFE's beam-axis and width rule (`make_field_figures.m`), ported so both maps are measured alike. On the FE frames it reproduces buildFE's `beam_metrics.csv` (angle 45.27°, widths to 0.01 mm).
-- **Finish criterion met:** against buildFE Task 125's FE solve (2.25L64-A2 on SA2-N55S, 64 elements, 45° shear steer, 2D, bonded), with tolerances committed before the comparison ran (fb37a6a): axis angle −0.37° (≤ 1°), exit point +0.01 mm (≤ 2 mm), −6 dB widths within 0.6 % (≤ 10 %), axis levels within 0.44 dB (≤ 1.5 dB). `validation/beam_field/compare_buildfe.py`; image `docs/plans/images/step6_beam_vs_buildfe.png`.
+- **`beam_metrics.py`:** buildFE's beam-axis and width rule, ported so both maps are measured alike. On the FE frames it reproduces buildFE's own measurement (angle 45.27°, widths to 0.01 mm).
+- **Finish criterion met:** against a full-wave FE solve (2.25L64-A2 on SA2-N55S, 64 elements, 45° shear steer, 2D, bonded), with tolerances committed before the comparison ran (fb37a6a): axis angle −0.37° (≤ 1°), exit point +0.01 mm (≤ 2 mm), −6 dB widths within 0.6 % (≤ 10 %), axis levels within 0.44 dB (≤ 1.5 dB). `validation/beam_field/compare_buildfe.py`.
 - **Qt window:** a **Beam Field** tab (2D or 3D model, pulsed or CW, inputs filled from the catalogue, computed in a worker thread) and the sections in the 3D view.
 - **Not modelled (stated in the tab):** reflections, mode conversion, attenuation, fluid couplant. The 3D mode is not separately validated.
 - **Catalogue:** the wedge's material density is now read (`WedgeAsset.density`).

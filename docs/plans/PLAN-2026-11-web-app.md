@@ -20,7 +20,7 @@ the window is new, a plain HTML/JavaScript page with no framework and no build s
 
 - Python runs in a Web Worker, off the page's thread, so the page stays responsive.
 - **Nothing a user enters leaves their browser.** The web server only hands out files, so a
-  confidential setup (fe-ref, a client's probe) is never sent anywhere.
+  confidential setup (a client's component or probe) is never sent anywhere.
 - Pyodide 314.0.8 runs Python 3.14.2 with numpy 2.4.6 and scipy 1.18.0, the same Python version
   as the dev laptop. Pyodide 314 ships as ES modules, so the worker is a module worker.
 

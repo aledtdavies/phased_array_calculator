@@ -113,10 +113,8 @@ def build(out, offline=False):
         shutil.copy2(os.path.join(ROOT, "python", f), os.path.join(out, "py", f))
     shutil.copy2(os.path.join(ROOT, "THIRD_PARTY_NOTICES.md"), os.path.join(out, "THIRD_PARTY_NOTICES.md"))
     # the beam field's model note and the figure it shows, at the paths the note and the page use
-    os.makedirs(os.path.join(out, "docs", "plans", "images"))
+    os.makedirs(os.path.join(out, "docs"))
     shutil.copy2(os.path.join(ROOT, "docs", "beam_field_model.html"), os.path.join(out, "docs", "beam_field_model.html"))
-    shutil.copy2(os.path.join(ROOT, "docs", "plans", "images", "step6_beam_vs_buildfe.png"),
-                 os.path.join(out, "docs", "plans", "images", "step6_beam_vs_buildfe.png"))
     open(os.path.join(out, ".nojekyll"), "w").close()        # GitHub Pages: serve files as they are
     base = ""
     if offline:

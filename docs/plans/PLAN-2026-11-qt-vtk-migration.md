@@ -189,7 +189,7 @@ scaneval was checked for pyqtgraph parts (FBK-0019): its linked views are still 
 
 **Status: done 2026-11-20** (`beam_field.py`, `beam_metrics.py`, `qt_field.py`; `validation/beam_field/`). The finish criterion is met: every metric is within the tolerance below, which was committed (fb37a6a) before the comparison was run.
 
-| Metric | buildFE FE | Calculator | Difference | Tolerance |
+| Metric | FE | Calculator | Difference | Tolerance |
 |---|---|---|---|---|
 | Axis angle (deg) | 45.27 | 44.90 | −0.37 | ≤ 1.0 |
 | Exit X (mm, plate frame) | 44.59 | 44.59 | +0.01 | ≤ 2.0 |
@@ -198,14 +198,14 @@ scaneval was checked for pyqtgraph parts (FBK-0019): its linked views are still 
 
 What this case does and does not test: a steered, unfocused 64-element beam checks the geometry, delays, refraction and the beam's width and direction closely. It checks the amplitude physics (directivity, transmission across angles) only weakly, because those vary slowly across a 45° beam. Beyond −12 dB on the beam's far side the maps differ. The model shows a broad −15 to −25 dB skirt; the FE map blanks most of that region (its first-arrival gate removes up-going arrivals) and also holds head and surface waves the model does not. Not checked: focused laws, longitudinal mode, 3D mode.
 
-**Further checks (owner, 2026-11-21: "do all of the recommendations").** Two more references are staged as buildFE Task 204 (bundle `fe-ref_wedge_laws_20261121`, waiting for the cluster). Each is Task 125's case with another law:
+**Further checks (owner, 2026-11-21: "do all of the recommendations").** Two more FE references are staged, waiting for their solve. Each is the 45° case's setup with another law:
 
 - `focused_sv55`: shear, elements 1–32, focused at plate (67.816, −25.000) mm, which is the calculator's 55° constant-depth law at 25 mm.
 - `steer_l60`: longitudinal, all 64 elements, unfocused at 60°. Its wedge ray is at 20.1°, 3.2° below the first critical angle.
 
-Two further checks cannot be staged yet, because buildFE does not build them:
-- a couplant layer (`contact: "couplant"` is reserved; fluid–solid coupling is not produced);
-- 3D (wedges are refused in 3D until the Task 189 follow-on).
+Two further checks cannot be staged yet, because the FE builder does not build them:
+- a couplant layer (fluid–solid coupling is not produced yet);
+- 3D with a wedge.
 
 **Tolerances for these two cases, stated in advance (2026-11-21, before the cluster run).** The same measurement rule and FE gate as the 45° case are used (`validation/beam_field`, `--case`).
 
@@ -228,11 +228,11 @@ These tolerances are wider for the focused case, because its width and level cha
 
 **Finish:** compared with a reference (CIVA or a buildFE solve) on one case, with the tolerance stated in advance.
 
-**Survey (2026-11-20).** No suite component holds an analytic or semi-analytic beam model: buildFE makes full-wave FE field maps (Tasks 125, 128, 129), imageFE builds travel-time tables in MATLAB, and nde-knowledge has no beam model. The calculator therefore gets its own ray-based model (a delayed sum of element contributions with Miller-Pursey strip directivity, wedge-to-part transmission and beam spread), with arim (MIT) functions copied with attribution where they fit.
+**Survey (2026-11-20).** No suite component holds an analytic or semi-analytic beam model: buildFE makes full-wave FE field maps, imageFE builds travel-time tables in MATLAB, and nde-knowledge has no beam model. The calculator therefore gets its own ray-based model (a delayed sum of element contributions with Miller-Pursey strip directivity, wedge-to-part transmission and beam spread), with arim (MIT) functions copied with attribution where they fit.
 
-**Reference case, fixed before the model was run.** buildFE Task 125's defect-free wedge beam (case `(case ID withheld)`, returned 2026-10-07): 2.25L64-A2 on SA2-N55S, all 64 elements, `steer` law at 45 degrees shear, 3-cycle Hann toneburst at 2.25 MHz, 2D plane strain, wedge bonded to the steel (shared nodes), steel 5900/3230 m/s, Rexolite 2337 m/s. The FE map is the time-flattened peak envelope of the first arrival (buildFE `make_field_figures`, gate `first`). The calculator runs the same case in its 2D (line-element) mode with the same delays.
+**Reference case, fixed before the model was run.** A defect-free wedge beam solved by full-wave FE (returned 2026-10-07): 2.25L64-A2 on SA2-N55S, all 64 elements, `steer` law at 45 degrees shear, 3-cycle Hann toneburst at 2.25 MHz, 2D plane strain, wedge bonded to the steel (shared nodes), steel 5900/3230 m/s, Rexolite 2337 m/s. The FE map is the time-flattened peak envelope of the first arrival (buildFE's beam-map rule, gate `first`). The calculator runs the same case in its 2D (line-element) mode with the same delays.
 
-**Tolerance, stated in advance (2026-11-20, before any comparison was run).** Both maps are measured with one Python port of `make_field_figures`' beam metrics (axis through the midpoints of each row's -6 dB band, widths across the axis). The port is checked first: on the FE frames it must reproduce buildFE's `beam_metrics.csv` to within one grid cell (0.31 mm) and 0.1 degree. Then the calculator's map passes if:
+**Tolerance, stated in advance (2026-11-20, before any comparison was run).** Both maps are measured with one Python port of buildFE's beam metrics (axis through the midpoints of each row's -6 dB band, widths across the axis). The port is checked first: on the FE frames it must reproduce buildFE's own measurement to within one grid cell (0.31 mm) and 0.1 degree. Then the calculator's map passes if:
 
 | Metric | Tolerance |
 |---|---|

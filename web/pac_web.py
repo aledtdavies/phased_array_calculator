@@ -35,7 +35,7 @@ from session import (DUAL_PROBE_TYPES, MATRIX_PROBE_TYPES, TABLE_HEADINGS, Catal
 FLOOR_DB = field_job.FLOOR_DB
 MAX_POINTS = field_job.MAX_POINTS[2]
 MAX_RAYS = 48
-VALIDATION_NOTE = ("Validated in 2D against an FE solve (buildFE Task 125: a steered 45 degree shear beam); "
+VALIDATION_NOTE = ("Validated in 2D against a full-wave FE solve of a steered 45 degree shear beam; "
                    "see docs/beam_field_model.html for where the model can be trusted.")
 WELD_TYPES = {"None": None, "Single-V": "single-V", "Double-V": "double-V", "Single-J": "single-J",
               "DXF file": "dxf"}
