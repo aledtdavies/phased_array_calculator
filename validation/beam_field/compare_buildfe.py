@@ -48,7 +48,7 @@ N_EL, PITCH, WIDTH = 64, 0.75e-3, 0.55e-3
 FACE_DEG, X1, H1 = 36.0, 0.004, 0.005
 DEPTH = 0.05
 
-# Tolerances as fixed in the plan (sv45: 2026-11-20, fb37a6a; the further cases: 2026-11-21, 5ded4b8).
+# Tolerances as fixed in the plan (sv45: 2026-11-20, bb9a730; the further cases: 2026-11-21, 183ed1f).
 CASES = {
     "sv45": dict(mode="shear", law="steer", angle=45.0, elements=(1, 64), depths=(10.0, 20.0, 30.0, 40.0),
                  tol=dict(angle_deg=1.0, exit_mm=2.0, width_rel=0.10, level_db=1.5),

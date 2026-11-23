@@ -61,7 +61,7 @@
 
 ## The Tk window is retired — 2026-11-21
 
-- Removed: `python/app.py`, `panels.py`, `plotting.py`, `catalog_dialog.py` and `test_gui.py`, and `tests/refactor_check` (the step 1 reference-image check rendered with the Tk window; it is in the history up to fb82aa6). The Qt window (`python/qt_app.py`) is the calculator's window; the PyInstaller build already used it.
+- Removed: `python/app.py`, `panels.py`, `plotting.py`, `catalog_dialog.py` and `test_gui.py`, and `tests/refactor_check` (the step 1 reference-image check rendered with the Tk window; it is in the history up to 5b43988). The Qt window (`python/qt_app.py`) is the calculator's window; the PyInstaller build already used it.
 - Kept: `scene.py` (the matplotlib drawing used by `visualisation.py`, and colours used by the Qt views), `session.py`, `navigation.py` and the library.
 - Configuration files saved by the Tk window load unchanged: a Tk-saved default and dual-matrix setup are kept as `tests/fixtures/tk_saved_configs.json` and tested. The Tk-vs-Qt table test becomes "the Data Table is `session.calculate`'s rows".
 - The headless image no longer installs Tk.
@@ -76,7 +76,7 @@
 
 ## Step 7: headless Docker image — 2026-11-21
 
-Plan step 7 (approved by the owner on 2026-11-20); finish criteria committed first (4e4cbc2).
+Plan step 7 (approved by the owner on 2026-11-20); finish criteria committed first (cadc1e3).
 
 - **`docker/Dockerfile`:** Python 3.12 on Debian bookworm with Xvfb, Mesa software OpenGL, the xcb libraries Qt loads, Tk and fonts; the repository's requirements and pytest. Qt runs on its native `xcb` platform and VTK on GLX (Mesa llvmpipe), as on a desktop.
 - **`docker/entrypoint.sh`:** `test` (first checks that Qt and VTK open a window, so the GUI tests cannot skip silently; then the suite with every skip listed), `images`, `info`.
@@ -96,7 +96,7 @@ Plan step 6 (approved by the owner on 2026-11-20).
   - Geometric spreading through the interface, 2D (line sources) and 3D (point sources).
   - Pulsed (Hann burst, broadband sum, envelope peak) or continuous wave; displacement summed as a vector.
 - **`beam_metrics.py`:** buildFE's beam-axis and width rule, ported so both maps are measured alike. On the FE frames it reproduces buildFE's own measurement (angle 45.27°, widths to 0.01 mm).
-- **Finish criterion met:** against a full-wave FE solve (2.25L64-A2 on SA2-N55S, 64 elements, 45° shear steer, 2D, bonded), with tolerances committed before the comparison ran (fb37a6a): axis angle −0.37° (≤ 1°), exit point +0.01 mm (≤ 2 mm), −6 dB widths within 0.6 % (≤ 10 %), axis levels within 0.44 dB (≤ 1.5 dB). `validation/beam_field/compare_buildfe.py`.
+- **Finish criterion met:** against a full-wave FE solve (2.25L64-A2 on SA2-N55S, 64 elements, 45° shear steer, 2D, bonded), with tolerances committed before the comparison ran (bb9a730): axis angle −0.37° (≤ 1°), exit point +0.01 mm (≤ 2 mm), −6 dB widths within 0.6 % (≤ 10 %), axis levels within 0.44 dB (≤ 1.5 dB). `validation/beam_field/compare_buildfe.py`.
 - **Qt window:** a **Beam Field** tab (2D or 3D model, pulsed or CW, inputs filled from the catalogue, computed in a worker thread) and the sections in the 3D view.
 - **Not modelled (stated in the tab):** reflections, mode conversion, attenuation, fluid couplant. The 3D mode is not separately validated.
 - **Catalogue:** the wedge's material density is now read (`WedgeAsset.density`).

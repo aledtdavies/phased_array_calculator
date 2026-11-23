@@ -187,7 +187,7 @@ scaneval was checked for pyqtgraph parts (FBK-0019): its linked views are still 
 
 ### 6. Beam field view (optional; approval needed)
 
-**Status: done 2026-11-20** (`beam_field.py`, `beam_metrics.py`, `qt_field.py`; `validation/beam_field/`). The finish criterion is met: every metric is within the tolerance below, which was committed (fb37a6a) before the comparison was run.
+**Status: done 2026-11-20** (`beam_field.py`, `beam_metrics.py`, `qt_field.py`; `validation/beam_field/`). The finish criterion is met: every metric is within the tolerance below, which was committed (bb9a730) before the comparison was run.
 
 | Metric | FE | Calculator | Difference | Tolerance |
 |---|---|---|---|---|

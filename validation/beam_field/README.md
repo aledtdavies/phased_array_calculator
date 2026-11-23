@@ -3,7 +3,7 @@
 The finish check of plan step 6: the calculator's beam field (`python/beam_field.py`, 2D,
 pulsed) against a full-wave FE solve (Pogo) of the same beam, both measured by one rule
 (`python/beam_metrics.py`, ported from buildFE's beam-map measurement). The tolerances were
-fixed in `docs/plans/PLAN-2026-11-qt-vtk-migration.md` (commit fb37a6a) before the comparison
+fixed in `docs/plans/PLAN-2026-11-qt-vtk-migration.md` (commit bb9a730) before the comparison
 was first run.
 
 ## Reference
@@ -47,7 +47,7 @@ See the step 6 status in the plan for the table and what the case does and does 
 
 `--case focused_sv55` (elements 1-32, 55 degree shear focused at 25 mm depth) and `--case steer_l60`
 (64 elements, 60 degree longitudinal, 3.2 degrees below the first critical angle). Their tolerances
-were fixed in the plan (commit 5ded4b8) before the solve.
+were fixed in the plan (commit 183ed1f) before the solve.
 
 ```
 python validation/beam_field/compare_buildfe.py <focused_sv55 field_products.h5> --case focused_sv55
