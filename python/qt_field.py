@@ -10,7 +10,7 @@ The field is computed on request (it takes seconds) in a worker thread. A field 
 law it was computed for: when the law, the setup or the inputs change it is marked stale and
 taken out of the 3D view until it is computed again.
 
-Validated case: 2D mode, pulsed, against buildFE's FE solve (validation/beam_field). 3D mode
+Validated case: 2D mode, pulsed, against a full-wave FE solve (validation/beam_field). 3D mode
 uses the same ingredients with point sources over each element and is not separately validated.
 """
 from __future__ import annotations

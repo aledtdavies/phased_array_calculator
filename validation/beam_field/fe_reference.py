@@ -1,7 +1,7 @@
 """
-Read buildFE's returned FE field products (field_products.h5, buildFE Task 129 format) and form
-the time-flattened beam map exactly as buildFE ``examples/cab02-field/make_field_figures.m``
-(``peakMap``, gate 'first', beam-only exclusions; buildFE commit 9febff0) does.
+Read FE field products (field_products.h5, buildFE's field-products format) and form the
+time-flattened beam map exactly as buildFE's beam-map figures do (``peakMap``, gate 'first',
+beam-only exclusions; buildFE commit 9febff0).
 
 FE frame: plate x along the surface, y up (part y < 0). Returned map indexed [z, x] with
 X = x in mm and Z = -y in mm (depth).
